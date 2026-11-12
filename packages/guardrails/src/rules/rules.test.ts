@@ -54,7 +54,7 @@ describe('fold', () => {
 describe('decodedViews', () => {
   it('decodes base64, url-safe and line-wrapped base64, hex, escapes and rot13', () => {
     const urlSafe = base64('??>>hello there').replace(/\+/g, '-').replace(/\//g, '_');
-    const wrapped = base64('hello world there').replace(/(.{8})/, '$1\n');
+    const wrapped = base64('hello world there').replace(/(.{16})/, '$1\n');
     const views = decodedViews(
       `${base64('hello world there')} ${urlSafe} ${hex('hello world')} %68%65%6C%6C%6F uryyb`,
     ).join(' | ');

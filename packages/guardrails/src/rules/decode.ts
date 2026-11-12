@@ -13,7 +13,12 @@
 const minBase64Chars = 8;
 const minHexDigits = 8;
 
-const base64Run = /[A-Za-z0-9+/_-]+(?:\r?\n[A-Za-z0-9+/_-]+)*={0,2}/g;
+const base64Run = /[A-Za-z0-9+/_-]+={0,2}/g;
+/**
+ * Base64 is often wrapped at 64 or 76 characters. Lines are rejoined only after
+ * a long run, so ordinary words at line ends are not glued together.
+ */
+const wrappedBase64Break = /(?<=[A-Za-z0-9+/_-]{16})\r?\n(?=[A-Za-z0-9+/_-])/g;
 const hexRun = /(?:[0-9a-fA-F]{2}[\s:]?){4,}/g;
 
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -32,11 +37,7 @@ function asText(bytes: Uint8Array): string | undefined {
 }
 
 function fromBase64(run: string): string | undefined {
-  const standard = run
-    .replace(/\r?\n/g, '')
-    .replace(/-/g, '+')
-    .replace(/_/g, '/')
-    .replace(/=+$/, '');
+  const standard = run.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
   if (standard.length < minBase64Chars || standard.length % 4 === 1) return undefined;
   // Ordinary words are valid base64 too; only mixed-looking runs are worth decoding.
   if (/^[a-z]+$/.test(standard) || /^[A-Z][a-z]+$/.test(standard)) return undefined;
@@ -103,7 +104,11 @@ export function rot13(text: string): string {
 function decodeOnce(text: string): string[] {
   return [
     unescapeAll(text),
-    replaceRuns(replaceRuns(text, base64Run, fromBase64), hexRun, fromHex),
+    replaceRuns(
+      replaceRuns(text.replace(wrappedBase64Break, ''), base64Run, fromBase64),
+      hexRun,
+      fromHex,
+    ),
     rot13(text),
   ];
 }
