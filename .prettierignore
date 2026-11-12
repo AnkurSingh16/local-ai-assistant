@@ -3,3 +3,6 @@ dist/
 coverage/
 package-lock.json
 *.tsbuildinfo
+
+# Written by npm run eval:record; reformatting would churn the diff on every re-record.
+packages/eval/fixtures/

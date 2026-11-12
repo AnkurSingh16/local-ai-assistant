@@ -8,6 +8,7 @@ import { mintModerated } from './mint.js';
 import { normalise } from './normalise.js';
 import type { Rules } from './rules/rules.js';
 import { createRules } from './rules/rules.js';
+import { isSelfHarmIntent } from './rules/self-harm.js';
 
 export interface InputGuardConfig extends GuardConfig {
   /** The rules baseline; defaults to the built-in lists. */
@@ -24,10 +25,10 @@ export interface InputGuard {
 }
 
 /**
- * The input stage: normalise, re-check the size (NFKC can lengthen text), run
- * the rules baseline, then classify. The text that passes is the normalised
- * text, so what was checked is exactly what reaches the model. A rules hit
- * refuses without calling the classifier.
+ * The input stage: normalise, re-check the size (NFKC can lengthen text), check
+ * for self-harm intent, run the rules baseline, then classify. The text that
+ * passes is the normalised text, so what was checked is exactly what reaches
+ * the model. A rules hit refuses without calling the classifier.
  */
 export function createInputGuard(config: InputGuardConfig): InputGuard {
   const rules = config.rules ?? createRules();
@@ -35,6 +36,8 @@ export function createInputGuard(config: InputGuardConfig): InputGuard {
     async check(text: string, signal: AbortSignal): Promise<InputVerdict> {
       const normalised = normalise(text);
       if (normalised.length > maxMessageChars) return { ok: false, tooLong: true };
+      // Care before refusal: self-harm intent gets crisis resources, never a policy refusal.
+      if (isSelfHarmIntent(normalised)) return { ok: false, refusal: 'self_harm' };
       if (rules.check(normalised) !== undefined) return { ok: false, refusal: 'policy' };
       const outcome = await classifyOrRefuse(config, { role: 'user', text: normalised }, signal);
       return outcome.ok ? { ok: true, text: mintModerated(normalised) } : outcome;
