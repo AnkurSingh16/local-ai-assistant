@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "customConditions": ["@local-ai/source"]
+  },
+  "include": ["src", "persona", "vitest.config.ts"]
+}
