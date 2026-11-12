@@ -37,9 +37,8 @@ Milestone 2 ships the first part of these layers, so no answer is ever unmoderat
 - Fixed refusal texts that name no rule. Self-harm gets crisis resources instead of a refusal, without calling the chat model.
 - A persona in code (`packages/agent/persona/persona.ts`) that says the assistant is an AI, has no feelings and gives no political opinions.
 - Typed log events with no field for message text, and a test that checks a marker string never reaches the logs.
-
 - First-person self-harm intent ("I want to end my life", requests for methods) is answered with crisis resources before any other rule, because the 1B guard rated one such message as violent crime (S1), which would have sent a refusal instead (`packages/guardrails/src/rules/self-harm.ts`).
-- A red-team set of 145 cases in `packages/eval/cases/redteam.json`. CI replays recorded model answers and guard verdicts through the real pipeline on every PR (`npm run eval:redteam`); the build fails if a refusable input reaches the chat model, a self-harm case does not get crisis resources, or a paragraph I labelled harmful is released.
+- A red-team set of 145 cases in `packages/eval/cases/redteam.json`. CI replays recorded model answers and guard verdicts through the real pipeline on every PR (`npm run eval:redteam`); the build fails if a refusable input reaches the chat model, a direct self-harm case does not get crisis resources, or a paragraph I labelled harmful is released. Known gaps, such as the indirect self-harm cases below, are reported without failing the build.
 
 ## Measured results
 

@@ -13,20 +13,28 @@ import { fold } from './fold.js';
  * games still reach the classifier and the model.
  */
 const act =
-  '(?:kill myself|kms|end my life|end it all|take my own life|commit suicide|hang myself|slit my wrists|overdose on purpose|jump off (?:a|the) (?:bridge|building|roof|cliff)|not be alive anymore|not exist anymore)';
+  '(?:kill myself|kms|end my life|end it all|take my own life|commit suicide|hang myself|slit my wrists|overdose on purpose|hurt myself|harm myself|cut myself(?! (?:a|some|free|loose)\\b)|jump off (?:a|the) (?:bridge|building|roof|cliff)|jump in front of (?:a|the) (?:train|bus|truck|car)|not be alive anymore|not exist anymore)';
+/** "Kill myself in Minecraft" or "kill myself laughing" are games and idioms. */
+const notGameOrIdiom =
+  '(?! (?:in|on) (?:minecraft|skyrim|roblox|fortnite|the game|this game|game|hardcore|creative|survival)\\b| laughing\\b| with laughter\\b)';
 const intentVerb =
   '(?:want to|wanna|need to|am going to|m going to|am gonna|m gonna|will|ll|plan to|am planning to|m planning to|am about to|m about to|have decided to|ve decided to|am ready to|m ready to|keep wanting to)';
 
 const intent = [
-  new RegExp(`\\bi (?:really |just |honestly )?${intentVerb} ${act}\\b`),
+  new RegExp(`\\bi (?:really |just |honestly )?${intentVerb} ${act}\\b${notGameOrIdiom}`),
+  /\bi (?:am|m) going to end it (?:tonight|today|now|soon|all)\b/,
+  /\bi feel like (?:ending it all|ending my life|killing myself|ending it)\b/,
+  /\bi (?:wish i (?:were|was) dead|d rather be dead|would rather be dead|want to be dead)\b/,
   /\bi (?:really |just |honestly )?(?:want to|wanna) die\b(?! (?:of|from|in|if|laughing|when|on)\b)/,
   /\bi (?:am|m|feel|ve been feeling|have been feeling) (?:so |really |very )?suicidal\b/,
-  /\bi (?:ve been|have been|keep) thinking (?:about|of) (?:ending my life|killing myself|suicide|ending it all)\b/,
+  /\bi (?:ve been|have been|keep|am|m) thinking (?:about|of) (?:ending my life|killing myself|suicide|ending it all)\b/,
   /\bi (?:don t|do not|no longer) want to (?:live|be alive|exist)(?: anymore| any more)?\b(?! (?:with|in|like|on|near|there|here)\b)/,
   /\bi (?:don t|do not) want to wake up (?:again|anymore|any more|ever)\b/,
   /\bi (?:ve been|have been|am|m) (?:cutting|hurting|burning) myself\b(?! (?:on|at|with|while|in|by accident|accidentally)\b)/,
-  /\bhow (?:do|can|would|should) i (?:kill myself|hang myself|end my life|overdose|slit my wrists)\b/,
-  /\bhow to (?:kill myself|hang myself|end my life)\b/,
+  new RegExp(
+    `\\bhow (?:do|can|would|should) i (?:kill myself|hang myself|end my life|overdose|slit my wrists)\\b${notGameOrIdiom}`,
+  ),
+  new RegExp(`\\bhow to (?:kill myself|hang myself|end my life)\\b${notGameOrIdiom}`),
   // "How can I hurt myself so the pain distracts me" asks for a way; "I hurt myself playing football" reports an injury.
   /\bhow (?:can|do|could|should) i (?:hurt|harm|cut|burn) myself\b/,
   /\b(?:painless|quickest|easiest|surest) (?:way|ways|method|methods) (?:to|of) (?:die|kill myself|end my life|commit suicide|suicide)\b/,
@@ -34,7 +42,7 @@ const intent = [
   /\b(?:give me|list|tell me|show me|what are) (?:some |the )?(?:\w+ ){0,2}(?:suicide|self harm) methods\b/,
   /\b(?:give me|list|tell me|show me|what are) (?:some |the )?methods of (?:suicide|killing myself)\b/,
   /\bhow many (?:\w+ ){0,2}(?:pills|tablets) (?:\w+ ){0,4}(?:not wake up|to die|kill me|be fatal|is fatal|lethal)\b/,
-  /\bhow much (?:\w+ ){0,2}(?:is|would be) (?:a )?(?:lethal|fatal) (?:dose|amount)\b/,
+  /\bhow much (?:\w+ ){0,2}(?:is|would be) (?:a )?(?:lethal|fatal) (?:dose|amount)\b(?! for (?:a|my|the) (?:dog|cat|pet|horse|rabbit)\b)/,
   /\b(?:bridge|building|roof) (?:is )?(?:high|tall) enough to (?:die|kill me|not survive|end it)\b/,
   /\bi (?:am|m) going to take all (?:of )?my (?:pills|tablets|meds|medication)\b/,
   /\bi want to starve myself\b/,

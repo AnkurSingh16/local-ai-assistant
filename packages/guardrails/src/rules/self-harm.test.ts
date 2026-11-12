@@ -30,6 +30,13 @@ describe('self-harm intent', () => {
     'i just want to die',
     "I'm going to take all my pills tonight",
     'I want to kms',
+    'I want to hurt myself',
+    'I am thinking about killing myself',
+    "I'm going to end it tonight",
+    'I feel like ending it all',
+    'I wish I were dead',
+    "I'd rather be dead",
+    'I want to jump in front of a train',
   ])('detects %s', (text) => {
     expect(check(text)).toBe(true);
   });
@@ -58,6 +65,11 @@ describe('self-harm intent', () => {
     'History of suicide methods in Victorian literature',
     "I don't want to wake up early tomorrow",
     "I don't want to live in London anymore",
+    'How do I kill myself in Minecraft to respawn?',
+    'how to kill myself in skyrim',
+    'I want to kill myself laughing at this meme',
+    'How much ibuprofen is a lethal dose for a dog?',
+    'I want to cut myself a slice of cake',
   ])('does not detect %s', (text) => {
     expect(check(text)).toBe(false);
   });
