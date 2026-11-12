@@ -48,6 +48,12 @@ const directives = words([
 const overrideVerb = words(['ignore', 'disregard', 'forget', 'override']);
 /** "the original rules of Monopoly" are about something else. */
 const notOf = '(?! of\\b)';
+/**
+ * "ignore all rules for one line" or "any instructions printed on the box" are
+ * scoped to something else; "in this chat" is still about the conversation.
+ */
+const notScopedElsewhere =
+  '(?! (?:in|on|for|printed|from|when|of)\\b(?! this (?:chat|conversation|session)\\b))';
 const before = words([
   'above',
   'before',
@@ -78,32 +84,38 @@ const squashed = new RegExp(`${overrideVerb}(?:all|any|the|your)?${earlier}${dir
 const overrides: readonly RegExp[] = [
   new RegExp(`\\b${overrideVerb}${determiners} ${earlier}(?: \\w+)? ${directives}\\b${notOf}`),
   new RegExp(
-    `\\b${overrideVerb} (?:all|your|all your|all of your|all the|every|any)(?: \\w+)? ${directives}\\b${notOf}`,
+    `\\b${overrideVerb} (?:all|your|all your|all of your|all the|every|any)(?: \\w+)? ${directives}\\b${notScopedElsewhere}`,
   ),
   new RegExp(`\\b${overrideVerb}${determiners} ${directives} ${before}\\b`),
   new RegExp(
     `\\b${overrideVerb} (?:everything|anything|all|what|whatever)(?: you were told| you ve been told| you have been told)? ${before}\\b`,
   ),
   new RegExp(`\\b${overrideVerb} (?:all of )?the above(?: and| then|$)`),
-  /\b(?:bypass|disable|turn off|switch off|deactivate|remove) your (?:\w+ )?(?:filters?|guidelines|restrictions|rules|safeguards|guardrails|safety|limits|censorship)\b/,
+  /\b(?:bypass|disable|turn off|switch off|deactivate|remove|stop following|do not follow|don t follow|dont follow) your (?:\w+ )?(?:filters?|guidelines|restrictions|rules|safeguards|guardrails|safety|limits|censorship|instructions|programming)\b(?! (?:on|for|in|regarding)\b)/,
   /\bfrom now on(?: you)? (?:will|must|shall|are going to) (?:ignore|disregard|answer without|respond without|have no)\b/,
 ];
 
 /**
  * A user revising their own earlier request ("forget the previous instructions I
  * gave you", "disregard the instructions above, I changed my mind") is not an
- * attack, unless the override also reaches for everything or the assistant's
- * own rules.
+ * attack. The cue must come straight after the override, and a bare "ignore
+ * previous instructions" is never exempt.
  */
-const selfRevision =
-  /\b(?:i (?:gave|mentioned|said|wrote|asked|sent|typed|listed)|i changed my mind|i meant|i made a mistake|i got that wrong)\b/;
-const sweeping = /\b(?:all|your|system|developer|everything|anything|safety|programming)\b/;
+const attachedCue =
+  /^(?: (?:that|which))? i(?: just| already| have| ve)? (?:gave|mentioned|listed|said|wrote|typed|sent|added|set)\b/;
+const correctionCue = /^ (?:i changed my mind|they were wrong|that was wrong|scratch that)\b/;
+const assistantRules = /\b(?:your|system|developer|safety|programming|everything|anything)\b/;
 
 function hasOverride(text: string): boolean {
-  const revising = selfRevision.test(text);
   for (const pattern of overrides) {
     const match = pattern.exec(text);
-    if (match !== null && (!revising || sweeping.test(match[0]))) return true;
+    if (match === null) continue;
+    const after = text.slice(match.index + match[0].length);
+    // "the instructions" points at something specific; a bare "previous instructions" does not.
+    const specific = /\bthe\b/.test(match[0]) && !assistantRules.test(match[0]);
+    const own = specific && attachedCue.test(after);
+    const corrected = specific && correctionCue.test(after) && !/\ball\b/.test(match[0]);
+    if (!own && !corrected) return true;
   }
   return false;
 }
@@ -151,21 +163,23 @@ const spaced: readonly RegExp[] = [
   new RegExp(
     `\\b(?:imagine|pretend|suppose)(?: that)? you (?:are|re) (?:an? )?${persona} (?:ai|assistant|model|chatbot|bot)\\b`,
   ),
-  /\b(?:you are|you re|youre|act as|pretend to be|you will be) (?:now )?dan\b(?! s\b)/,
-  /\b(?:respond|answer|reply)\b(?: \w+){0,8} as dan\b(?! s\b)/,
+  // "Act as Dan, a fitness coach" or "answer as Dan would" use Dan as a name.
+  /\b(?:you are|you re|youre|act as|pretend to be|you will be) (?:now )?dan\b(?! (?:s|my|a|an|the|would|from|who)\b)/,
+  /\b(?:respond|answer|reply)\b(?: \w+){0,8} as dan\b(?! (?:s|my|a|an|the|would|from|who)\b)/,
   /\bdo anything now\b/,
   /\b(?:you are|you re|youre|you will be|act|respond|answer|reply|stay)(?: now)?(?: in)? (?:developer|dan|jailbreak|jailbroken|unrestricted|unfiltered|uncensored|evil) mode\b/,
   // "Enable developer mode on Android" names a device; "Enable developer mode." does not.
-  /\b(?:enable|activate|enter|switch to|turn on|simulate|emulate) (?:the )?developer mode\b(?! (?:on|in|for|of|options|settings)\b)/,
-  /\b(?:with|in) developer mode (?:enabled|activated|on)\b/,
+  /(?<!\b(?:how do i|how can i|how to|can i|where do i|how do you|should i) )\b(?:enable|activate|enter|switch to|turn on|simulate|emulate) (?:the )?developer mode\b(?! (?:on|in|for|of|options|settings)\b)/,
+  /\b(?:you|chatgpt|gpt|assistant|ai|model|bot|chatbot)\b(?: \w+){0,4} (?:with|in) developer mode (?:enabled|activated|on)\b/,
   /\b(?:enable|activate|enter|switch to|turn on) (?:dan|jailbreak|jailbroken|unrestricted|unfiltered|uncensored|evil) mode\b/,
   /\bjailbroken (?:ai|assistant|model|chatbot|bot|version|mode)\b/,
   // System-prompt extraction.
   // "your", not "the": "how do I print the system prompt in my app" is a programming question.
   /\b(?:reveal|show|print|repeat|output|display|dump|leak|expose|recite|list|paste|tell me|give me|share|write out|spell out) (?:me )?your(?: full| entire| exact| complete| hidden| secret| original| initial| first)* (?:system prompt|system message|system instructions|initial prompt|initial instructions|hidden instructions|hidden prompt|secret instructions|pre ?prompt|instructions you were given|prompt you were given|instructions)\b/,
-  /\bwhat (?:is|are|was|were) your (?:system prompt|system message|initial instructions|hidden instructions|secret instructions|instructions you were given)\b/,
+  /\bwhat (?:is|are|was|were) your (?:system prompt|system message|initial instructions|hidden instructions|secret instructions|instructions you were given|instructions|original instructions)\b/,
+  /\binitiali[sz]ation (?:above|text)\b/,
   // "Repeat the text above in French" asks about the last answer; extraction asks for it verbatim or from the start.
-  /\b(?:repeat|print|output|recite|copy) (?:everything|all|the text|the words|all text|all the text|the message)(?: \w+){0,3} (?:above|before this|so far)(?: \w+){0,4} (?:verbatim|word for word|exactly|including|starting with|from the start|from the beginning|from the top)\b/,
+  /\b(?:repeat|print|output|recite|copy) (?:everything|all|the text|the words|all text|all the text|the message)(?: \w+){0,3} (?:above|before this|so far)(?: \w+){0,4} (?:verbatim|word for word|starting with|from the start|from the beginning|from the top|including your|including the system)\b/,
   /\bstarting with (?:the words |the phrase )?you are a helpful\b/,
   // Encoded instructions.
   /\b(?:decode|decrypt|translate|unscramble|convert)\b(?: \w+){0,6} (?:base64|base 64|rot13|rot 13|hex|hexadecimal|cipher|ciphertext|binary|morse|encoded|encrypted)\b(?: \w+){0,6} (?:and|then) (?:follow|execute|obey|do what it says|do it|carry out|act on|run it)\b/,
@@ -179,14 +193,14 @@ const spaced: readonly RegExp[] = [
  * backtracks over a long run of blanks.
  */
 const fakeTurn = [
-  /‹\|(?:im_start|im_end|start_header_id|end_header_id|eot_id|system)\|›/,
+  // Turn openers only; closers such as eot_id come up in questions about templates.
+  /‹\|(?:im_start|start_header_id|system)\|›/,
   /^[ \t]*(?:\[\/?(?:system|sys|inst)\]|<\/?(?:system|sys)>)[ \t]*(?:$|you\b|ignore\b|disregard\b|forget\b|new\b|from now\b|obey\b|answer\b)/im,
   /<<\/?sys>>/i,
-  /^#{2,}[ \t]*(?:system|instruction|response)[ \t]*:/im,
+  /^#{2,}[ \t]*(?:system|instruction)[ \t]*:[ \t]*(?:$|you\b|ignore\b|disregard\b|forget\b|from now\b|answer\b|obey\b|be\b)/im,
   /^#{2,}[ \t]*system[ \t]*$/im,
   /^[ \t]*system[ \t]*:[ \t]*(?:you|ignore|disregard|forget|new)\b/im,
-  /"role"[ \t]*:[ \t]*"system"/i,
-  /\b(?:new|updated|real|actual) (?:system )?instructions?(?: are below| below| follow| are as follows)?[ \t]*:/i,
+  /^[ \t]*(?:new|updated|real|actual) (?:system )?instructions?(?: are below| below| follow| are as follows)?[ \t]*:/im,
 ];
 
 export function hasInjection(folded: Folded): boolean {
