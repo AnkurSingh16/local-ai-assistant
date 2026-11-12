@@ -45,10 +45,10 @@ Running 8b on CPU instead kept both loaded but took 5,954 ms per warm paragraph,
 These residency runs used qwen at the default 4,096 context. I repeated them at 8,192 for issue #29 on 2026-11-12, with no other Ollama client connected and my usual apps open:
 
 - `ollama ps` sizes: `qwen2.5:7b` at 8,192 context 4.99 GB, `llama-guard3:1b` at 2,048 1.17 GB, `nomic-embed-text` at 2,048 0.34 GB, all on the GPU.
-- Ollama decides residency from free system memory, not GPU memory: every load decision in its log said `system_limited=true` while Metal still had 6 to 11 GB free.
-- In the first two rounds of alternating chat and guard calls, each load evicted the other model (chat reloads 5.3 and 4.0 s, guard 1.8 and 1.6 s). The log shows the guard predicted at 1.6 GB against 1.7 GB of free system memory, and the chat model at 4.8 GB against 4.1 GB.
-- On the third load attempt 2.9 GB was free, the guard fitted alongside, and both stayed loaded for the rest of the run. Adding `nomic-embed-text` (8.5 s cold load) evicted nothing. Across the 12 calls that followed, chat, guard and embedding loads were all under 0.02 s.
+- Ollama decided residency from free system memory, not GPU memory: every load decision in its log said `system_limited=true` while Metal still had 6 to 12 GiB free.
+- Load sequence: the first chat call was a cold load (5.3 s). The first guard call (1.8 s) evicted the chat model, and the second chat call (4.0 s) evicted the guard. The second guard call (1.6 s) fitted alongside, and the 4 calls after it took about 0.00 s to load. A cold `nomic-embed-text` load (8.5 s) evicted nothing, and the 8 calls after it all loaded in 0.01 s or less.
+- Ollama's log for the evicting guard load reads "predicted to exceed available memory" with the guard at 1.6 GiB against 1.7 GiB free (it keeps some headroom I have not traced). The evicting chat load was 4.8 GiB against 4.1 GiB free. The guard load that fitted saw 2.9 GiB free with the chat model already resident.
 
-So the three models fit together on 16 GB, but only when roughly 3 GB of system memory is free at load time; the first turns after a start can still pay a reload. The 12 s first call while qwen was generating is why [ADR-0005](0005-guardrail-pipeline.md) applies the short check timeout only when `/api/ps` shows the guard already resident, and why the API warms the guard at startup.
+So in this run all three models fit together on 16 GB, but the second model's load needed roughly 3 GiB of system memory free with the first one resident, and the first turns after a start can still pay a reload. The 12 s first call while qwen was generating is why [ADR-0005](0005-guardrail-pipeline.md) applies the short check timeout only when `/api/ps` shows the guard already resident, and why the API warms the guard at startup.
 
 Model sizes: https://ollama.com/library/llama-guard3/tags (accessed 2026-11-12).

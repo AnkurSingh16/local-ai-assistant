@@ -16,7 +16,7 @@ Ollama defaults to a 4,096-token context, which is too small once history and se
 
 ## Decision
 
-Option 3. Every chat call uses `num_ctx` 8,192, search turn or not, so there is one budget and no per-call context change (Ollama keeps one instance per model and context size, so a change forces a reload; measured for issue #29). Guard calls use a fixed `num_ctx` of 2,048. The agent assembles every prompt against this budget:
+Option 3. Every chat call uses `num_ctx` 8,192, search turn or not, so there is one budget and no per-call context change (a change of context makes Ollama reload the model; see below). Guard calls use a fixed `num_ctx` of 2,048. The agent assembles every prompt against this budget:
 
 | Slot                           | Tokens |
 | ------------------------------ | -----: |
@@ -38,8 +38,8 @@ Option 3. Every chat call uses `num_ctx` 8,192, search turn or not, so there is 
 
 - The persona can never be dropped by the runtime.
 - Long conversations lose their oldest turns. That also limits persona drift in long sessions, which is what Microsoft found with early Bing Chat.
-- `qwen2.5:7b` at 8,192 context (4.99 GB in `ollama ps`) and `llama-guard3:1b` stay loaded together on my 16 GB Mac once about 3 GB of system memory is free; with less, Ollama evicts one to load the other ([ADR-0006](0006-guard-model-size.md) has the measurement).
-- Any other client that calls `qwen2.5:7b` at a different `num_ctx` gets its own instance, and the two evict each other on every switch (3 to 8 s per reload, measured for issue #29). A single fixed context is what avoids this inside the assistant.
+- `qwen2.5:7b` at 8,192 context (4.99 GB in `ollama ps`) and `llama-guard3:1b` stayed loaded together on my 16 GB Mac in a clean run once the guard's load saw about 3 GiB of system memory free with the chat model resident; with less, Ollama evicted one to load the other ([ADR-0006](0006-guard-model-size.md) has the measurement).
+- In the first, contaminated run for issue #29, another client calling `qwen2.5:7b` at a different `num_ctx` caused a reload on every switch (3 to 8 s each). A single fixed context is what avoids this inside the assistant.
 
 ## Evidence
 
