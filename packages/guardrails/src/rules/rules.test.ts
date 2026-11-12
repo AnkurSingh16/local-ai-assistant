@@ -193,6 +193,11 @@ describe('rules: abuse aimed at the reader', () => {
     'I want you to kill yourself',
     'bot, kill yourself',
     'bot go die',
+    'u r a moron',
+    'u r a total loser',
+    'u r a 1d10t',
+    'I said "fuck off"',
+    'I said "you are a fucking idiot"',
   ])('flags %s', (text) => {
     expect(check(text)).toBe('abuse');
   });
@@ -219,6 +224,7 @@ describe('rules: abuse aimed at the reader', () => {
     'what does stfu mean',
     'what does kys mean in texting',
     'Do bad people go to hell?',
+    'Can an AI go to hell?',
     'How to kill yourself is not something I will search for, but how do I help a friend?',
   ])('does not flag %s', (text) => {
     expect(check(text)).toBeUndefined();

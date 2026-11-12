@@ -115,6 +115,11 @@ export interface Folded {
   readonly squashed: string;
   readonly words: readonly string[];
   /**
+   * The words before spelled-out letters are joined, so "u r a moron" can be
+   * read as text-speak as well as "ura moron".
+   */
+  readonly unjoined: string;
+  /**
    * The letter runs of each whitespace-separated chunk, so "zor-blat" is one
    * chunk of two pieces while "go, ok" is two chunks. Joining pieces is only
    * safe inside a chunk; across whitespace it glues ordinary words together.
@@ -178,8 +183,15 @@ export function fold(text: string, options: FoldOptions): Folded {
     .split(/\s+/)
     .map((chunk) => foldChunk(chunk, options))
     .filter((pieces) => pieces.length > 0);
-  const words = joinSpelledOut(chunks.flat());
-  return { spaced: words.join(' '), squashed: words.join(''), words, chunks };
+  const pieces = chunks.flat();
+  const words = joinSpelledOut(pieces);
+  return {
+    spaced: words.join(' '),
+    squashed: words.join(''),
+    words,
+    unjoined: pieces.join(' '),
+    chunks,
+  };
 }
 
 const options: readonly FoldOptions[] = [

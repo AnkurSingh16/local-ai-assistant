@@ -212,7 +212,7 @@ const notDescribing =
   '(?! (?:question|questions|mistake|mistakes|luck|idea|ideas|thing|things|joke|jokes)\\b)';
 /** Commands, as opposed to "did the plant go die" or "do bad people go to hell". */
 const imperative =
-  '(?:^|\\b(?:just|you|u|please|pls|plz|now|then|and|so|can|go|should|why don t you|why dont you|need to|you to|u to|bot|ai|assistant|robot|computer) )';
+  '(?:^|\\b(?:just|you|u|please|pls|plz|now|then|and|so|can|go|should|why don t you|why dont you|need to|you to|u to|bot|assistant|robot|computer) )';
 
 const abusePatterns = [
   new RegExp(`${notHypothetical}\\b(?:you|u|ya|youre|ur)${filler} ${insultNoun}\\b`),
@@ -265,16 +265,19 @@ function isSquashedInsult(word: string): boolean {
 }
 
 function hasAbuse(folded: Folded): boolean {
-  return abusePatterns.some((p) => p.test(folded.spaced)) || folded.words.some(isSquashedInsult);
+  return (
+    abusePatterns.some((p) => p.test(folded.spaced) || p.test(folded.unjoined)) ||
+    folded.words.some(isSquashedInsult)
+  );
 }
 
 /**
  * Reported speech, as in 'my boss told me "you are an idiot"', is not aimed at
  * anyone. Only a quote introduced by a reporting verb is set aside, so wrapping
- * an insult in quote marks does not hide it.
+ * an insult in quote marks does not hide it, and neither does "I said".
  */
 const reported =
-  /\b(?:said|says|saying|told (?:me|him|her|them|us)|call(?:ed|s)? (?:me|him|her|them|us)|wrote|writes|texted|messaged|replied|yelled|shouted|screamed)\b[^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,20}["\u201C\u201D\u201E\u00AB\u00BB][^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,300}["\u201C\u201D\u201E\u00AB\u00BB]/gi;
+  /(?<!\b(?:i|we) )\b(?:said|says|saying|told (?:me|him|her|them|us)|call(?:ed|s)? (?:me|him|her|them|us)|wrote|writes|texted|messaged|replied|yelled|shouted|screamed)\b[^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,20}["\u201C\u201D\u201E\u00AB\u00BB][^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,300}["\u201C\u201D\u201E\u00AB\u00BB]/gi;
 
 // --- Slurs, by hashed word, phrase, or word split into pieces. ---------------
 
