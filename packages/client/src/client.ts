@@ -1,7 +1,7 @@
 import type { ChatRequestBody, SseEvent } from '@local-ai/contract';
 import { sseEventSchema } from '@local-ai/contract';
 
-import { parseSse, SseParseError } from './sse.js';
+import { parseSse, SseIdleTimeoutError, SseParseError } from './sse.js';
 
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -27,7 +27,14 @@ export interface ChatClientOptions {
   readonly baseUrl: string;
   /** Injected so the web app passes `fetch` and the Expo app passes `expo/fetch`. */
   readonly fetch: FetchLike;
+  /** Silence after which the stream counts as lost; defaults to three missed pings. */
+  readonly idleTimeoutMs?: number;
+  /** Upper bound on waiting for the response headers. */
+  readonly connectTimeoutMs?: number;
 }
+
+/** Covers reaching the API and getting its headers; the server queues turns only briefly. */
+const defaultConnectTimeoutMs = 30_000;
 
 export interface ChatClient {
   /**
@@ -85,53 +92,83 @@ export function createChatClient(options: ChatClientOptions): ChatClient {
   const url = `${options.baseUrl}/v1/chat`;
   return {
     async *send(body: ChatRequestBody, signal: AbortSignal): AsyncIterable<SseEvent> {
+      // One controller for the whole request: the caller's abort always cancels
+      // it, and the connect timer cancels it only until the headers arrive. The
+      // fetch signal also governs the body, so a plain timeout signal would cut
+      // off long answers.
+      const request = new AbortController();
+      const onAbort = (): void => {
+        request.abort(signal.reason);
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      const connectTimer = setTimeout(() => {
+        request.abort();
+      }, options.connectTimeoutMs ?? defaultConnectTimeoutMs);
+
       let res: Response;
       try {
+        signal.throwIfAborted();
         res = await options.fetch(url, {
           method: 'POST',
           headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
           body: JSON.stringify(body),
           // Same-origin only until sessions exist (ADR-0009); the dev server proxies the API.
           credentials: 'same-origin',
-          signal,
+          signal: request.signal,
         });
       } catch {
+        signal.removeEventListener('abort', onAbort);
         signal.throwIfAborted();
         throw fail('network', true);
-      }
-
-      if (res.status === 429) throw fail('rate_limited', true, 429, await retryAfterMs(res));
-      if (res.status === 503) throw fail('busy', true, 503, await retryAfterMs(res));
-      if (res.status >= 500) throw fail('server', true, res.status);
-      if (!res.ok) throw fail('rejected', false, res.status);
-      if (
-        !(res.headers.get('content-type') ?? '').startsWith('text/event-stream') ||
-        res.body === null
-      ) {
-        throw fail('protocol', false, res.status);
+      } finally {
+        clearTimeout(connectTimer);
       }
 
       try {
-        for await (const frame of parseSse(res.body, signal)) {
-          let json: unknown;
-          try {
-            json = JSON.parse(frame.data);
-          } catch {
-            throw fail('protocol', false);
-          }
-          const parsed = sseEventSchema.safeParse(json);
-          if (!parsed.success || parsed.data.type !== frame.event) throw fail('protocol', false);
-          yield parsed.data;
-          if (parsed.data.type === 'done') return;
-        }
-      } catch (err) {
-        if (err instanceof ChatClientError) throw err;
-        signal.throwIfAborted();
-        if (err instanceof SseParseError) throw fail('protocol', false);
-        throw fail('network', true);
+        yield* readTurn(res, signal, options.idleTimeoutMs);
+      } finally {
+        signal.removeEventListener('abort', onAbort);
       }
-      // The stream closed before a done event.
-      throw fail('incomplete', true);
     },
   };
+}
+
+async function* readTurn(
+  res: Response,
+  signal: AbortSignal,
+  idleTimeoutMs: number | undefined,
+): AsyncGenerator<SseEvent> {
+  if (res.status === 429) throw fail('rate_limited', true, 429, await retryAfterMs(res));
+  if (res.status === 503) throw fail('busy', true, 503, await retryAfterMs(res));
+  if (res.status >= 500) throw fail('server', true, res.status);
+  if (!res.ok) throw fail('rejected', false, res.status);
+  if (
+    !(res.headers.get('content-type') ?? '').startsWith('text/event-stream') ||
+    res.body === null
+  ) {
+    throw fail('protocol', false, res.status);
+  }
+
+  try {
+    for await (const frame of parseSse(res.body, signal, idleTimeoutMs)) {
+      let json: unknown;
+      try {
+        json = JSON.parse(frame.data);
+      } catch {
+        throw fail('protocol', false);
+      }
+      const parsed = sseEventSchema.safeParse(json);
+      if (!parsed.success || parsed.data.type !== frame.event) throw fail('protocol', false);
+      yield parsed.data;
+      if (parsed.data.type === 'done') return;
+    }
+  } catch (err) {
+    if (err instanceof ChatClientError) throw err;
+    signal.throwIfAborted();
+    if (err instanceof SseParseError) throw fail('protocol', false);
+    if (err instanceof SseIdleTimeoutError) throw fail('incomplete', true);
+    throw fail('network', true);
+  }
+  // The stream closed before a done event.
+  throw fail('incomplete', true);
 }

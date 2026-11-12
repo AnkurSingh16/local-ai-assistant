@@ -98,6 +98,12 @@ describe('parseSse', () => {
     expect(parsed).toEqual([{ event: 'message', id: undefined, data: 'a' }]);
   });
 
+  it('accepts a lone CR as the final line end at the end of the stream', async () => {
+    expect(await frames(streamOf([encoder.encode('data: x\r\r')]))).toEqual([
+      { event: 'message', id: undefined, data: 'x' },
+    ]);
+  });
+
   it('drops a final frame without its blank line, and frames without data', async () => {
     expect(await frames(streamOf([encoder.encode('event: x\n\ndata: cut')]))).toEqual([]);
   });
@@ -135,6 +141,91 @@ async function frames2(body: ReadableStream<Uint8Array>, s: AbortSignal): Promis
   for await (const f of parseSse(body, s)) out.push(f);
   return out;
 }
+
+describe('stream timeouts', () => {
+  it('fails a silent stream after the idle timeout, retryably', async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(encoder.encode(wire((fixtureTurns.answered ?? []).slice(0, 2))));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const client = createChatClient({
+      baseUrl: '',
+      fetch: () => Promise.resolve(sseResponse(body)),
+      idleTimeoutMs: 30,
+    });
+    const seen: SseEvent[] = [];
+    const err: unknown = await (async () => {
+      for await (const e of client.send({ message: 'x' }, signal)) seen.push(e);
+    })().catch((e: unknown) => e);
+    expect(seen).toHaveLength(2);
+    expect(err).toMatchObject({ code: 'incomplete', retryable: true });
+    expect(cancelled).toBe(true);
+  });
+
+  it('keeps a slow stream alive while pings or events keep arriving', async () => {
+    const turn = fixtureTurns.refused ?? [];
+    const body = new ReadableStream<Uint8Array>({
+      async start(c) {
+        for (const [i, e] of turn.entries()) {
+          await new Promise((r) => setTimeout(r, 15));
+          c.enqueue(encoder.encode(ssePing + encodeSseEvent(e, sseEventId(fixtureMessageId, i))));
+        }
+        c.close();
+      },
+    });
+    const client = createChatClient({
+      baseUrl: '',
+      fetch: () => Promise.resolve(sseResponse(body)),
+      idleTimeoutMs: 40,
+    });
+    expect(await collect(client.send({ message: 'x' }, signal))).toEqual(turn);
+  });
+
+  it('times out waiting for headers but not a long body', async () => {
+    const hanging = createChatClient({
+      baseUrl: '',
+      connectTimeoutMs: 20,
+      fetch: (_u, init) =>
+        new Promise((_r, reject) => {
+          init.signal?.addEventListener('abort', () => {
+            reject(new TypeError('aborted'));
+          });
+        }),
+    });
+    const err: unknown = await collect(hanging.send({ message: 'x' }, signal)).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toMatchObject({ code: 'network', retryable: true });
+
+    let requestSignal: AbortSignal | undefined;
+    const slowBody = createChatClient({
+      baseUrl: '',
+      connectTimeoutMs: 20,
+      fetch: (_u, init) => {
+        requestSignal = init.signal ?? undefined;
+        const turn = fixtureTurns.refused ?? [];
+        return Promise.resolve(
+          sseResponse(
+            new ReadableStream<Uint8Array>({
+              async start(c) {
+                await new Promise((r) => setTimeout(r, 60));
+                c.enqueue(encoder.encode(wire(turn)));
+                c.close();
+              },
+            }),
+          ),
+        );
+      },
+    });
+    expect(await collect(slowBody.send({ message: 'x' }, signal))).toHaveLength(4);
+    expect(requestSignal?.aborted).toBe(false);
+  });
+});
 
 describe('chat client', () => {
   it('posts JSON with credentials to /v1/chat', async () => {

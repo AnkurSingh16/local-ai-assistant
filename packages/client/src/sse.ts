@@ -6,12 +6,27 @@ export interface SseFrame {
 }
 
 /** Bounds what a broken or hostile server can make the client buffer. */
+/** Measured in UTF-16 characters, as decoded. */
 export const maxFrameChars = 1_000_000;
 
 export class SseParseError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'SseParseError';
+  }
+}
+
+/**
+ * How long the stream may stay silent. The server sends a `: ping` every 15 s
+ * (ADR-0007), so three missed pings mean the connection is gone, which a
+ * half-open socket on a dropped Wi-Fi link would otherwise hide forever.
+ */
+export const defaultIdleTimeoutMs = 45_000;
+
+export class SseIdleTimeoutError extends Error {
+  constructor() {
+    super('stream idle too long');
+    this.name = 'SseIdleTimeoutError';
   }
 }
 
@@ -25,8 +40,18 @@ export class SseParseError extends Error {
 export async function* parseSse(
   body: ReadableStream<Uint8Array>,
   signal: AbortSignal,
+  idleTimeoutMs: number = defaultIdleTimeoutMs,
 ): AsyncGenerator<SseFrame> {
   const reader = body.getReader();
+  let idle = false;
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  const armIdleTimer = (): void => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      idle = true;
+      void reader.cancel().catch(() => undefined);
+    }, idleTimeoutMs);
+  };
   const decoder = new TextDecoder();
   const onAbort = (): void => {
     void reader.cancel().catch(() => undefined);
@@ -66,8 +91,10 @@ export async function* parseSse(
   try {
     for (;;) {
       signal.throwIfAborted();
+      armIdleTimer();
       const { done, value } = await reader.read();
       signal.throwIfAborted();
+      if (idle) throw new SseIdleTimeoutError();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       for (;;) {
@@ -84,8 +111,15 @@ export async function* parseSse(
     }
     finished = true;
     buffer += decoder.decode();
-    // A trailing frame without its blank line is incomplete and is dropped, as the spec says.
+    // At the end a lone CR is a complete line end too. Lines still without one,
+    // and a frame without its blank line, are incomplete and dropped (WHATWG).
+    for (let m = /\r\n|\r|\n/.exec(buffer); m !== null; m = /\r\n|\r|\n/.exec(buffer)) {
+      const frame = take(buffer.slice(0, m.index));
+      buffer = buffer.slice(m.index + m[0].length);
+      if (frame !== undefined) yield frame;
+    }
   } finally {
+    clearTimeout(idleTimer);
     signal.removeEventListener('abort', onAbort);
     if (!finished) await reader.cancel().catch(() => undefined);
     reader.releaseLock();
