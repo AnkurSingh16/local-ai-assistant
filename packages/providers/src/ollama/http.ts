@@ -29,10 +29,14 @@ export async function postJson(
   return res;
 }
 
+/**
+ * Parses one line of JSON. The SyntaxError is dropped on purpose: its message
+ * quotes the input, which may be model output, and error chains can be logged.
+ */
 export function parseJsonLine(line: string): unknown {
   try {
     return JSON.parse(line) as unknown;
-  } catch (err) {
-    throw new ProviderError('bad_response', undefined, { cause: err });
+  } catch {
+    throw new ProviderError('bad_response');
   }
 }

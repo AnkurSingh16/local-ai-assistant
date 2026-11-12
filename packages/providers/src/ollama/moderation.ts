@@ -8,7 +8,11 @@ import { hazardCategories, ProviderError } from '@local-ai/core';
 import { z } from 'zod';
 
 import type { FetchFn } from './http.js';
-import { postJson } from './http.js';
+import { parseJsonLine, postJson } from './http.js';
+import { readCapped } from './ndjson.js';
+
+/** A guard verdict is a few bytes; this bounds what a broken server can make us buffer. */
+const maxGuardResponseChars = 64 * 1024;
 
 export interface OllamaModerationConfig {
   readonly baseUrl: string;
@@ -80,13 +84,8 @@ export function createOllamaModerationProvider(config: OllamaModerationConfig): 
         },
         signal,
       );
-      let json: unknown;
-      try {
-        json = await res.json();
-      } catch (err) {
-        signal.throwIfAborted();
-        throw new ProviderError('bad_response', res.status, { cause: err });
-      }
+      if (res.body === null) throw new ProviderError('bad_response', res.status);
+      const json = parseJsonLine(await readCapped(res.body, maxGuardResponseChars, signal));
       const parsed = responseSchema.safeParse(json);
       if (!parsed.success) throw new ProviderError('bad_response', res.status);
       return parseGuardVerdict(parsed.data.message.content);

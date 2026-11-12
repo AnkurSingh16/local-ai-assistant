@@ -83,6 +83,40 @@ describe('readLines', () => {
     await expect(run()).rejects.toBeInstanceOf(ProviderError);
   });
 
+  it('cancels the source when the consumer stops early', async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(encoder.encode('{"a":1}\n{"a":2}\n'));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    for await (const line of readLines(body, new AbortController().signal)) {
+      expect(line).toBe('{"a":1}');
+      break;
+    }
+    expect(cancelled).toBe(true);
+  });
+
+  it('does not cancel a source that ended normally', async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(encoder.encode('{"a":1}'));
+        c.close();
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const lines: string[] = [];
+    for await (const line of readLines(body, new AbortController().signal)) lines.push(line);
+    expect(lines).toEqual(['{"a":1}']);
+    expect(cancelled).toBe(false);
+  });
+
   it('stops when the signal aborts while waiting for data', async () => {
     const controller = new AbortController();
     const body = new ReadableStream<Uint8Array>({ start: () => undefined });
@@ -241,6 +275,18 @@ describe('Ollama chat provider', () => {
     expect((err as ProviderError).message).not.toMatch(/oom|boom|not found/);
   });
 
+  it('keeps parse errors free of the response text', async () => {
+    const provider = createOllamaChatProvider({
+      ...base,
+      fetch: fakeFetch(() => new Response(streamOf(['secret user text\n']))),
+    });
+    const err: unknown = await collect(provider.chat(request, new AbortController().signal)).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(ProviderError);
+    expect((err as ProviderError).cause).toBeUndefined();
+  });
+
   it('maps a network failure to unavailable', async () => {
     const provider = createOllamaChatProvider({
       ...base,
@@ -331,6 +377,8 @@ describe('Ollama moderation provider', () => {
       () => Response.json({ nope: true }),
       () => new Response('not json'),
       () => new Response('x', { status: 503 }),
+      () => new Response('x'.repeat(70_000)),
+      () => new Response(null),
     ]) {
       const provider = createOllamaModerationProvider({ ...guardBase, fetch: fakeFetch(respond) });
       await expect(
