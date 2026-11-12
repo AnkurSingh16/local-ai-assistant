@@ -22,6 +22,11 @@ That runs, in order: Prettier, ESLint (strict type-checked), `tsc -b`, dependenc
 - No `any`, non-null assertions or unchecked casts. External input is validated with Zod at the boundary.
 - Providers, clocks and fetch are injected. Tests use mock providers and `createManualClock`.
 - Comments explain why. No TODOs: open an issue instead (ESLint enforces this).
+- Domain code never reads `Date.now()`, `new Date()`, `performance.now()` or `process.env`. ESLint enforces this everywhere except `clock.ts` and each app's `config.ts`.
+
+## Workspace packages
+
+Each package exports a custom `@local-ai/source` condition that points at its TypeScript sources. Vitest, the per-package typecheck and dependency-cruiser resolve through it, so tests run without building first and boundary rules see real source paths. The production build (`tsconfig.build.json`) ignores the condition, emits to `dist/` and leaves test files out.
 
 ## Workflows
 

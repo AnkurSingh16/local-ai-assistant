@@ -1,2 +1,1 @@
-files=$(git diff --cached --name-only --diff-filter=ACMR)
-[ -z "$files" ] || npx --no -- prettier --check --ignore-unknown $files
+git diff --cached --name-only --diff-filter=ACMR -z | xargs -0 -r npx --no -- prettier --check --ignore-unknown

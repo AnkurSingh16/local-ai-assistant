@@ -14,11 +14,8 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: [
-            '*.config.ts',
-            'packages/*/vitest.config.ts',
-            'apps/*/vitest.config.ts',
-          ],
+          // Package configs are covered by each package's tsconfig.json; only root configs need this.
+          allowDefaultProject: ['*.config.ts'],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -33,6 +30,32 @@ export default tseslint.config(
         { terms: ['todo', 'fixme', 'xxx', 'hack'], location: 'anywhere' },
       ],
       'no-console': 'error',
+    },
+  },
+  {
+    // Time and environment are injected, so domain code stays deterministic under test.
+    files: ['packages/*/src/**/*.{ts,tsx}', 'apps/*/src/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}', 'packages/core/src/clock.ts', 'apps/*/src/config.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='Date'][property.name='now']",
+          message: 'Use an injected Clock instead of Date.now().',
+        },
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message: 'Use an injected Clock instead of new Date().',
+        },
+        {
+          selector: "MemberExpression[object.name='performance'][property.name='now']",
+          message: 'Use Clock.monotonicMs() instead of performance.now().',
+        },
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message: 'Read configuration in the app config module and inject it.',
+        },
+      ],
     },
   },
   {

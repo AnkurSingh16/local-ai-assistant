@@ -10,7 +10,7 @@ Change any of these only with a new ADR backed by evidence.
 
 - Node.js 24, TypeScript strict, npm workspaces. Fastify API, React 19 + Vite web, React Native + Expo mobile.
 - Vitest, React Testing Library, React Native Testing Library, Playwright. Zod for validation, pino for logs. No other application languages.
-- Ollama models: chat `qwen2.5:7b` (this Mac has 16 GB), safety `llama-guard3`, embeddings `nomic-embed-text`. All behind provider interfaces.
+- Ollama models: chat `qwen2.5:7b` (chosen for this 16 GB Mac; `llama3.1:8b` is the allowed alternative, `llama3.2:3b` below 16 GB), safety `llama-guard3`, embeddings `nomic-embed-text`. All behind provider interfaces.
 - Fresh information from self-hosted SearXNG. Pages fetched with `@mozilla/readability` + `jsdom` under size limits, timeouts, https only and SSRF protection that re-checks every redirect.
 - Mock providers are the default in tests and CI. CI never calls Ollama, SearXNG or the internet, and no workflow needs a paid key.
 
@@ -32,7 +32,7 @@ npm run build          # build all workspaces
 ## Code rules
 
 - No `any`, no non-null assertions, no unchecked casts. Validate every external input with Zod at the boundary.
-- Inject providers, clocks (`Clock` from `@local-ai/core`), fetch and randomness. Domain code never reads `Date.now()`, `process.env` or a vendor SDK.
+- Inject providers, clocks (`Clock` from `@local-ai/core`), fetch and randomness. Domain code never reads `Date.now()`, `new Date()`, `performance.now()`, `process.env` or a vendor SDK; ESLint enforces this outside `clock.ts` and app config modules.
 - Every long-running call takes an `AbortSignal` and has a timeout.
 - Logs never contain message text, page content or personal data by default.
 - Comments explain why. No TODOs, no emoji, no commented-out code.

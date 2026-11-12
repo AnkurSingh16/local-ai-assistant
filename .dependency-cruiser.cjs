@@ -41,6 +41,13 @@ module.exports = {
       to: { path: 'node_modules/(ollama|openai|@anthropic-ai|@google)' },
     },
     {
+      name: 'not-to-unresolvable',
+      comment: 'An import that cannot be resolved also cannot be checked against the rules above.',
+      severity: 'error',
+      from: {},
+      to: { couldNotResolve: true },
+    },
+    {
       name: 'not-to-test-from-src',
       severity: 'error',
       from: { path: '/src/', pathNot: '\\.test\\.tsx?$' },
@@ -61,9 +68,11 @@ module.exports = {
     exclude: { path: '(^|/)(dist|coverage)/' },
     tsPreCompilationDeps: true,
     tsConfig: { fileName: 'tsconfig.base.json' },
+    // Workspace packages resolve to their sources through the custom export
+    // condition, so a cross-package import is checked against its real path.
     enhancedResolveOptions: {
       exportsFields: ['exports'],
-      conditionNames: ['import', 'require', 'node', 'default'],
+      conditionNames: ['@local-ai/source', 'import', 'require', 'node', 'default'],
     },
   },
 };

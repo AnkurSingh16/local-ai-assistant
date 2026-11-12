@@ -1,6 +1,8 @@
 import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // Tests run against workspace sources, so no package has to be built first.
+  resolve: { conditions: ['@local-ai/source'] },
   test: {
     projects: ['packages/*/vitest.config.ts', 'apps/*/vitest.config.ts'],
     exclude: [...configDefaults.exclude, '**/dist/**'],

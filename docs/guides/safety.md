@@ -1,6 +1,6 @@
 # Safety guide
 
-Safety is the top priority in this project. I designed the guardrails around what went wrong with Microsoft's Tay (learning directly from abusive users), early Bing Chat (persona drift and hostility under pressure) and Grok (offensive output reaching users). No single layer is trusted on its own.
+Safety is the top priority in this project. I am designing the guardrails around what went wrong with Microsoft's Tay (learning directly from abusive users), early Bing Chat (persona drift and hostility under pressure) and Grok (offensive output reaching users). No single layer is trusted on its own.
 
 ## Layers
 

@@ -1,5 +1,7 @@
 export default {
   extends: ['@commitlint/config-conventional'],
+  // Dependabot writes long release-note bodies that would break line-length rules.
+  ignores: [(message) => message.includes('Signed-off-by: dependabot[bot]')],
   rules: {
     'scope-enum': [
       2,
