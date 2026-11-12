@@ -56,6 +56,14 @@ module.exports = {
       to: { path: '^packages/providers/' },
     },
     {
+      name: 'tests-use-mock-providers',
+      comment:
+        'Tests outside the providers package may use the mocks only, so no test can reach Ollama or SearXNG.',
+      severity: 'error',
+      from: { path: '\\.test\\.tsx?$', pathNot: '^packages/providers/' },
+      to: { path: '^packages/providers/', pathNot: '^packages/providers/src/mock/' },
+    },
+    {
       name: 'storage-not-from-routes',
       comment:
         'Routes reach storage only through the assistant, which accepts only moderated text.',

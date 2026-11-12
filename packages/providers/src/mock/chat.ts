@@ -45,7 +45,6 @@ export function createMockChatProvider(options: MockChatOptions = {}): MockChatP
       calls.push(req);
       for (const chunk of reply(req)) {
         await sleep(delayMs, signal);
-        signal.throwIfAborted();
         yield chunk;
       }
     },

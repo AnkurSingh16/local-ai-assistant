@@ -33,8 +33,10 @@ Each package exports a custom `@local-ai/source` condition that points at its Ty
 dependency-cruiser and ESLint enforce the guard boundary from ADR-0002:
 
 - `providers-only-from-compose`: only `apps/api/src/compose.ts`, the eval runner and test files import `@local-ai/providers`.
-- `storage-not-from-routes` and `tools-not-to-storage`: routes and tools never reach the stores directly.
-- ESLint rejects `as ModeratedText`, `as UntrustedWebText`, the angle-bracket form and generic calls such as `brand<ModeratedText>(x)` everywhere except the two mint files.
+- `tests-use-mock-providers`: tests outside the providers package import only `@local-ai/providers/mock`.
+- `storage-not-from-routes` and `tools-not-to-storage`: routes and tools never reach the stores directly. These two have no code to check until `apps/api`, `storage` and `tools` exist; I checked each rule against a temporary violating file.
+- `local/no-brand-cast` (in `eslint-rules/`) asks the type checker whether a cast, an explicit type argument or a type predicate produces `ModeratedText` or `UntrustedWebText`, including through aliases, renamed imports, qualified names, unions, arrays and nested object fields. It also rejects casts to `never` and to a bare type parameter, which could launder any value. Only `guardrails/src/mint.ts` and `tools/src/untrusted.ts` are exempt. Its fixture tests list every form it catches.
+- What it cannot see: a value typed `any` (already rejected by the `no-unsafe-*` rules) and a library function whose return type the caller picks without a type argument. Review covers those.
 
 ## Mock providers
 
