@@ -68,3 +68,14 @@ Errors before the stream starts come back as JSON:
 ## `GET /readyz`
 
 `200 {"status":"ready"}` once the guard model has answered its warm-up check at startup. `503 {"status":"starting"}` before that, or if the warm-up failed. Turns still work in that state, and they fail closed if the guard cannot answer.
+
+## Headless client
+
+`@local-ai/client` is what the web and mobile apps use to call the API. It depends only on `@local-ai/contract`, never on server code.
+
+- `createChatClient({ baseUrl, fetch })` sends same-origin credentials only, until sessions arrive. It takes `fetch` as a parameter. The web app passes the browser's `fetch`, and the Expo app passes `expo/fetch`, which streams response bodies. `send(body, signal)` yields each event after validating it against the shared schema. Aborting the signal cancels the request, and with it the turn on the server.
+- A refusal or a model error arrives as an event. A turn that cannot be delivered throws `ChatClientError`, whose `code` is `network`, `rate_limited`, `busy`, `rejected`, `server`, `protocol` or `incomplete`, and whose `message` is safe to show. `retryAfterMs` is set when the server sends one.
+- `parseSse` implements the WHATWG event-stream format: LF, CR and CRLF line ends, multi-line data, comments, and a 1 MB frame cap.
+- `reduceTurn` folds a turn's events into one `TurnView`, whose `text` is the deltas concatenated,, so both apps render refusals, errors and cut-off answers the same way.
+
+The contract tests encode the shared fixture turns in `@local-ai/contract/fixtures` with the server's encoder, split them at many byte boundaries, including one byte at a time, and check the client reads back exactly the same events.

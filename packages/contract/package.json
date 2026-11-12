@@ -8,6 +8,11 @@
       "@local-ai/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./fixtures": {
+      "@local-ai/source": "./src/fixtures.ts",
+      "types": "./dist/fixtures.d.ts",
+      "import": "./dist/fixtures.js"
     }
   },
   "scripts": {

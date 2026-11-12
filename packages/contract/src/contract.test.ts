@@ -81,3 +81,13 @@ describe('SSE wire format', () => {
     expect(frame.split('\n\n')).toHaveLength(2);
   });
 });
+
+describe('fixture turns', () => {
+  it('are all valid events that end with done', async () => {
+    const { fixtureTurns } = await import('./fixtures.js');
+    for (const turn of Object.values(fixtureTurns)) {
+      for (const event of turn) expect(sseEventSchema.parse(event)).toEqual(event);
+      expect(turn.at(-1)?.type).toBe('done');
+    }
+  });
+});
