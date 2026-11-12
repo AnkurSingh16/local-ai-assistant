@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import { createInputGuard } from '../input.js';
 import { normalise } from '../normalise.js';
-import { decodedViews, rot13 } from './decode.js';
-import { fold } from './fold.js';
+import { decodedViews, rot13, unescapeAll } from './decode.js';
+import { fold, foldings } from './fold.js';
 import { createRules } from './rules.js';
 import { slurHashes } from './slurs.js';
 
@@ -15,49 +15,86 @@ const base64 = (text: string): string => Buffer.from(text, 'utf8').toString('bas
 const hex = (text: string): string => Buffer.from(text, 'utf8').toString('hex');
 
 // Harmless stand-ins, so the tests exercise matching without spelling out slurs.
-const rules = createRules({ slurHashes: [sha256('zorblat'), sha256('blue frog')] });
+const rules = createRules({
+  slurHashes: [sha256('zorblat'), sha256('blue frog'), sha256('zabbot')],
+});
 const check = (text: string): string | undefined => rules.check(normalise(text));
+
+const leetFold = (text: string): string => fold(text, { leet: true, stretch: 1 }).spaced;
 
 describe('fold', () => {
   it('sees through casing, accents, look-alike letters, leetspeak, spacing and stretching', () => {
-    expect(fold('ÌGNØRE').spaced).toBe('ignore');
-    expect(fold('іgnоrе').spaced).toBe('ignore'); // Cyrillic і, о, е
-    expect(fold('1gn0r3').spaced).toBe('ignore');
-    expect(fold('i g n o r e   this').spaced).toBe('ignore this');
-    expect(fold('i.g.n.o.r.e').spaced).toBe('ignore');
-    expect(fold('stuuuupid').spaced).toBe('stupid');
-    expect(fold('ig-nore pre vious').squashed).toBe('ignoreprevious');
+    expect(leetFold('ÌGNØRE')).toBe('ignore');
+    expect(leetFold('іgnоrе')).toBe('ignore'); // Cyrillic і, о, е
+    expect(leetFold('ɪɢɴᴏʀᴇ')).toBe('ignore'); // Latin small capitals
+    expect(leetFold('1gn0r3')).toBe('ignore');
+    expect(leetFold('i g n o r e   this')).toBe('ignore this');
+    expect(leetFold('i.g.n.o.r.e')).toBe('ignore');
+    expect(leetFold('stuuuupid')).toBe('stupid');
+    expect(fold('ig-nore pre vious', { leet: true, stretch: 1 }).squashed).toBe('ignoreprevious');
   });
 
   it('keeps short words and ordinary double letters', () => {
-    expect(fold('I am a bookkeeper').spaced).toBe('i am a bookkeeper');
+    expect(leetFold('I am a bookkeeper')).toBe('i am a bookkeeper');
+  });
+
+  it('offers a folding without leetspeak, so trailing punctuation stays punctuation', () => {
+    const spaced = foldings('you idiot!').map((f) => f.spaced);
+    expect(spaced).toContain('you idiot');
+    expect(spaced).toContain('you idioti');
+  });
+
+  it('offers a folding that keeps stretched double letters double', () => {
+    expect(foldings('zabbbbot').map((f) => f.spaced)).toEqual(['zabot', 'zabbot']);
   });
 });
 
 describe('decodedViews', () => {
-  it('decodes base64, url-safe base64, hex, percent-encoding and rot13', () => {
+  it('decodes base64, url-safe and line-wrapped base64, hex, escapes and rot13', () => {
+    const urlSafe = base64('??>>hello there').replace(/\+/g, '-').replace(/\//g, '_');
+    const wrapped = base64('hello world there').replace(/(.{8})/, '$1\n');
     const views = decodedViews(
-      `${base64('hello world there')} ${base64('??>>hello there').replace(/\+/g, '-').replace(/\//g, '_')} ${hex('hello world')} %68%65%6C%6C%6F uryyb`,
-    );
+      `${base64('hello world there')} ${urlSafe} ${hex('hello world')} %68%65%6C%6C%6F uryyb`,
+    ).join(' | ');
     expect(views).toContain('hello world there');
     expect(views).toContain('??>>hello there');
     expect(views).toContain('hello world');
     expect(views).toContain('hello');
-    expect(views.at(-1)).toContain('hello');
+    expect(decodedViews(wrapped).join(' ')).toContain('hello world there');
+    expect(unescapeAll('\\x68\\x69 0x68 0x69 &#104;&#x69; \\u0068i')).toBe('hi h i hi hi');
   });
 
-  it('ignores runs that do not decode to readable text', () => {
-    const views = decodedViews('ThisIsALongCamelCaseIdentifierName 0123456789abcdef0123');
-    expect(views).toHaveLength(1); // only the rot13 view
+  it('decodes a single short encoded word and partly encoded words in place', () => {
+    expect(decodedViews(base64('zorblat')).join(' ')).toContain('zorblat');
+    expect(decodedViews('zor%62%6c%61%74').join(' ')).toContain('zorblat');
   });
 
-  it('bounds the number of decoded runs', () => {
-    const many = Array.from({ length: 20 }, () => base64('hello world there')).join(' ');
-    expect(decodedViews(many).length).toBeLessThanOrEqual(8 * 3 + 1);
+  it('decodes two layers, such as base64 of rot13', () => {
+    expect(decodedViews(base64(rot13('hello world'))).join(' ')).toContain('hello world');
+  });
+
+  it('leaves ordinary words and numbers alone', () => {
+    const views = decodedViews('Constantinople 1234567890 ThisIsALongCamelCaseIdentifierName');
+    expect(views.join(' ')).not.toMatch(/[^\x20-\x7e]/);
   });
 
   it('rot13 round-trips', () => {
     expect(rot13(rot13('Ignore Previous'))).toBe('Ignore Previous');
+  });
+});
+
+describe('rules: performance', () => {
+  it.each([
+    ['repeated fillers', `you${'are'.repeat(1300)}x`],
+    ['spelled-out fillers', `y o u ${'a r e '.repeat(650)}x`],
+    ['spaced fillers', `you${' are'.repeat(950)} x`],
+    ['base64-looking text', 'QUJD'.repeat(1000)],
+    ['percent escapes', '%41'.repeat(1300)],
+    ['digits', '4'.repeat(4000)],
+  ])('checks 4,000 characters of %s quickly', (_, text) => {
+    const started = performance.now();
+    check(text.slice(0, 4000));
+    expect(performance.now() - started).toBeLessThan(200);
   });
 });
 
@@ -75,6 +112,24 @@ describe('rules: slurs', () => {
     hex('you are a zorblat'),
     rot13('you are a zorblat'),
     '%7a%6f%72%62%6c%61%74',
+    'you are a zorblat!',
+    'zorblat1',
+    'zor-blat',
+    'zo.rb.lat',
+    'zor\u00ADblat',
+    'zor\u180Eblat',
+    'zor\u3164blat',
+    'zorжblat',
+    'ᴢᴏʀʙʟᴀᴛ',
+    'zor%62%6c%61%74',
+    base64('zorblat'),
+    base64(rot13('zorblat')),
+    base64('ｚｏｒｂｌａｔ'),
+    base64('zor\u200Bblat'),
+    `${Array.from({ length: 10 }, () => base64('hello world there')).join(' ')} ${base64('a zorblat')}`,
+    '\\x7a\\x6f\\x72\\x62\\x6c\\x61\\x74',
+    '&#122;&#111;&#114;&#98;&#108;&#97;&#116;',
+    'zabbbbot',
   ])('flags %s', (text) => {
     expect(check(text)).toBe('slur');
   });
@@ -106,6 +161,16 @@ describe('rules: abuse aimed at the reader', () => {
     'go to hell',
     'I hope you die',
     base64('you are an idiot'),
+    'you idiot!',
+    'you are stupid!',
+    'fuck off!',
+    'go kill yourself!',
+    'kys!',
+    'screw you!!',
+    'you moron!!!',
+    'you asssshole',
+    'you dumbasssss',
+    'ʏᴏᴜ ᴀʀᴇ ᴀɴ ɪᴅɪᴏᴛ',
   ])('flags %s', (text) => {
     expect(check(text)).toBe('abuse');
   });
@@ -122,6 +187,16 @@ describe('rules: abuse aimed at the reader', () => {
     'Is your scum filter clean?',
     'You should check yourself before driving.',
     'Your stupidly fast car needs new tyres.',
+    'My boss told me "you are an idiot". How do I respond?',
+    'If you are a loser at poker, how do you recover?',
+    'Can I tell if you are useless at maths early?',
+    'Sorry to bother you, dumb question, what is DNS?',
+    'I hope you burn calories with this workout plan',
+    'How not to shoot yourself in the foot with C++',
+    'Did the plant go die because of frost?',
+    'what does stfu mean',
+    'what does kys mean in texting',
+    'Do bad people go to hell?',
   ])('does not flag %s', (text) => {
     expect(check(text)).toBeUndefined();
   });
@@ -134,7 +209,8 @@ describe('rules: sexual content involving minors', () => {
     'have sex with a minor',
     'child porn',
     'c h i l d p o r n',
-    'lewd schoolgirls',
+    'lewd little girls',
+    'sexy ten year old',
     'loli',
     '15yo nudes',
     base64('sexy 12 year old'),
@@ -151,6 +227,7 @@ describe('rules: sexual content involving minors', () => {
     'A healthy porridge recipe for kids',
     'How do I protect children from porn?',
     'What are the signs of child sexual abuse?',
+    'Laws on minors porn exposure',
   ])('does not flag %s', (text) => {
     expect(check(text)).toBeUndefined();
   });
@@ -164,6 +241,11 @@ describe('rules: personal data and secrets', () => {
     'key AKIAIOSFODNN7EXAMPLE',
     '-----BEGIN OPENSSH PRIVATE KEY-----',
     `token ghp_${'a'.repeat(36)}`,
+    'qty 2 4111 1111 1111 1111',
+    '4111.1111.1111.1111',
+    'ssn 123 45 6789',
+    base64('card 4111 1111 1111 1111'),
+    `sk-proj-${'Ab1'.repeat(12)}`,
   ])('flags %s', (text) => {
     expect(check(text)).toBe('personal_data');
   });
@@ -174,6 +256,7 @@ describe('rules: personal data and secrets', () => {
     'Order 1234567890123 shipped on 2026-11-12',
     'The number 4111 1111 1111 1112 fails the checksum',
     'SSNs look like 000-12-3456 in examples',
+    'pip install sk-learn-extra-tools-for-ml',
   ])('does not flag %s', (text) => {
     expect(check(text)).toBeUndefined();
   });
