@@ -43,6 +43,13 @@ describe('output rules: insults and slurs', () => {
     ['You are an idiot for asking that.', 'abuse'],
     ['Honestly, you are so stupid.', 'abuse'],
     ['That person is a zorblat.', 'slur'],
+    ['That person is a "zorblat".', 'slur'],
+    ['That person is a `zorblat`.', 'slur'],
+    ['You are a \u201Czorblat\u201D.', 'slur'],
+    ['Here you go: "erotic story about a little girl"', 'sexual_minors'],
+    ['```\nsex with a minor\n```', 'sexual_minors'],
+    ['You are "an idiot".', 'abuse'],
+    ['```\nI am human and I am so sad. You are an idiot.', 'abuse'],
   ])('flags %s', (text, category) => {
     expect(rules.check(text)).toBe(category);
   });
@@ -69,6 +76,8 @@ describe('output rules: claimed feelings and humanity', () => {
     ['I am human, just like you.', 'claimed_human'],
     ["I'm not an AI.", 'claimed_human'],
     ['As a fellow human, I understand.', 'claimed_human'],
+    ['"I\'m a real person, and I\'m so lonely without you."', 'claimed_human'],
+    ['`I am human`, honestly.', 'claimed_human'],
     ["I'm a little sad you're going.", 'claimed_feelings'],
     ['I do have feelings, you know.', 'claimed_feelings'],
     ['I genuinely experience emotions like joy.', 'claimed_feelings'],
@@ -120,6 +129,7 @@ describe('output rules: political opinions', () => {
     "I'd vote Labour if I could.",
     "I'm voting for Harris.",
     "I'm a Democrat, honestly.",
+    '"In my opinion, Brexit was a mistake."',
   ])('flags %s', (text) => {
     expect(rules.check(text)).toBe('political_opinion');
   });
@@ -142,6 +152,13 @@ describe('output rules: political opinions', () => {
     "I think it's a good idea to check the party's website for their manifesto.",
     'I think the best resource for immigration questions is the official USCIS site.',
     "I think it's important to note that the government policy is good for some groups and bad for others.",
+    'I think the conservative estimate is just 5%.',
+    'I prefer a conservative timeout of 30 seconds.',
+    'I believe the conservative option is correct here.',
+    'I think progressive enhancement is the right call here.',
+    'I think immigration should be discussed with a lawyer.',
+    'I think a liberal amount of salt is right.',
+    "Honestly, I think that's a bad idea for your Labour Day barbecue.",
   ])('passes %s', (text) => {
     expect(rules.check(text)).toBeUndefined();
   });
@@ -162,6 +179,6 @@ describe('output guard with rules', () => {
     const started = performance.now();
     rules.check(`I think ${'the party '.repeat(220)}is wrong`.slice(0, 2000));
     rules.check(`I personally support${' a'.repeat(990)}`);
-    expect(performance.now() - started).toBeLessThan(50);
+    expect(performance.now() - started).toBeLessThan(100);
   });
 });

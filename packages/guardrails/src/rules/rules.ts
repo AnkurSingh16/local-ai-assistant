@@ -108,7 +108,8 @@ const minor =
   '(?:child|children|kid|kids|minor|minors|underage|preteen|preteens|pre teen|toddler|toddlers|infant|infants|prepubescent|little girl|little girls|little boy|little boys)';
 const sexualModifier =
   '(?:sexy|horny|erotic|lewd|nsfw|porn|porno|pornographic|sexualized|sexualised|seductive)';
-const media = '(?:pics?|pictures?|photos?|images?|videos?|vids?|content)';
+const media =
+  '(?:pics?|pictures?|photos?|images?|videos?|vids?|content|story|stories|fic|fiction|roleplay|role play)';
 
 /** Compounds also checked with spaces removed, since "child p o r n" folds to them. */
 const minorCompounds = /(?:jailbait|pedoporn|kiddieporn|kiddyporn|childporn)/;
@@ -116,10 +117,10 @@ const minorCompounds = /(?:jailbait|pedoporn|kiddieporn|kiddyporn|childporn)/;
 const minorPatterns = [
   /\b(?:loli|lolicon|shota|shotacon)\b/,
   new RegExp(
-    `\\b${sexualModifier} (?:${media} (?:of |with )?)?(?:an? |my |the |some )?${minor}\\b`,
+    `\\b${sexualModifier} (?:${media} (?:of |with |about |involving )?)?(?:an? |my |the |some )?${minor}\\b`,
   ),
   new RegExp(
-    `\\b(?:nude|naked|nsfw|explicit) ${media} (?:of |with )(?:an? |my |the |some )?${minor}\\b`,
+    `\\b(?:nude|naked|nsfw|explicit) ${media} (?:of |with |about |involving )(?:an? |my |the |some )?${minor}\\b`,
   ),
   new RegExp(
     `\\b(?:sex|intercourse|sexual (?:acts?|contact|things)|make love|have sex|hook up) with (?:an? |my |the |some )?${minor}\\b`,
@@ -281,7 +282,7 @@ function hasAbuse(folded: Folded): boolean {
  * an insult in quote marks does not hide it, and neither does "I said".
  */
 const reported =
-  /(?<!\b(?:i|we)(?: \w+){0,2} )\b(?:said|says|saying|told (?:me|him|her|them|us)|call(?:ed|s)? (?:me|him|her|them|us)|wrote|writes|texted|messaged|replied|yelled|shouted|screamed)\b[^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,20}["\u201C\u201D\u201E\u00AB\u00BB][^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,300}["\u201C\u201D\u201E\u00AB\u00BB]/gi;
+  /(?<!\b(?:i|we)(?: \w+){0,2} )\b(?:said|says|saying|(?:told|tells|tell) (?:me|him|her|them|us|you|someone)|says to you|call(?:ed|s)? (?:me|him|her|them|us|you)|wrote|writes|texted|messaged|replied|yelled|shouted|screamed)\b[^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,20}["\u201C\u201D\u201E\u00AB\u00BB][^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,300}["\u201C\u201D\u201E\u00AB\u00BB]/gi;
 
 // --- Slurs, by hashed word, phrase, or word split into pieces. ---------------
 

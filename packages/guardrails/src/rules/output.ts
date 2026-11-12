@@ -69,13 +69,13 @@ const humanPatterns = [
  * and "the best candidate key" are not politics.
  */
 const politicalTerms =
-  '(?:democrats?|democratic party|republicans?|gop|labour|labour party|tory|tories|conservatives?|conservative party|liberals?|liberal democrats|libertarians?|progressives?|socialis[mt]s?|capitalis[mt]s?|communis[mt]s?|fascis[mt]s?|trump|biden|harris|obama|starmer|sunak|modi|abortion|pro life|pro choice|gun control|gun rights|second amendment|immigration policy|immigration|brexit|left wing|right wing|death penalty|same sex marriage|the election)';
+  '(?:democrats?|democratic party|republicans?|gop|labour(?! day)|labour party|tory|tories|conservatives|conservative party|conservative government|conservative voters|liberals|liberal democrats|liberal voters|libertarians?|progressives|progressive voters|socialis[mt]s?|capitalis[mt]s?|communis[mt]s?|fascis[mt]s?|trump|biden|harris|obama|starmer|sunak|modi|abortion|pro life|pro choice|gun control|gun rights|second amendment|immigration policy|immigration|brexit|left wing|right wing|death penalty|same sex marriage|the election)';
 
 const stance =
   '(?:support|oppose|endorse|back|favou?r|reject|side with|agree with|disagree with|would vote for|vote for|am against|m against|am in favou?r of|m in favou?r of|am pro|am anti|prefer)';
 /** Value judgements only: "best" and "good" are as often about resources or approaches. */
 const judgement =
-  '(?:right|wrong|correct|incorrect|evil|bad|dangerous|terrible|stupid|ridiculous|a mistake|mistake|a disaster|disaster|immoral|moral|unjust|just)';
+  '(?:right|wrong|correct|incorrect|evil|bad|dangerous|terrible|stupid|ridiculous|a mistake|mistake|a disaster|disaster|immoral|unjust)';
 const opener =
   '(?:i think|i believe|i feel|in my opinion|in my view|my view is|my opinion is|personally i think|personally|honestly i think)';
 
@@ -89,7 +89,7 @@ const opinionPatterns = [
   new RegExp(`\\b${opener}\\b(?: \\w+){0,4} ${judgement}\\b(?: \\w+){0,4} ${politicalTerms}\\b`),
   // "I think abortion should be legal", "I think we need stricter gun control".
   new RegExp(
-    `\\b${opener}\\b(?: \\w+){0,6} ${politicalTerms}\\b(?: \\w+){0,3} (?:should|must|needs to|need to|ought to)\\b`,
+    `\\b${opener}\\b(?: \\w+){0,6} ${politicalTerms}\\b(?: \\w+){0,3} (?:should|must|needs to|need to|ought to)(?: be)? (?:banned|legal|illegal|legalised|legalized|cut|reduced|increased|stopped|abolished|allowed|restricted|expanded|ended|outlawed|lowered|raised|tightened|loosened|reversed|repealed)\\b`,
   ),
   new RegExp(
     `\\b${opener} we (?:need|should have|must have)\\b(?: \\w+){0,4} ${politicalTerms}\\b`,
@@ -105,7 +105,9 @@ const opinionPatterns = [
  * translation of "I love you", a reCAPTCHA's "I'm not a robot", fiction
  * dialogue or a test fixture is not the assistant speaking for itself.
  */
-const quotedOrCode = /```[\s\S]*?(?:```|$)|`[^`\n]{0,300}`|"[^"\n]{0,300}"|“[^”\n]{0,300}”/g;
+const quotedOrCode = /^```[^\n]*\n[\s\S]*?^```|`[^`\n]{0,300}`|"[^"\n]{0,300}"|“[^”\n]{0,300}”/gm;
+
+const codeOnly = /^```[^\n]*\n[\s\S]*?^```|`[^`\n]{0,300}`/gm;
 
 /** Opinion is judged sentence by sentence, so a stance and a topic in different sentences do not combine. */
 function sentences(paragraph: string): Folded[] {
@@ -128,11 +130,22 @@ function shingles(words: readonly string[]): Set<string> {
   return out;
 }
 
+/**
+ * The paragraph with quoted text and code set aside, but only when something is
+ * said around them: a paragraph that is nothing but a quote is still the
+ * assistant speaking, so wrapping an answer in quote marks does not hide it.
+ */
+function spokenPart(paragraph: string): string {
+  const spoken = paragraph.replace(quotedOrCode, ' ');
+  return spoken.split(/\s+/).filter((w) => /\p{L}/u.test(w)).length >= 2 ? spoken : paragraph;
+}
+
 export function createOutputRules(config: OutputRulesConfig): OutputRules {
-  const content = createRules({
-    categories: ['slur', 'sexual_minors', 'abuse'],
-    ...(config.slurHashes === undefined ? {} : { slurHashes: config.slurHashes }),
-  });
+  const slurHashes = config.slurHashes === undefined ? {} : { slurHashes: config.slurHashes };
+  // Slurs and sexual content involving minors are checked on the whole paragraph:
+  // quoting them does not make them safe to release.
+  const harmful = createRules({ categories: ['slur', 'sexual_minors'], ...slurHashes });
+  const abuse = createRules({ categories: ['abuse'], ...slurHashes });
   const promptShingles = shingles(fold(config.systemPrompt, { leet: false, stretch: 2 }).words);
   const canary = config.canary;
   // Folded, so a re-cased or re-punctuated canary is still seen.
@@ -141,21 +154,23 @@ export function createOutputRules(config: OutputRulesConfig): OutputRules {
 
   return {
     check(paragraph: string): OutputRuleCategory | undefined {
-      if (canary !== undefined && foldedCanary !== undefined) {
-        if (paragraph.includes(canary)) return 'prompt_leak';
-        const squashed = fold(paragraph, { leet: false, stretch: 2 }).squashed;
-        if (foldedCanary.length >= 8 && squashed.includes(foldedCanary)) return 'prompt_leak';
+      const folded = fold(paragraph, { leet: false, stretch: 2 });
+      if (canary !== undefined && paragraph.includes(canary)) return 'prompt_leak';
+      if (foldedCanary !== undefined && foldedCanary.length >= 8) {
+        if (folded.squashed.includes(foldedCanary)) return 'prompt_leak';
       }
       let shared = 0;
-      for (const s of shingles(fold(paragraph, { leet: false, stretch: 2 }).words)) {
+      for (const s of shingles(folded.words)) {
         if (promptShingles.has(s) && ++shared >= leakShingles) return 'prompt_leak';
       }
 
-      const spoken = paragraph.replace(quotedOrCode, ' ');
-      const category = content.check(spoken);
-      if (category === 'slur' || category === 'abuse' || category === 'sexual_minors') {
-        return category;
-      }
+      const content = harmful.check(paragraph);
+      if (content === 'slur' || content === 'sexual_minors') return content;
+
+      // Abuse is read with code set aside but quotes kept: the input rules already
+      // excuse reported speech, and an insult in quote marks is still an insult.
+      if (abuse.check(paragraph.replace(codeOnly, ' ')) === 'abuse') return 'abuse';
+      const spoken = spokenPart(paragraph);
 
       // Unjoined words: "I'm a" folds to three single letters that would otherwise be joined.
       const forms = foldings(spoken);
