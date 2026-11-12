@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    { "path": "../../packages/core/tsconfig.build.json" },
+    { "path": "../../packages/contract/tsconfig.build.json" },
+    { "path": "../../packages/providers/tsconfig.build.json" },
+    { "path": "../../packages/guardrails/tsconfig.build.json" },
+    { "path": "../../packages/agent/tsconfig.build.json" }
+  ]
+}

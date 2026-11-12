@@ -1,3 +1,70 @@
 # API reference
 
-The Fastify API will stream answers over Server-Sent Events. The endpoints, request and response schemas, and the SSE event contract shared with the web and mobile clients are documented here as they land, starting in Milestone 2.
+The API listens on `127.0.0.1:8787` by default. Every request must carry an allowed `Host` header, and browser requests an allowed `Origin` ([configuration](configuration.md)). Request bodies are JSON only and at most 16 KB.
+
+## `POST /v1/chat`
+
+Runs one turn and streams it as Server-Sent Events ([ADR-0007](../adr/0007-streaming-contract.md)). The schemas live in `packages/contract`.
+
+Request:
+
+```json
+{ "message": "What is a rainbow?", "conversationId": "optional UUID" }
+```
+
+`message` is 1 to 4,000 characters. Unknown fields are rejected.
+
+Response: `200` with `content-type: text/event-stream`. Each frame looks like this:
+
+```text
+event: delta
+id: <messageId>:<seq>
+data: {"type":"delta","text":"A rainbow is ..."}
+```
+
+| Event      | Payload                                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| `meta`     | `conversationId`, `messageId`                                                                                    |
+| `status`   | `phase`: `moderating`, `searching`, `reading` or `answering`; optional `detail`                                  |
+| `delta`    | `text`: one paragraph of the answer that has passed output moderation                                            |
+| `citation` | `n`, `url` (https only), `title`                                                                                 |
+| `refusal`  | `kind`: `policy`, `self_harm`, `unavailable` or `rate_limited`; a fixed `message`                                |
+| `error`    | `code`: `bad_request`, `internal`, `model_unavailable` or `timeout`; generic `message`, `requestId`, `retryable` |
+| `done`     | `finishReason`: `stop`, `length`, `refused` or `error`                                                           |
+
+A turn always ends with `done`, unless the client disconnects. Disconnecting aborts the turn and stops generation. A `: ping` comment arrives every 15 seconds on a quiet stream. There is no resume: to retry, send the turn again.
+
+A turn goes through these steps:
+
+1. `meta`, then `status: moderating`.
+2. The message is normalised and checked by the guard model. If it is flagged, the turn ends with `refusal` and `done: refused`, and the message never reaches the chat model. If the guard is down, the refusal kind is `unavailable`.
+3. `status: answering`. The answer arrives one paragraph at a time, and each paragraph passes the guard before it is sent. If a paragraph is flagged, generation stops, the paragraphs already sent stay, and the turn ends with `refusal`.
+
+Errors before the stream starts come back as JSON:
+
+```json
+{
+  "error": {
+    "code": "bad_request",
+    "message": "The request body is not valid.",
+    "requestId": "..."
+  }
+}
+```
+
+| Status | `code`                   | When                                                     |
+| ------ | ------------------------ | -------------------------------------------------------- |
+| 400    | `bad_request`            | Invalid JSON or a body that fails the schema             |
+| 403    | `forbidden`              | `Host` or `Origin` not allowed                           |
+| 413    | `too_large`              | Body over 16 KB                                          |
+| 415    | `unsupported_media_type` | Anything but `application/json`                          |
+| 429    | `rate_limited`           | Too many turns from this IP; includes `retryAfterMs`     |
+| 503    | `busy`                   | All turn slots and the queue are full; has `Retry-After` |
+
+## `GET /healthz`
+
+`200 {"status":"ok"}` while the process runs.
+
+## `GET /readyz`
+
+`200 {"status":"ready"}` once the guard model has answered its warm-up check at startup. `503 {"status":"starting"}` before that, or if the warm-up failed. Turns still work in that state, and they fail closed if the guard cannot answer.

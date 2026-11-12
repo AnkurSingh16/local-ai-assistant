@@ -1,10 +1,23 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/core/tsconfig.build.json" },
-    { "path": "packages/contract/tsconfig.build.json" },
-    { "path": "packages/providers/tsconfig.build.json" },
-    { "path": "packages/guardrails/tsconfig.build.json" },
-    { "path": "packages/agent/tsconfig.build.json" }
+    {
+      "path": "packages/core/tsconfig.build.json"
+    },
+    {
+      "path": "packages/contract/tsconfig.build.json"
+    },
+    {
+      "path": "packages/providers/tsconfig.build.json"
+    },
+    {
+      "path": "packages/guardrails/tsconfig.build.json"
+    },
+    {
+      "path": "packages/agent/tsconfig.build.json"
+    },
+    {
+      "path": "apps/api/tsconfig.build.json"
+    }
   ]
 }

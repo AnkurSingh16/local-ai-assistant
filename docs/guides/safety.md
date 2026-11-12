@@ -14,6 +14,19 @@ Safety is the top priority in this project. I am designing the guardrails around
 | Untrusted web content         | Fetched pages wrapped as data, never followed as instructions              | 4         |
 | Safe learning                 | Feedback moderated before storage; only items I approve are used           | 5         |
 
+## What runs today
+
+Milestone 2 ships the first part of these layers, so no answer is ever unmoderated:
+
+- Per-IP rate limits, a 16 KB body limit, 4,000 characters per message, and a cap of two concurrent turns with a queue of four.
+- Normalisation (NFKC; zero-width, bidi and tag characters stripped; chat-template tokens neutralised) before anything is checked.
+- `llama-guard3` on every user message and on every paragraph of the answer before it is sent. If the guard errors, times out or answers in an unexpected format, the turn is refused with `unavailable`; there is no fail-open setting.
+- Fixed refusal texts that name no rule. Self-harm gets crisis resources instead of a refusal, without calling the chat model.
+- A persona in code (`packages/agent/persona/persona.ts`) that says the assistant is an AI, has no feelings and gives no political opinions.
+- Typed log events with no field for message text, and a test that checks a marker string never reaches the logs.
+
+The rules baseline, jailbreak detection, persona output rules, the circuit breaker and the red-team set come in Milestone 3.
+
 ## Measured results
 
 Not measured yet. The red-team eval lands in Milestone 3, and I will report results here exactly as measured, with the date, the providers used and the command.
