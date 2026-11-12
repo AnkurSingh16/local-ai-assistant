@@ -14,8 +14,8 @@ It is a demo project, separate from my retrieval-only portfolio chatbot.
 
 | Milestone | Scope                                               | State       |
 | --------- | --------------------------------------------------- | ----------- |
-| 0         | Repository, tooling, CI, docs skeleton              | In progress |
-| 1         | Architecture debate and ADRs                        | Planned     |
+| 0         | Repository, tooling, CI, docs skeleton              | Done        |
+| 1         | Architecture debate and ADRs                        | In progress |
 | 2         | Chat with Ollama, streaming API, minimal web client | Planned     |
 | 3         | Guardrails and the red-team eval in CI              | Planned     |
 | 4         | Web search with SearXNG, SSRF protection, citations | Planned     |

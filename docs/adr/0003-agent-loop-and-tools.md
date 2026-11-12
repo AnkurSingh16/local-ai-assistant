@@ -6,7 +6,7 @@
 
 ## Context
 
-Each turn the assistant decides whether to answer from model knowledge or search. Time-sensitive questions (recent events, prices, scores, releases, people's current roles) must go through search. Fetched pages are untrusted, approved memory is private, and search queries leave the machine: the combination Simon Willison calls the lethal trifecta. A page must not be able to steer the model into sending private data out in a URL or a query.
+Each turn the assistant decides whether to answer from model knowledge or search. Time-sensitive questions (recent events, prices, scores, releases, people's current roles) must go through search. Fetched pages are untrusted, approved memory is private, and search queries leave the machine: the combination Simon Willison calls the [lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/). A page must not be able to steer the model into sending private data out in a URL or a query.
 
 ## Options considered
 
@@ -20,8 +20,8 @@ Each turn the assistant decides whether to answer from model knowledge or search
 Option 4.
 
 - **Routing.** A rules pre-router in `agent` marks a turn time-sensitive (words such as current, latest, today, now, price, score, "who is the CEO", release, and years at or after the model's training cutoff). On those turns a `web_search` runs before generation; the model cannot skip it. On other turns the model may call `web_search` itself. Routing is a pure function of the rules verdict and the model's tool calls, so it is unit-tested with the mock chat provider.
-- **Who writes the forced query.** The chat model, through a structured-output call limited to 200 characters, never the raw user message. The query passes the same personal-data check as stored text before it goes out, so a message containing an email address or phone number does not get sent to search engines.
-- **Budgets per turn.** One `web_search` (up to 5 results), then up to two `read_page` calls. Four model steps in total. Timeouts: search 5 s, each page read 8 s, the whole turn 60 s.
+- **Who writes the forced query.** The chat model, through a structured-output call limited to 200 characters, never the raw user message. Before it goes out, the query is rejected (and the turn answered without search, saying so) if it matches the personal-data patterns in [ADR-0009](0009-sessions-and-memory-deletion.md) or shares a run of four or more words with any approved memory item, so private details do not reach search engines.
+- **Budgets per turn.** One `web_search` (up to 5 results), then up to two `read_page` calls. Four model steps in total. Timeouts: search 5 s, each page read 10 s (8 s fetch plus 2 s parse, [ADR-0008](0008-fetch-safety.md)), the whole turn 60 s.
 - **Taint rule.** A turn starts clean. After search results are in context, the only tool allowed is `read_page`, and only on exact URLs returned by this turn's search. After page text is in context, no further search is allowed. The model can never fetch a URL invented by a page or a user, which closes exfiltration through query strings to a public host.
 - **Validation.** Every tool call is parsed with its Zod schema. An unknown tool or invalid arguments produce an error result for the model, not a retry loop.
 - **Cancellation.** One signal per turn, `AbortSignal.any([clientAbort, AbortSignal.timeout(60_000)])`, passed to Ollama, SearXNG, every fetch and the parse worker.

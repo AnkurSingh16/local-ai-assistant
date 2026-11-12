@@ -26,7 +26,7 @@ npm run build          # build all workspaces
 ## Layout
 
 - `packages/` shared code: `core`, `contract`, `agent`, `guardrails`, `tools`, `providers`, `storage`, `client`, `eval` (ADR-0002). Never imports from `apps/`.
-- Only `apps/api/src/compose.ts` imports `providers`. Stores and the agent accept only `ModeratedText`, minted in `guardrails/src/mint.ts`.
+- Only `apps/api/src/compose.ts` and the eval runner import `providers` (tests may use its mocks). Stores and the agent accept only `ModeratedText`, minted in `guardrails/src/mint.ts`; web content enters prompts only as `UntrustedWebText`, minted by the wrapper in `tools`. These rules are enforced once the packages exist (dependency-cruiser and ESLint, ADR-0002).
 - `apps/` deployable applications (`api`, `web`, `mobile`). Apps never import each other.
 - Boundaries are enforced by `.dependency-cruiser.cjs`; run `npm run depcruise`.
 

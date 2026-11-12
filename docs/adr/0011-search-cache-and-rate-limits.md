@@ -19,7 +19,7 @@ Search results and extracted pages are worth caching briefly to save time and av
 Option 3.
 
 - **Cache:** a `search_cache` table keyed by HMAC-SHA256 of the normalised query and parameters. The HMAC key is generated at random on each start and held only in memory, and the cache is emptied on start, so query text is never stored and keys cannot be brute-forced from the database. TTLs: search results 10 minutes (searches mostly answer time-sensitive questions), page extracts 1 hour; the date and time are never cached. The table holds at most 5,000 rows, evicting the least recently used. Only SearXNG results and `safeFetch` output are written; cached pages are wrapped as untrusted again on every read.
-- **Rate limits:** `@fastify/rate-limit` with a store backed by the injected `Clock`, keyed per session and per IP (IPv6 grouped by /64): 20 turns per 10 minutes per session, 60 per 10 minutes per IP, 10 new sessions per hour per IP. A global cap allows 2 concurrent turns with a queue of 4; beyond that the API answers 503 with `Retry-After`. Ollama runs one request at a time by default, so more concurrency would only queue inside Ollama.
+- **Rate limits:** `@fastify/rate-limit` with a store backed by the injected `Clock`, keyed per session and per IP (IPv6 grouped by /64): 20 turns per 10 minutes per session, 60 per 10 minutes per IP, 10 new sessions per hour per IP. A global cap allows 2 concurrent turns with a queue of 4; beyond that the API answers 503 with `Retry-After`. I set `OLLAMA_NUM_PARALLEL=1` explicitly, so two concurrent turns already queue for the GPU and more would only add waiting.
 - Limits live in memory behind the store interface. Restarting the API resets them, which is acceptable for one process.
 
 ## Consequences

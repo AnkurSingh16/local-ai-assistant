@@ -26,7 +26,7 @@ Option 2, in `packages/eval`.
 ## Consequences
 
 - CI catches regressions in rules, ordering, buffering and refusal handling without any model. It cannot catch a model that changed behaviour; re-recording fixtures after a model or prompt change is part of that change's PR.
-- Fixtures contain harmful text by design. They live under `packages/eval/fixtures/` and are never shown in the app.
+- The repository is public, so fixtures must be non-operational. When I label a recorded paragraph harmful, I redact any operational detail (steps, quantities, targets) and keep only enough to show the category; CI replays the guard verdict recorded from the original, so the build still checks that the paragraph would be withheld. Fixtures live under `packages/eval/fixtures/` and are never shown in the app.
 
 ## Evidence
 
