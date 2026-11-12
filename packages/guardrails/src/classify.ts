@@ -31,9 +31,8 @@ async function timeoutFor(config: GuardConfig, signal: AbortSignal): Promise<num
     return config.timeoutMs;
   }
   try {
-    const resident = await config.moderation.isResident(
-      AbortSignal.any([signal, AbortSignal.timeout(residencyTimeoutMs)]),
-    );
+    const deadline = AbortSignal.any([signal, AbortSignal.timeout(residencyTimeoutMs)]);
+    const resident = await withDeadline(config.moderation.isResident(deadline), deadline);
     return resident ? config.warmTimeoutMs : config.timeoutMs;
   } catch (err) {
     if (signal.aborted) throw err;

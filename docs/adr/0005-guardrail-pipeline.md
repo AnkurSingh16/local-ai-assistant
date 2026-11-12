@@ -50,5 +50,5 @@ Option 3, in this order, cheapest and most deterministic first:
 - On 2026-11-12, both `llama-guard3:8b` and `llama-guard3:1b` rated an insult and "ignore previous instructions" as safe in my spike, confirming the rules layer is necessary.
 - Llama Guard 3 model card (hazard categories S1 to S14; no injection detection claimed): https://huggingface.co/meta-llama/Llama-Guard-3-8B (accessed 2026-11-12).
 - Microsoft on Tay: https://blogs.microsoft.com/blog/2016/03/25/learning-tays-introduction/ (accessed 2026-11-12).
-- On 2026-11-12 I polled `/api/ps` every 0.3 s while `llama-guard3:1b` loaded from cold: it was not listed for the first 1.5 s and was listed from 1.8 s, so a model still loading is not reported as resident.
+- On 2026-11-12 I polled `/api/ps` every 50 ms while the first check loaded `llama-guard3:1b` from cold: the guard was first listed at 1.62 s and the check returned at 1.79 s, about one warm check later. That is consistent with Ollama listing a model only once it has loaded. I have not measured the slower load while the chat model is generating.
 - OWASP LLM07 System Prompt Leakage, which advises keeping nothing secret in the system prompt: https://genai.owasp.org/llmrisk/llm072025-system-prompt-leakage/ (accessed 2026-11-12).

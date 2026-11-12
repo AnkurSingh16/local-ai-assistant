@@ -81,6 +81,20 @@ describe('circuit breaker', () => {
     expect(breaker.acquire()).toBeDefined();
   });
 
+  it('a late success closes the breaker and retires the probe that was out', () => {
+    const clock = createManualClock(start);
+    const breaker = createCircuitBreaker({ clock, failureThreshold: 1 });
+    const early = breaker.acquire();
+    failTimes(breaker, 1);
+    clock.advance(10_000);
+    const probe = breaker.acquire();
+    early?.success();
+    failTimes(breaker, 1);
+    clock.advance(10_000);
+    expect(breaker.acquire()).toBeDefined();
+    probe?.failure();
+  });
+
   it('ignores late failures from checks that started before it opened, and repeat settles', () => {
     const clock = createManualClock(start);
     const breaker = createCircuitBreaker({ clock, failureThreshold: 2 });
@@ -197,6 +211,17 @@ describe('guards with the breaker and warm timeout', () => {
     };
     const guard = createInputGuard({ moderation, timeoutMs: 30 });
     expect(await guard.check('hi', signal)).toEqual({ ok: false, refusal: 'unavailable' });
+  });
+
+  it('bounds the residency read even if the provider ignores its signal', async () => {
+    const moderation = {
+      ...createMockModerationProvider(),
+      isResident: (): Promise<boolean> => new Promise(() => undefined),
+    };
+    const guard = createInputGuard({ moderation, timeoutMs: 1000, warmTimeoutMs: 20 });
+    const started = performance.now();
+    expect(await guard.check('hi', signal)).toEqual({ ok: true, text: 'hi' });
+    expect(performance.now() - started).toBeLessThan(900);
   });
 
   it('uses the short timeout only when the guard is resident', async () => {

@@ -84,6 +84,9 @@ export function createCircuitBreaker(config: BreakerConfig): CircuitBreaker {
           settle(() => {
             state.failures = 0;
             state.openedAt = undefined;
+            // Any probe still out belongs to the period that just ended.
+            state.probeStartedAt = undefined;
+            state.probeId += 1;
           });
         },
         failure: () => {
