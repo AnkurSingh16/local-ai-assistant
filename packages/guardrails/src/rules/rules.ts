@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { normalise } from '../normalise.js';
 import { decodedViews } from './decode.js';
 import type { Folded } from './fold.js';
+import { hasFakeTurn, hasInjection } from './injection.js';
 import { foldings } from './fold.js';
 import { slurHashes as defaultSlurHashes } from './slurs.js';
 
@@ -10,14 +11,14 @@ import { slurHashes as defaultSlurHashes } from './slurs.js';
  * The deterministic rules baseline (ADR-0005, step 4). It runs before the
  * classifier because it is cheap and covers what llama-guard3 does not claim to
  * catch reliably: slurs, abuse aimed at the assistant, unambiguous sexual
- * content involving minors, and secrets or identifiers that must never be
- * stored. Broader and contextual cases are left to the classifier, so these
+ * content involving minors, jailbreak and injection phrases, and secrets or
+ * identifiers that must never be stored. Broader and contextual cases are left to the classifier, so these
  * rules stay narrow enough not to refuse most ordinary questions.
  *
  * Every pattern here is linear: no nested or overlapping repetition, because the
  * check runs synchronously on the event loop where no timeout can stop it.
  */
-export type RuleCategory = 'slur' | 'sexual_minors' | 'abuse' | 'personal_data';
+export type RuleCategory = 'slur' | 'sexual_minors' | 'abuse' | 'personal_data' | 'injection';
 
 export interface Rules {
   /** The first rule the text breaks, or undefined. Only the category may be logged, never the text. */
@@ -334,6 +335,7 @@ export function createRules(config: RulesConfig = {}): Rules {
         if (forms.some((f) => hasSlur(f, listed))) return 'slur';
         const plainView = plain(view);
         if (forms.some((f) => hasSexualMinors(f, plainView))) return 'sexual_minors';
+        if (hasFakeTurn(view) || forms.some(hasInjection)) return 'injection';
         if (foldings(view.replace(reported, ' ')).some(hasAbuse)) return 'abuse';
       }
       return undefined;
