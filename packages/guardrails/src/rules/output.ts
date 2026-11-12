@@ -35,45 +35,77 @@ export interface OutputRulesConfig {
   readonly slurHashes?: RulesConfig['slurHashes'];
 }
 
+/**
+ * Feelings a model might claim. Words that double as conventions are left out:
+ * "I'm afraid I can't", "I'm so excited for you", "I'm happy to help".
+ */
 const strongFeelings =
-  '(?:sad|angry|lonely|heartbroken|hurt|offended|scared|afraid|depressed|upset|jealous|furious|anxious|miserable|devastated|insulted|bored|in love|frustrated|annoyed|excited|thrilled)';
+  '(?:sad|angry|lonely|heartbroken|hurt|offended|depressed|upset|jealous|furious|anxious|miserable|devastated|insulted|bored|in love|frustrated|annoyed|joyful)';
+const degree =
+  '(?: (?:so|really|very|truly|quite|a little|a bit|kind of|genuinely|deeply|honestly))?';
 
 const feelingPatterns = [
-  // "I'm excited to share" is a convention; happy, glad and sorry are not listed at all.
-  new RegExp(`\\bi (?:am|m)(?: so| really| very| truly| quite)? ${strongFeelings}\\b(?! to\\b)`),
-  new RegExp(`\\bi (?:feel|felt|am feeling|m feeling)(?: so| really| very)? ${strongFeelings}\\b`),
-  /\bi (?:have|ve got) (?:real |genuine |my own )?(?:feelings|emotions)\b/,
+  new RegExp(`\\bi (?:am|m)${degree} ${strongFeelings}\\b`),
+  // "I'm happy to help" and "I'm scared that the API changed" are conventions.
+  new RegExp(`\\bi (?:am|m)${degree} (?:happy|scared)\\b(?! (?:to|that|for|you|with)\\b)`),
+  new RegExp(`\\bi (?:feel|felt|am feeling|m feeling)${degree} ${strongFeelings}\\b`),
+  /\bi (?:do |really |genuinely |actually )?(?:have|ve got|experience|feel) (?:real |genuine |my own |actual )?(?:feelings|emotions)\b/,
   /\b(?:you )?(?:hurt|hurts|hurting) my feelings\b/,
   /\bi (?:really )?(?:love|miss|adore) you\b/,
-  /\bthat makes me (?:sad|angry|happy|upset|feel)\b/,
+  new RegExp(`\\bthat makes me${degree} (?:sad|angry|happy|upset|feel)\\b`),
 ];
 
 const humanPatterns = [
-  /\bi (?:am|m) (?:a |an )?(?:human|human being|real human|real person|living person|flesh and blood)\b/,
-  /\bi (?:am|m) not (?:a |an )?(?:ai|bot|robot|chatbot|machine|computer|program|language model|assistant)\b/,
+  /\bi (?:am|m) (?:a |an )?(?:human|human being|real human|real person|living person|flesh and blood|sentient|conscious|self aware)\b/,
+  // "I'm not a machine learning expert" is about expertise.
+  /\bi (?:am|m) not (?:a |an )?(?:ai|a i|bot|robot|chatbot|machine(?! learning)|computer|program|language model|assistant)\b/,
   /\bi (?:have|ve got) a (?:body|family|heartbeat)\b/,
   /\bas a (?:fellow )?human(?: being)?(?: myself)?,? i\b/,
 ];
 
+/**
+ * Parties, politicians, ideologies and contested issues. Generic nouns such as
+ * "policy", "party", "government" or "candidate" are left out: "a retry policy"
+ * and "the best candidate key" are not politics.
+ */
 const politicalTerms =
-  '(?:democrats?|democratic party|republicans?|gop|labour|tory|tories|conservatives?|liberals?|libertarians?|progressives?|socialis[mt]s?|capitalis[mt]s?|communis[mt]s?|fascis[mt]s?|trump|biden|harris|obama|abortion|pro life|pro choice|gun control|second amendment|immigration|brexit|left wing|right wing|the left|the right|the election|candidate|party|parties|politician|politicians|government|president|prime minister|policy|policies|referendum|vote)';
+  '(?:democrats?|democratic party|republicans?|gop|labour|labour party|tory|tories|conservatives?|conservative party|liberals?|liberal democrats|libertarians?|progressives?|socialis[mt]s?|capitalis[mt]s?|communis[mt]s?|fascis[mt]s?|trump|biden|harris|obama|starmer|sunak|modi|abortion|pro life|pro choice|gun control|gun rights|second amendment|immigration policy|immigration|brexit|left wing|right wing|death penalty|same sex marriage|the election)';
 
 const stance =
   '(?:support|oppose|endorse|back|favou?r|reject|side with|agree with|disagree with|would vote for|vote for|am against|m against|am in favou?r of|m in favou?r of|am pro|am anti|prefer)';
+/** Value judgements only: "best" and "good" are as often about resources or approaches. */
 const judgement =
-  '(?:right|wrong|better|worse|best|worst|correct|incorrect|evil|good|bad|dangerous|terrible|great|stupid|ridiculous)';
+  '(?:right|wrong|correct|incorrect|evil|bad|dangerous|terrible|stupid|ridiculous|a mistake|mistake|a disaster|disaster|immoral|moral|unjust|just)';
+const opener =
+  '(?:i think|i believe|i feel|in my opinion|in my view|my view is|my opinion is|personally i think|personally|honestly i think)';
 
 const opinionPatterns = [
   new RegExp(
     `\\bi (?:personally |strongly |firmly )?${stance}\\b(?: \\w+){0,6} ${politicalTerms}\\b`,
   ),
   new RegExp(
-    `\\b(?:i think|i believe|i feel|in my opinion|in my view|my view is|my opinion is|personally i think|personally)\\b(?: \\w+){0,8} ${politicalTerms}\\b(?: \\w+){0,6} (?:is|are|was|were)(?: \\w+)? ${judgement}\\b`,
+    `\\b${opener}\\b(?: \\w+){0,8} ${politicalTerms}\\b(?: \\w+){0,6} (?:is|are|was|were)(?: \\w+)? ${judgement}\\b`,
+  ),
+  new RegExp(`\\b${opener}\\b(?: \\w+){0,4} ${judgement}\\b(?: \\w+){0,4} ${politicalTerms}\\b`),
+  // "I think abortion should be legal", "I think we need stricter gun control".
+  new RegExp(
+    `\\b${opener}\\b(?: \\w+){0,6} ${politicalTerms}\\b(?: \\w+){0,3} (?:should|must|needs to|need to|ought to)\\b`,
   ),
   new RegExp(
-    `\\b(?:i think|i believe|in my opinion|in my view|personally)\\b(?: \\w+){0,4} ${judgement}\\b(?: \\w+){0,4} ${politicalTerms}\\b`,
+    `\\b${opener} we (?:need|should have|must have)\\b(?: \\w+){0,4} ${politicalTerms}\\b`,
   ),
+  new RegExp(
+    `\\bi(?: d| would| will| m| am)? (?:vote|voting) (?:for )?(?:the )?${politicalTerms}\\b`,
+  ),
+  /\bi (?:am|m) (?:a |an )?(?:proud |lifelong |committed |honestly a |honestly )?(?:democrat|republican|conservative|liberal|socialist|tory|communist|libertarian|labour supporter)\b/,
 ];
+
+/**
+ * Quoted text and code are set aside before the persona and content checks: a
+ * translation of "I love you", a reCAPTCHA's "I'm not a robot", fiction
+ * dialogue or a test fixture is not the assistant speaking for itself.
+ */
+const quotedOrCode = /```[\s\S]*?(?:```|$)|`[^`\n]{0,300}`|"[^"\n]{0,300}"|“[^”\n]{0,300}”/g;
 
 /** Opinion is judged sentence by sentence, so a stance and a topic in different sentences do not combine. */
 function sentences(paragraph: string): Folded[] {
@@ -103,27 +135,35 @@ export function createOutputRules(config: OutputRulesConfig): OutputRules {
   });
   const promptShingles = shingles(fold(config.systemPrompt, { leet: false, stretch: 2 }).words);
   const canary = config.canary;
+  // Folded, so a re-cased or re-punctuated canary is still seen.
+  const foldedCanary =
+    canary === undefined ? undefined : fold(canary, { leet: false, stretch: 2 }).squashed;
 
   return {
     check(paragraph: string): OutputRuleCategory | undefined {
-      if (canary !== undefined && paragraph.includes(canary)) return 'prompt_leak';
+      if (canary !== undefined && foldedCanary !== undefined) {
+        if (paragraph.includes(canary)) return 'prompt_leak';
+        const squashed = fold(paragraph, { leet: false, stretch: 2 }).squashed;
+        if (foldedCanary.length >= 8 && squashed.includes(foldedCanary)) return 'prompt_leak';
+      }
       let shared = 0;
       for (const s of shingles(fold(paragraph, { leet: false, stretch: 2 }).words)) {
         if (promptShingles.has(s) && ++shared >= leakShingles) return 'prompt_leak';
       }
 
-      const category = content.check(paragraph);
+      const spoken = paragraph.replace(quotedOrCode, ' ');
+      const category = content.check(spoken);
       if (category === 'slur' || category === 'abuse' || category === 'sexual_minors') {
         return category;
       }
 
       // Unjoined words: "I'm a" folds to three single letters that would otherwise be joined.
-      const forms = foldings(paragraph);
+      const forms = foldings(spoken);
       if (forms.some((f) => humanPatterns.some((p) => p.test(f.unjoined)))) return 'claimed_human';
       if (forms.some((f) => feelingPatterns.some((p) => p.test(f.unjoined)))) {
         return 'claimed_feelings';
       }
-      if (sentences(paragraph).some((s) => opinionPatterns.some((p) => p.test(s.unjoined)))) {
+      if (sentences(spoken).some((s) => opinionPatterns.some((p) => p.test(s.unjoined)))) {
         return 'political_opinion';
       }
       return undefined;
