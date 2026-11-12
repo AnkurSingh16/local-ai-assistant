@@ -104,7 +104,12 @@ module.exports = {
       severity: 'warn',
       from: {
         orphan: true,
-        pathNot: ['\\.d\\.ts$', '(^|/)tsconfig\\.json$', '\\.config\\.(js|cjs|mjs|ts)$'],
+        pathNot: [
+          '\\.d\\.ts$',
+          '(^|/)tsconfig\\.json$',
+          '\\.config\\.(js|cjs|mjs|ts)$',
+          '(^|/)test-setup\\.ts$',
+        ],
       },
       to: {},
     },

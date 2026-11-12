@@ -1,0 +1,130 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #5f6368;
+  --line: #dadce0;
+  --you: #eef3fd;
+  --warn: #fdf2e9;
+  --err: #fce8e6;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  line-height: 1.5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1c1e;
+    --fg: #e8eaed;
+    --muted: #9aa0a6;
+    --line: #3c4043;
+    --you: #22304a;
+    --warn: #3d2e1f;
+    --err: #4a2522;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+.app {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 16px 16px 160px;
+}
+header h1 {
+  font-size: 1.25rem;
+  margin: 8px 0 0;
+}
+.subtitle,
+.status,
+.note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.turns {
+  list-style: none;
+  padding: 0;
+}
+.turn {
+  margin: 24px 0;
+}
+.question {
+  background: var(--you);
+  border-radius: 12px;
+  padding: 10px 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.reply {
+  padding: 4px 2px;
+  overflow-wrap: anywhere;
+}
+.answer p {
+  white-space: pre-wrap;
+}
+pre {
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+}
+.refusal {
+  background: var(--warn);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.error {
+  background: var(--err);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.composer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 8px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 12px 16px 20px;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+.composer textarea {
+  flex: 1;
+  resize: none;
+  font: inherit;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--fg);
+}
+button {
+  font: inherit;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--fg);
+  color: var(--bg);
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}

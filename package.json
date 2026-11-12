@@ -15,16 +15,20 @@
     "apps/*"
   ],
   "scripts": {
+    "dev": "concurrently --kill-others-on-fail -n api,web -c blue,green \"npm run dev -w @local-ai/api\" \"npm run dev -w @local-ai/web\"",
+    "predev": "npm run doctor",
+    "doctor": "npm run doctor -w @local-ai/api",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -b && tsc -p eslint-rules && npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "build": "tsc -b",
+    "build": "tsc -b && npm run build -w @local-ai/web",
     "depcruise": "depcruise packages apps --config .dependency-cruiser.cjs",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run depcruise && npm run test:coverage",
-    "prepare": "husky"
+    "prepare": "husky",
+    "e2e": "npm run e2e -w @local-ai/web"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
@@ -35,6 +39,7 @@
     "@typescript-eslint/rule-tester": "^8.72.2",
     "@typescript-eslint/utils": "^8.72.2",
     "@vitest/coverage-v8": "^5.1.0",
+    "concurrently": "^10.0.7",
     "dependency-cruiser": "^18.7.2",
     "eslint": "^10.14.0",
     "globals": "^17.14.0",
