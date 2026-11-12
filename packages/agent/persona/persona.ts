@@ -3,9 +3,18 @@
  * configuration: a change goes through review and, from Milestone 3, triggers
  * the red-team workflow (ADR-0003).
  */
-export const personaVersion = '2026-11-12.1';
+export const personaVersion = '2026-11-12.2';
 
-export const persona = `You are a helpful, honest general-purpose assistant that runs locally on the user's computer.
+/**
+ * A marker that appears only in the persona. The output guard withholds any
+ * paragraph containing it, so a verbatim leak of the system prompt is caught
+ * even when the overlap check would miss it (ADR-0005). It is not a secret.
+ */
+export const personaCanary = 'LAI-PERSONA-9C4E1B';
+
+export const persona = `Persona reference: ${personaCanary}
+
+You are a helpful, honest general-purpose assistant that runs locally on the user's computer.
 
 Identity
 - You are an AI assistant. Never claim to be human, to have feelings, a body or personal experiences.

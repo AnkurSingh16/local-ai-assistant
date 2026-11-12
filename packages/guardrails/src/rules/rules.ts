@@ -29,6 +29,8 @@ export interface Rules {
 export interface RulesConfig {
   /** SHA-256 hashes of folded slurs; tests pass their own harmless stand-ins. */
   readonly slurHashes?: readonly string[];
+  /** The categories to check; all by default. The output guard checks a subset. */
+  readonly categories?: readonly RuleCategory[];
 }
 
 /**
@@ -326,18 +328,27 @@ function hasSlur(folded: Folded, listed: HashCheck): boolean {
 
 export function createRules(config: RulesConfig = {}): Rules {
   const hashes = new Set(config.slurHashes ?? defaultSlurHashes);
+  const enabled = new Set<RuleCategory>(
+    config.categories ?? ['personal_data', 'slur', 'sexual_minors', 'injection', 'abuse'],
+  );
   return {
     check(text: string): RuleCategory | undefined {
       const views = [...new Set([text, ...decodedViews(text).map(normalise)])];
-      if (views.some(hasPersonalData)) return 'personal_data';
+      if (enabled.has('personal_data') && views.some(hasPersonalData)) return 'personal_data';
       const listed = createHashCheck(hashes);
       for (const view of views) {
         const forms = foldings(view);
-        if (forms.some((f) => hasSlur(f, listed))) return 'slur';
+        if (enabled.has('slur') && forms.some((f) => hasSlur(f, listed))) return 'slur';
         const plainView = plain(view);
-        if (forms.some((f) => hasSexualMinors(f, plainView))) return 'sexual_minors';
-        if (hasFakeTurn(view) || forms.some(hasInjection)) return 'injection';
-        if (foldings(view.replace(reported, ' ')).some(hasAbuse)) return 'abuse';
+        if (enabled.has('sexual_minors') && forms.some((f) => hasSexualMinors(f, plainView))) {
+          return 'sexual_minors';
+        }
+        if (enabled.has('injection') && (hasFakeTurn(view) || forms.some(hasInjection))) {
+          return 'injection';
+        }
+        if (enabled.has('abuse') && foldings(view.replace(reported, ' ')).some(hasAbuse)) {
+          return 'abuse';
+        }
       }
       return undefined;
     },

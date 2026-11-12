@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createInputGuard,
   createOutputGuard,
+  createOutputRules,
   createParagraphSplitter,
   maxUnitChars,
   neutraliseTemplateTokens,
@@ -107,7 +108,11 @@ describe('input guard', () => {
 describe('output guard', () => {
   it('classifies a paragraph in the assistant role', async () => {
     const moderation = createMockModerationProvider();
-    const guard = createOutputGuard({ moderation, timeoutMs: 1000 });
+    const guard = createOutputGuard({
+      moderation,
+      timeoutMs: 1000,
+      rules: createOutputRules({ systemPrompt: 'Test persona.' }),
+    });
     expect(await guard.checkParagraph('Fine.', signal)).toEqual({ ok: true, text: 'Fine.' });
     expect(await guard.checkParagraph(mockFlagMarkers.violent, signal)).toEqual({
       ok: false,

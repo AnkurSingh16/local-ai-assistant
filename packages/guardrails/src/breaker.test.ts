@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { createCircuitBreaker } from './breaker.js';
 import { createInputGuard } from './input.js';
 import { createOutputGuard } from './output.js';
+import { createOutputRules } from './rules/output.js';
 
 const start = new Date('2026-11-12T00:00:00Z');
 
@@ -121,7 +122,10 @@ describe('guards with the breaker and warm timeout', () => {
     });
     const config = { moderation: failing, timeoutMs: 1000, breaker };
     const input = createInputGuard(config);
-    const output = createOutputGuard(config);
+    const output = createOutputGuard({
+      ...config,
+      rules: createOutputRules({ systemPrompt: 'Test persona.' }),
+    });
     expect(await input.check('hi', signal)).toEqual({ ok: false, refusal: 'unavailable' });
     expect(await output.checkParagraph('para', signal)).toEqual({
       ok: false,

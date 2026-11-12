@@ -1,7 +1,7 @@
 import { ProviderError } from '@local-ai/core';
 import type { SseEvent } from '@local-ai/contract';
 import { sseEventSchema } from '@local-ai/contract';
-import { createInputGuard, createOutputGuard } from '@local-ai/guardrails';
+import { createInputGuard, createOutputGuard, createOutputRules } from '@local-ai/guardrails';
 import type { MockModerationOptions } from '@local-ai/providers/mock';
 import {
   createMockChatProvider,
@@ -30,7 +30,11 @@ function setup(
   const deps: AssistantDeps = {
     chat,
     inputGuard: createInputGuard({ moderation, timeoutMs: 1000 }),
-    outputGuard: createOutputGuard({ moderation, timeoutMs: 1000 }),
+    outputGuard: createOutputGuard({
+      moderation,
+      timeoutMs: 1000,
+      rules: createOutputRules({ systemPrompt: persona }),
+    }),
     newId: ids(),
     turnTimeoutMs: 5000,
     ...overrides,
