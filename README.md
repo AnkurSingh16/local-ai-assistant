@@ -17,7 +17,7 @@ It is a demo project, separate from my retrieval-only portfolio chatbot.
 | 0         | Repository, tooling, CI, docs skeleton              | Done    |
 | 1         | Architecture debate and ADRs                        | Done    |
 | 2         | Chat with Ollama, streaming API, minimal web client | Done    |
-| 3         | Guardrails and the red-team eval in CI              | Planned |
+| 3         | Guardrails and the red-team eval in CI              | Done    |
 | 4         | Web search with SearXNG, SSRF protection, citations | Planned |
 | 5         | Memory, feedback and safe learning                  | Planned |
 | 6         | Polished web client and Expo mobile app             | Planned |
@@ -77,7 +77,7 @@ cd local-ai-assistant && npm ci
 npm run dev
 ```
 
-Then open http://127.0.0.1:5173. Today it answers from model knowledge only. Every message and every paragraph of the answer is checked by `llama-guard3` first. Web search with citations arrives in Milestone 4.
+Then open http://127.0.0.1:5173. Today it answers from model knowledge only. Every message is checked by input rules (self-harm, slurs, abuse, sexual content involving minors, injection, personal data) and `llama-guard3` before the model sees it, and every paragraph of the answer is checked by persona rules and `llama-guard3` before it is sent; the red-team results are in the [safety guide](docs/guides/safety.md#measured-results). Web search with citations arrives in Milestone 4.
 
 ## Documentation
 
