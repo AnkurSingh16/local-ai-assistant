@@ -1,5 +1,5 @@
 export { createInputGuard } from './input.js';
-export type { InputGuard, InputVerdict } from './input.js';
+export type { InputGuard, InputGuardConfig, InputVerdict } from './input.js';
 export { createCircuitBreaker } from './breaker.js';
 export type { BreakerConfig, BreakerPermit, CircuitBreaker } from './breaker.js';
 export type { GuardConfig } from './classify.js';
@@ -9,3 +9,5 @@ export type { OutputGuard, OutputVerdict } from './output.js';
 export { createParagraphSplitter, maxUnitChars, softParagraphChars } from './paragraphs.js';
 export type { ParagraphSplitter } from './paragraphs.js';
 export { refusalMessages } from './refusals.js';
+export { createRules } from './rules/rules.js';
+export type { RuleCategory, Rules, RulesConfig } from './rules/rules.js';

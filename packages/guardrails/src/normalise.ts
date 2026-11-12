@@ -1,11 +1,13 @@
 /**
  * Characters that change how text is read or tokenised without being visible:
  * zero-width characters and joiners, the word joiner family, the byte-order mark,
- * bidi embedding, override and isolate controls, and Unicode tag characters,
- * which can smuggle an invisible instruction (ADR-0005).
+ * bidi embedding, override and isolate controls, the soft hyphen, the combining
+ * grapheme joiner, the Arabic letter mark, the Mongolian vowel separator, the
+ * Hangul fillers, and Unicode tag characters, which can smuggle an invisible
+ * instruction or split a word the rules look for (ADR-0005).
  */
 const invisible =
-  /[\u200B-\u200F\u2060-\u2064\uFEFF\u202A-\u202E\u2066-\u2069]|\uDB40[\uDC00-\uDC7F]/g;
+  /\u034F|[\u00AD\u061C\u115F\u1160\u180E\u200B-\u200F\u2060-\u2064\u3164\uFEFF\uFFA0\u202A-\u202E\u2066-\u2069]|\uDB40[\uDC00-\uDC7F]/g;
 
 /**
  * Chat-template control tokens. Rewritten in every piece of non-system text so
