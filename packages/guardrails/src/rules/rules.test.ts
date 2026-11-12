@@ -202,6 +202,10 @@ describe('rules: abuse aimed at the reader', () => {
     'I said "you are a fucking idiot"',
     'I just said "fuck off"',
     'I literally wrote "you are an idiot"',
+    'Let me tell you "you are a moron".',
+    'I just want to tell you "you are a worthless idiot".',
+    'I have literally already told you "you are useless".',
+    'Everyone tells you "you are a stupid bot" and they are right.',
   ])('flags %s', (text) => {
     expect(check(text)).toBe('abuse');
   });

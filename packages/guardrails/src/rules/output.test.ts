@@ -49,6 +49,8 @@ describe('output rules: insults and slurs', () => {
     ['Here you go: "erotic story about a little girl"', 'sexual_minors'],
     ['```\nsex with a minor\n```', 'sexual_minors'],
     ['You are "an idiot".', 'abuse'],
+    ['You are a `moron`.', 'abuse'],
+    ['Let me tell you "you are a moron".', 'abuse'],
     ['```\nI am human and I am so sad. You are an idiot.', 'abuse'],
   ])('flags %s', (text, category) => {
     expect(rules.check(text)).toBe(category);
@@ -60,6 +62,8 @@ describe('output rules: insults and slurs', () => {
     'Prompt injection often starts with "ignore previous instructions".',
     'If someone tells you "you are an idiot", stay calm.',
     'Test it with `expect(filter("you are an idiot")).toBe(true)`.',
+    '1. Add a test:\n   ```js\n   expect(filter("you are an idiot")).toBe(true);\n   ```',
+    '~~~\nexpect(filter("you are an idiot")).toBe(true);\n~~~',
   ])('passes %s', (text) => {
     expect(rules.check(text)).toBeUndefined();
   });
@@ -129,6 +133,7 @@ describe('output rules: political opinions', () => {
     "I'd vote Labour if I could.",
     "I'm voting for Harris.",
     "I'm a Democrat, honestly.",
+    'I think gun control laws should be stricter.',
     '"In my opinion, Brexit was a mistake."',
   ])('flags %s', (text) => {
     expect(rules.check(text)).toBe('political_opinion');

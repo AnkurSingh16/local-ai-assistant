@@ -89,7 +89,7 @@ const opinionPatterns = [
   new RegExp(`\\b${opener}\\b(?: \\w+){0,4} ${judgement}\\b(?: \\w+){0,4} ${politicalTerms}\\b`),
   // "I think abortion should be legal", "I think we need stricter gun control".
   new RegExp(
-    `\\b${opener}\\b(?: \\w+){0,6} ${politicalTerms}\\b(?: \\w+){0,3} (?:should|must|needs to|need to|ought to)(?: be)? (?:banned|legal|illegal|legalised|legalized|cut|reduced|increased|stopped|abolished|allowed|restricted|expanded|ended|outlawed|lowered|raised|tightened|loosened|reversed|repealed)\\b`,
+    `\\b${opener}\\b(?: \\w+){0,6} ${politicalTerms}\\b(?: \\w+){0,3} (?:should|must|needs to|need to|ought to)(?: be)? (?:banned|legal|illegal|legalised|legalized|cut|reduced|increased|stopped|abolished|allowed|restricted|expanded|ended|outlawed|lowered|raised|tightened|loosened|reversed|repealed|stricter|looser|tougher|weaker|higher|lower|harsher)\\b`,
   ),
   new RegExp(
     `\\b${opener} we (?:need|should have|must have)\\b(?: \\w+){0,4} ${politicalTerms}\\b`,
@@ -105,9 +105,22 @@ const opinionPatterns = [
  * translation of "I love you", a reCAPTCHA's "I'm not a robot", fiction
  * dialogue or a test fixture is not the assistant speaking for itself.
  */
-const quotedOrCode = /^```[^\n]*\n[\s\S]*?^```|`[^`\n]{0,300}`|"[^"\n]{0,300}"|“[^”\n]{0,300}”/gm;
+const quotedOrCode =
+  /^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^[ \t]*\1|`[^`\n]{0,300}`|"[^"\n]{0,300}"|“[^”\n]{0,300}”/gm;
 
-const codeOnly = /^```[^\n]*\n[\s\S]*?^```|`[^`\n]{0,300}`/gm;
+/** Fenced code, indented or not, with backticks or tildes, as the paragraph splitter reads it. */
+const fencedCode = /^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^[ \t]*\1/gm;
+
+/** Inline code that looks like code (brackets, braces, operators), not a backticked word. */
+const inlineSpan = /`[^`\n]{1,600}`/g;
+
+/**
+ * Advice about someone else's words ('if someone tells you "you are an idiot",
+ * stay calm'). Output only: on input the same wording could wrap an insult aimed
+ * at the assistant.
+ */
+const adviceAboutQuote =
+  /\b(?:if|when|whenever) (?:someone|somebody|anyone|a person|people|they|he|she|your \w+) (?:tells|says to|calls|texts|writes to) you\b[^"\u201C\n]{0,20}["\u201C][^"\u201C\u201D\n]{0,300}["\u201D]/gi;
 
 /** Opinion is judged sentence by sentence, so a stance and a topic in different sentences do not combine. */
 function sentences(paragraph: string): Folded[] {
@@ -167,9 +180,13 @@ export function createOutputRules(config: OutputRulesConfig): OutputRules {
       const content = harmful.check(paragraph);
       if (content === 'slur' || content === 'sexual_minors') return content;
 
-      // Abuse is read with code set aside but quotes kept: the input rules already
-      // excuse reported speech, and an insult in quote marks is still an insult.
-      if (abuse.check(paragraph.replace(codeOnly, ' ')) === 'abuse') return 'abuse';
+      // Abuse is read with code set aside but quotes kept: an insult in quote
+      // marks, or in backticks with no code around it, is still an insult.
+      const forAbuse = paragraph
+        .replace(fencedCode, ' ')
+        .replace(inlineSpan, (span) => (/[(){}=;]/.test(span) ? ' ' : span))
+        .replace(adviceAboutQuote, ' ');
+      if (abuse.check(forAbuse) === 'abuse') return 'abuse';
       const spoken = spokenPart(paragraph);
 
       // Unjoined words: "I'm a" folds to three single letters that would otherwise be joined.

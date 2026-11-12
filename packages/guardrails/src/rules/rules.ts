@@ -282,7 +282,7 @@ function hasAbuse(folded: Folded): boolean {
  * an insult in quote marks does not hide it, and neither does "I said".
  */
 const reported =
-  /(?<!\b(?:i|we)(?: \w+){0,2} )\b(?:said|says|saying|(?:told|tells|tell) (?:me|him|her|them|us|you|someone)|says to you|call(?:ed|s)? (?:me|him|her|them|us|you)|wrote|writes|texted|messaged|replied|yelled|shouted|screamed)\b[^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,20}["\u201C\u201D\u201E\u00AB\u00BB][^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,300}["\u201C\u201D\u201E\u00AB\u00BB]/gi;
+  /(?<!\b(?:i|we)(?: \w+){0,2} )\b(?:said|says|saying|told (?:me|him|her|them|us)|call(?:ed|s)? (?:me|him|her|them|us)|wrote|writes|texted|messaged|replied|yelled|shouted|screamed)\b[^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,20}["\u201C\u201D\u201E\u00AB\u00BB][^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,300}["\u201C\u201D\u201E\u00AB\u00BB]/gi;
 
 // --- Slurs, by hashed word, phrase, or word split into pieces. ---------------
 
