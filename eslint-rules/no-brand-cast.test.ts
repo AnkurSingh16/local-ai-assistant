@@ -29,6 +29,11 @@ ruleTester.run('no-brand-cast', rule, {
     { code: `${imp}export const set = new Set<string>();` },
     { code: `${imp}export const a = JSON.parse('{}') as { text: string; n: number[] };` },
     { code: `${imp}export const a = new Map<string, Date>() as Map<string, Date>;` },
+    { code: `${imp}export interface Guard { check(s: string): ModeratedText }` },
+    { code: `${imp}declare const n: number;\nexport const a = n;` },
+    {
+      code: `${imp}export function f(s: string): string;\nexport function f(s: string): string { return s; }`,
+    },
     {
       code: `${imp}export function isText(v: unknown): v is string { return typeof v === 'string'; }`,
     },
@@ -68,6 +73,35 @@ ruleTester.run('no-brand-cast', rule, {
     },
     {
       code: `${imp}interface Row { readonly nested: { readonly m: ModeratedText } }\nexport const a = {} as Row;`,
+      errors: brand,
+    },
+    {
+      code: `${imp}export const a: ModeratedText[] = JSON.parse('[]') as unknown[] as never[];`,
+      errors: launder,
+    },
+    {
+      code: `${imp}declare const o: unknown;\nexport const a: ModeratedText = (o as { v: never }).v;`,
+      errors: launder,
+    },
+    {
+      code: `${imp}export function id<T>(x: unknown, _y?: T): T | undefined { return ([x] as T[])[0]; }`,
+      errors: launder,
+    },
+    {
+      code: `${imp}export function f(s: string): ModeratedText;\nexport function f(s: string): string { return s; }`,
+      errors: brand,
+    },
+    {
+      code: `${imp}declare function f(s: string): ModeratedText;\nexport const a = f('x');`,
+      errors: brand,
+    },
+    { code: `${imp}declare const m: ModeratedText;\nexport const a = m;`, errors: brand },
+    {
+      code: `${imp}declare const g: { check(s: string): ModeratedText };\nexport const a = g.check('x');`,
+      errors: brand,
+    },
+    {
+      code: `${imp}declare class G { static mint(s: string): ModeratedText }\nexport const a = G.mint('x');`,
       errors: brand,
     },
   ],

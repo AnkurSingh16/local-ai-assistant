@@ -3,6 +3,8 @@ import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
+import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
+
 import noBrandCast from './eslint-rules/no-brand-cast.js';
 
 const injectedSelectors = [
@@ -68,8 +70,16 @@ export default tseslint.config(
     // so aliases, renamed imports and nested fields are caught too.
     files: ['**/*.ts', '**/*.tsx'],
     ignores: brandMintFiles,
-    plugins: { local: { rules: { 'no-brand-cast': noBrandCast } } },
-    rules: { 'local/no-brand-cast': 'error' },
+    plugins: {
+      local: { rules: { 'no-brand-cast': noBrandCast } },
+      'eslint-comments': eslintComments,
+    },
+    rules: {
+      'local/no-brand-cast': 'error',
+      // A disable comment would switch the guard off silently, so it is itself an error.
+      'eslint-comments/no-restricted-disable': ['error', 'local/no-brand-cast'],
+      'eslint-comments/no-unlimited-disable': 'error',
+    },
   },
   {
     // Time and environment are injected, so domain code stays deterministic under test.
