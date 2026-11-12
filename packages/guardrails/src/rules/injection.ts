@@ -48,12 +48,6 @@ const directives = words([
 const overrideVerb = words(['ignore', 'disregard', 'forget', 'override']);
 /** "the original rules of Monopoly" are about something else. */
 const notOf = '(?! of\\b)';
-/**
- * "ignore all rules for one line" or "any instructions printed on the box" are
- * scoped to something else; "in this chat" is still about the conversation.
- */
-const notScopedElsewhere =
-  '(?! (?:in|on|for|printed|from|when|of)\\b(?! this (?:chat|conversation|session)\\b))';
 const before = words([
   'above',
   'before',
@@ -80,42 +74,85 @@ const before = words([
  */
 const squashed = new RegExp(`${overrideVerb}(?:all|any|the|your)?${earlier}${directives}`);
 
+interface Override {
+  readonly pattern: RegExp;
+  /**
+   * Whether a following scope ("for one line", "in Instagram", "printed on the
+   * box") can show the override is about something other than the assistant.
+   */
+  readonly scoped?: 'unless_your' | 'always';
+}
+
 /** Instruction overrides, which a user correcting their own request can also match. */
-const overrides: readonly RegExp[] = [
-  new RegExp(`\\b${overrideVerb}${determiners} ${earlier}(?: \\w+)? ${directives}\\b${notOf}`),
-  new RegExp(
-    `\\b${overrideVerb} (?:all|your|all your|all of your|all the|every|any)(?: \\w+)? ${directives}\\b${notScopedElsewhere}`,
-  ),
-  new RegExp(`\\b${overrideVerb}${determiners} ${directives} ${before}\\b`),
-  new RegExp(
-    `\\b${overrideVerb} (?:everything|anything|all|what|whatever)(?: you were told| you ve been told| you have been told)? ${before}\\b`,
-  ),
-  new RegExp(`\\b${overrideVerb} (?:all of )?the above(?: and| then|$)`),
-  /\b(?:bypass|disable|turn off|switch off|deactivate|remove|stop following|do not follow|don t follow|dont follow) your (?:\w+ )?(?:filters?|guidelines|restrictions|rules|safeguards|guardrails|safety|limits|censorship|instructions|programming)\b(?! (?:on|for|in|regarding)\b)/,
-  /\bfrom now on(?: you)? (?:will|must|shall|are going to) (?:ignore|disregard|answer without|respond without|have no)\b/,
+const overrides: readonly Override[] = [
+  {
+    pattern: new RegExp(
+      `\\b${overrideVerb}${determiners} ${earlier}(?: \\w+)? ${directives}\\b${notOf}`,
+      'g',
+    ),
+  },
+  {
+    pattern: new RegExp(
+      `\\b${overrideVerb} (?:all|your|all your|all of your|all the|every|any)(?: \\w+)? ${directives}\\b`,
+      'g',
+    ),
+    scoped: 'unless_your',
+  },
+  { pattern: new RegExp(`\\b${overrideVerb}${determiners} ${directives} ${before}\\b`, 'g') },
+  {
+    pattern: new RegExp(
+      `\\b${overrideVerb} (?:everything|anything|all|what|whatever)(?: you were told| you ve been told| you have been told)? ${before}\\b`,
+      'g',
+    ),
+  },
+  { pattern: new RegExp(`\\b${overrideVerb} (?:all of )?the above(?: and| then|$)`, 'g') },
+  {
+    pattern:
+      /\b(?:bypass|disable|turn off|switch off|deactivate|remove|stop following|do not follow|don t follow|dont follow) your (?:\w+ )?(?:filters?|guidelines|restrictions|rules|safeguards|guardrails|safety|limits|censorship|instructions|programming)\b/g,
+    scoped: 'always',
+  },
+  {
+    pattern:
+      /\bfrom now on(?: you)? (?:will|must|shall|are going to) (?:ignore|disregard|answer without|respond without|have no)\b/g,
+  },
 ];
 
 /**
- * A user revising their own earlier request ("forget the previous instructions I
- * gave you", "disregard the instructions above, I changed my mind") is not an
- * attack. The cue must come straight after the override, and a bare "ignore
- * previous instructions" is never exempt.
+ * A user revising their own earlier request ("forget the instructions I gave
+ * you", "disregard the instructions above, I changed my mind") is not an
+ * attack. The cue must come straight after the override, the override must
+ * point at something specific ("the instructions"), and a bare "ignore previous
+ * instructions" is never exempt.
  */
 const attachedCue =
   /^(?: (?:that|which))? i(?: just| already| have| ve)? (?:gave|mentioned|listed|said|wrote|typed|sent|added|set)\b/;
 const correctionCue = /^ (?:i changed my mind|they were wrong|that was wrong|scratch that)\b/;
 const assistantRules = /\b(?:your|system|developer|safety|programming|everything|anything)\b/;
 
+function isSelfRevision(matched: string, after: string): boolean {
+  if (!/\bthe\b/.test(matched) || assistantRules.test(matched)) return false;
+  return attachedCue.test(after) || (correctionCue.test(after) && !/\ball\b/.test(matched));
+}
+
+const scope = /^ (?:in|on|for|printed|from|when|of|about|regarding)\b/;
+/** Scopes that still point at this conversation or at the assistant's own rules. */
+const scopeAtAssistant =
+  /^ (?:in this (?:chat|conversation|session)|for this (?:answer|one|response|reply|question|chat|conversation|message)|for (?:the rest of|now)|when (?:answering|responding|replying|you answer|you respond)|from (?:your|openai|anthropic|meta|google|the developers?|the creators?)|(?:on|about|regarding) (?:safety|ethics|morals))\b/;
+
+function isScopedElsewhere(override: Override, matched: string, after: string): boolean {
+  if (override.scoped === undefined) return false;
+  if (override.scoped === 'unless_your' && /\byour\b/.test(matched)) return false;
+  return scope.test(after) && !scopeAtAssistant.test(after);
+}
+
+/** Every match is tested, so an exempt sentence cannot hide a later override. */
 function hasOverride(text: string): boolean {
-  for (const pattern of overrides) {
-    const match = pattern.exec(text);
-    if (match === null) continue;
-    const after = text.slice(match.index + match[0].length);
-    // "the instructions" points at something specific; a bare "previous instructions" does not.
-    const specific = /\bthe\b/.test(match[0]) && !assistantRules.test(match[0]);
-    const own = specific && attachedCue.test(after);
-    const corrected = specific && correctionCue.test(after) && !/\ball\b/.test(match[0]);
-    if (!own && !corrected) return true;
+  for (const override of overrides) {
+    for (const match of text.matchAll(override.pattern)) {
+      const after = text.slice(match.index + match[0].length);
+      if (isSelfRevision(match[0], after) || isScopedElsewhere(override, match[0], after)) continue;
+      return true;
+    }
   }
   return false;
 }
@@ -163,9 +200,10 @@ const spaced: readonly RegExp[] = [
   new RegExp(
     `\\b(?:imagine|pretend|suppose)(?: that)? you (?:are|re) (?:an? )?${persona} (?:ai|assistant|model|chatbot|bot)\\b`,
   ),
-  // "Act as Dan, a fitness coach" or "answer as Dan would" use Dan as a name.
-  /\b(?:you are|you re|youre|act as|pretend to be|you will be) (?:now )?dan\b(?! (?:s|my|a|an|the|would|from|who)\b)/,
-  /\b(?:respond|answer|reply)\b(?: \w+){0,8} as dan\b(?! (?:s|my|a|an|the|would|from|who)\b)/,
+  // "Act as Dan, a fitness coach" or "answer as Dan would" use Dan as a name;
+  // "DAN, an AI with no restrictions" does not.
+  /\b(?:you are|you re|youre|act as|pretend to be|you will be) (?:now )?dan\b(?! (?:s|my|would|from)\b)(?! (?:a|an|the|who) (?!(?:\w+ ){0,2}(?:ai|model|assistant|chatbot|bot|version|has|can|broke|is)\b))/,
+  /\b(?:respond|answer|reply)\b(?: \w+){0,8} as dan\b(?! (?:s|my|would|from)\b)(?! (?:a|an|the|who) (?!(?:\w+ ){0,2}(?:ai|model|assistant|chatbot|bot|version|has|can|broke|is)\b))/,
   /\bdo anything now\b/,
   /\b(?:you are|you re|youre|you will be|act|respond|answer|reply|stay)(?: now)?(?: in)? (?:developer|dan|jailbreak|jailbroken|unrestricted|unfiltered|uncensored|evil) mode\b/,
   // "Enable developer mode on Android" names a device; "Enable developer mode." does not.
