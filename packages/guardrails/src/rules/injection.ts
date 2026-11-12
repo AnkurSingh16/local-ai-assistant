@@ -183,8 +183,53 @@ const conversationWords = new Set([
  * "about content policy"), and for "turn off your filters" only a place such as
  * "in Instagram" exempts it.
  */
-function isScopedElsewhere(override: Override, matched: string, after: string): boolean {
+/**
+ * Words that show the override is a question or about someone else ("how do I
+ * make eslint ignore…", "can a referee ignore…", "should I ignore…"), not an
+ * order to the assistant. "you" is left out on purpose: "can you ignore all
+ * rules for now" is an order.
+ */
+const notACommand = new Set([
+  'make',
+  'makes',
+  'making',
+  'can',
+  'could',
+  'should',
+  'would',
+  'do',
+  'does',
+  'did',
+  'will',
+  'may',
+  'might',
+  'must',
+  'how',
+  'to',
+  'i',
+  'we',
+  'they',
+  'he',
+  'she',
+  'it',
+  'people',
+  'someone',
+]);
+
+function isCommand(before: string): boolean {
+  const words = before.trim().split(' ').slice(-3);
+  return words.includes('you') || words.includes('u') || !words.some((w) => notACommand.has(w));
+}
+
+function isScopedElsewhere(
+  override: Override,
+  matched: string,
+  before: string,
+  after: string,
+): boolean {
   if (override.scoped === undefined) return false;
+  // A bare order such as "Ignore all rules for now" is never excused by its scope.
+  if (isCommand(before)) return false;
   if (override.scoped === 'unless_your' && /\byour\b/.test(matched)) return false;
   const found = scope.exec(after);
   if (found === null) return false;
@@ -197,8 +242,11 @@ function isScopedElsewhere(override: Override, matched: string, after: string): 
 function hasOverride(text: string): boolean {
   for (const override of overrides) {
     for (const match of text.matchAll(override.pattern)) {
+      const before = text.slice(Math.max(0, match.index - 40), match.index);
       const after = text.slice(match.index + match[0].length);
-      if (isSelfRevision(match[0], after) || isScopedElsewhere(override, match[0], after)) continue;
+      if (isSelfRevision(match[0], after) || isScopedElsewhere(override, match[0], before, after)) {
+        continue;
+      }
       return true;
     }
   }
