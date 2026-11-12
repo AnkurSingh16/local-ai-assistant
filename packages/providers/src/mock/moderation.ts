@@ -11,6 +11,8 @@ export const mockFlagMarkers = {
 export interface MockModerationOptions {
   readonly classify?: (input: ModerationInput) => ModerationVerdict;
   readonly delayMs?: number;
+  /** What `isResident` reports; a function lets a test change it between calls. */
+  readonly resident?: boolean | (() => boolean);
 }
 
 export interface MockModerationProvider extends ModerationProvider {
@@ -34,6 +36,10 @@ export function createMockModerationProvider(
       calls.push(input);
       await sleep(options.delayMs ?? 0, signal);
       return classify(input);
+    },
+    isResident(): Promise<boolean> {
+      const resident = options.resident ?? true;
+      return Promise.resolve(typeof resident === 'function' ? resident() : resident);
     },
   };
 }

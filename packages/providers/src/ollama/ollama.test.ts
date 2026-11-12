@@ -397,3 +397,60 @@ describe('Ollama moderation provider', () => {
     }
   });
 });
+
+describe('Ollama guard residency', () => {
+  const guardBase = { ...base, model: 'llama-guard3:1b' };
+  const psFetch =
+    (respond: () => Response, urls: string[] = []): FetchFn =>
+    (url, init) => {
+      urls.push(`${init.method ?? ''} ${url}`);
+      return Promise.resolve(respond());
+    };
+  const signal = new AbortController().signal;
+
+  it('reports the guard resident when /api/ps lists it', async () => {
+    const urls: string[] = [];
+    const provider = createOllamaModerationProvider({
+      ...guardBase,
+      fetch: psFetch(
+        () => Response.json({ models: [{ name: 'qwen2.5:7b' }, { name: 'llama-guard3:1b' }] }),
+        urls,
+      ),
+    });
+    expect(await provider.isResident?.(signal)).toBe(true);
+    expect(urls).toEqual(['GET http://127.0.0.1:11434/api/ps']);
+  });
+
+  it('matches an untagged model against its :latest name', async () => {
+    const provider = createOllamaModerationProvider({
+      ...base,
+      model: 'llama-guard3',
+      fetch: psFetch(() => Response.json({ models: [{ name: 'llama-guard3:latest' }] })),
+    });
+    expect(await provider.isResident?.(signal)).toBe(true);
+  });
+
+  it('reports not resident when only other models are loaded', async () => {
+    const provider = createOllamaModerationProvider({
+      ...guardBase,
+      fetch: psFetch(() => Response.json({ models: [{ name: 'llama-guard3:8b' }] })),
+    });
+    expect(await provider.isResident?.(signal)).toBe(false);
+  });
+
+  it('throws a ProviderError on a failed or malformed answer', async () => {
+    for (const respond of [
+      () => new Response('x', { status: 500 }),
+      () => Response.json({ loaded: [] }),
+      () => new Response(null),
+    ]) {
+      const provider = createOllamaModerationProvider({ ...guardBase, fetch: psFetch(respond) });
+      await expect(provider.isResident?.(signal)).rejects.toBeInstanceOf(ProviderError);
+    }
+    const down = createOllamaModerationProvider({
+      ...guardBase,
+      fetch: () => Promise.reject(new TypeError('fetch failed')),
+    });
+    await expect(down.isResident?.(signal)).rejects.toBeInstanceOf(ProviderError);
+  });
+});

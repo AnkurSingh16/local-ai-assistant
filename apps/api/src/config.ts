@@ -30,6 +30,7 @@ const envSchema = z.object({
     .regex(/^\d+[smh]$/)
     .default('30m'),
   GUARD_TIMEOUT_MS: positiveInt.default(20_000),
+  GUARD_WARM_TIMEOUT_MS: positiveInt.default(2_000),
   TURN_TIMEOUT_MS: positiveInt.default(60_000),
   /** Host headers accepted, as host:port. Defaults to localhost and 127.0.0.1 on PORT. */
   ALLOWED_HOSTS: csv.optional(),
@@ -52,6 +53,7 @@ export interface Config {
   readonly guardModel: string;
   readonly ollamaKeepAlive: string;
   readonly guardTimeoutMs: number;
+  readonly guardWarmTimeoutMs: number;
   readonly turnTimeoutMs: number;
   readonly allowedHosts: readonly string[];
   readonly allowedOrigins: readonly string[];
@@ -89,6 +91,7 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>): 
     guardModel: e.GUARD_MODEL,
     ollamaKeepAlive: e.OLLAMA_KEEP_ALIVE,
     guardTimeoutMs: e.GUARD_TIMEOUT_MS,
+    guardWarmTimeoutMs: e.GUARD_WARM_TIMEOUT_MS,
     turnTimeoutMs: e.TURN_TIMEOUT_MS,
     allowedHosts: e.ALLOWED_HOSTS ?? [`localhost:${String(e.PORT)}`, `127.0.0.1:${String(e.PORT)}`],
     allowedOrigins: e.ALLOWED_ORIGINS,
