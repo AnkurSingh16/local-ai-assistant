@@ -43,12 +43,13 @@ export async function* parseSse(
   idleTimeoutMs: number = defaultIdleTimeoutMs,
 ): AsyncGenerator<SseFrame> {
   const reader = body.getReader();
-  let idle = false;
+  // An object, so the compiler sees the timer callback's write.
+  const idle = { fired: false };
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
   const armIdleTimer = (): void => {
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
-      idle = true;
+      idle.fired = true;
       void reader.cancel().catch(() => undefined);
     }, idleTimeoutMs);
   };
@@ -94,7 +95,7 @@ export async function* parseSse(
       armIdleTimer();
       const { done, value } = await reader.read();
       signal.throwIfAborted();
-      if (idle) throw new SseIdleTimeoutError();
+      if (idle.fired) throw new SseIdleTimeoutError();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       for (;;) {
