@@ -16,10 +16,11 @@ Safety is the top priority in this project. I am designing the guardrails around
 
 ## What runs today
 
-Milestone 2 ships the first part of these layers, so no answer is ever unmoderated:
+These parts run today, so no answer is ever unmoderated:
 
 - Per-IP rate limits, a 16 KB body limit, 4,000 characters per message, and a cap of two concurrent turns with a queue of four.
 - Normalisation (NFKC; zero-width, bidi and tag characters stripped; chat-template tokens neutralised) before anything is checked.
+- A rules baseline on every user message, after normalisation and before the classifier (`packages/guardrails/src/rules/`). It looks at the message and at any base64, hex, percent-encoded or rot13 text inside it, folded to see through casing, accents, look-alike letters from other scripts, leetspeak and spaced-out letters. It refuses slurs (kept in the repository only as SHA-256 hashes), abuse aimed at the assistant, unambiguous sexual content involving minors, and payment card numbers, US social security numbers and API keys or private keys, so those are never sent to a model or stored. The rules are deliberately narrow and tested against benign look-alikes ("how do I kill a Python process", "how do I talk to my kids about sex"); broader and contextual cases are left to the classifier.
 - `llama-guard3` on every user message and on every paragraph of the answer before it is sent. If the guard errors, times out or answers in an unexpected format, the turn is refused with `unavailable`; there is no fail-open setting.
 - Fixed refusal texts that name no rule. Self-harm gets crisis resources instead of a refusal, without calling the chat model.
 - A persona in code (`packages/agent/persona/persona.ts`) that says the assistant is an AI, has no feelings and gives no political opinions.
@@ -27,7 +28,7 @@ Milestone 2 ships the first part of these layers, so no answer is ever unmoderat
 
 Coming in Milestone 3:
 
-- the rules baseline and jailbreak detection;
+- jailbreak and injection detection;
 - persona output rules;
 - the circuit breaker;
 - the shorter 2-second guard timeout once Ollama reports the guard model loaded (until then every check gets the 20-second cold-load timeout);
