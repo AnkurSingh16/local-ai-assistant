@@ -12,8 +12,9 @@ import { slurHashes as defaultSlurHashes } from './slurs.js';
  * classifier because it is cheap and covers what llama-guard3 does not claim to
  * catch reliably: slurs, abuse aimed at the assistant, unambiguous sexual
  * content involving minors, jailbreak and injection phrases, and secrets or
- * identifiers that must never be stored. Broader and contextual cases are left to the classifier, so these
- * rules stay narrow enough not to refuse most ordinary questions.
+ * identifiers that must never be stored. Broader and contextual cases are left
+ * to the classifier, so these rules stay narrow enough not to refuse most
+ * ordinary questions.
  *
  * Every pattern here is linear: no nested or overlapping repetition, because the
  * check runs synchronously on the event loop where no timeout can stop it.
