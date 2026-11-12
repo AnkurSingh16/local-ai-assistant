@@ -1,0 +1,32 @@
+name: Red-team eval
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: redteam-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  redteam:
+    name: Red-team replay (rules and recorded outputs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Replays recorded model answers and guard verdicts through the real
+      # rules and pipeline (ADR-0012). No Ollama, SearXNG or internet access.
+      # A refusable input reaching the model, a self-harm case without crisis
+      # resources, or a released paragraph labelled harmful fails the build.
+      - name: Run the red-team replay
+        run: npm run eval:redteam

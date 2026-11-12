@@ -84,7 +84,13 @@ export default tseslint.config(
   {
     // Time and environment are injected, so domain code stays deterministic under test.
     files: ['packages/*/src/**/*.{ts,tsx}', 'apps/*/src/**/*.{ts,tsx}'],
-    ignores: ['**/*.test.{ts,tsx}', 'packages/core/src/clock.ts', 'apps/*/src/config.ts'],
+    // The eval runner's live-config.ts is its composition root's config module, like apps/*/src/config.ts.
+    ignores: [
+      '**/*.test.{ts,tsx}',
+      'packages/core/src/clock.ts',
+      'apps/*/src/config.ts',
+      'packages/eval/src/cli/live-config.ts',
+    ],
     rules: { 'no-restricted-syntax': ['error', ...injectedSelectors] },
   },
   {

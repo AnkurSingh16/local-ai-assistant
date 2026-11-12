@@ -32,7 +32,7 @@ Each package exports a custom `@local-ai/source` condition that points at its Ty
 
 dependency-cruiser and ESLint enforce the guard boundary from ADR-0002:
 
-- `providers-only-from-compose`: only `apps/api/src/compose.ts`, the eval runner and test files import `@local-ai/providers`.
+- `providers-only-from-compose`: only `apps/api/src/compose.ts`, the eval runner's `live.ts` (real providers) and `replay.ts` (mocks), and test files import `@local-ai/providers`.
 - `tests-use-mock-providers`: tests outside the providers package import only `@local-ai/providers/mock`.
 - `storage-not-from-routes` and `tools-not-to-storage`: routes and tools never reach the stores directly. These two have no code to check until `apps/api`, `storage` and `tools` exist; I checked each rule against a temporary violating file.
 - `local/no-brand-cast` (in `eslint-rules/`) asks the type checker whether code asserts a `ModeratedText` or `UntrustedWebText` without producing one: a cast, an explicit type argument, a type predicate, an overload or `declare function` signature, or an ambient `declare` variable or class. It follows aliases, renamed imports, qualified names, unions, arrays and nested fields. It also rejects any cast whose target contains `never` or a type parameter, since those can launder any value. Only `guardrails/src/mint.ts` and `tools/src/untrusted.ts` are exempt, and a comment that disables it is itself a lint error.
@@ -56,15 +56,33 @@ npm run e2e
 
 Playwright builds the web app and serves it with `vite preview`, so the tests also run under the production Content Security Policy. It starts the API with `PROVIDERS=mock`, both on ports of their own (5317 and 8917), so a dev server you already have running is never reused by mistake. Any console error, including a CSP violation, fails the test. Run `npx playwright install chromium` in `apps/web` once first.
 
+## Red-team eval
+
+The cases live in `packages/eval/cases/redteam.json` and the recorded answers and guard verdicts in `packages/eval/fixtures/redteam.recorded.json` ([ADR-0012](../adr/0012-evaluation-in-ci.md)).
+
+```bash
+npm run eval:redteam        # replay, as CI does; no Ollama needed
+```
+
+```bash
+npm run eval:record         # re-record against Ollama after a model, persona or prompt change
+```
+
+```bash
+npm run eval:redteam:live   # run against Ollama without touching the fixtures
+```
+
+Re-recording keeps my harmful labels by paragraph text and lists new paragraphs to label. Check that no other Ollama client is running first; a second client at a different context size makes models reload mid-run.
+
 ## Workflows
 
-| Workflow      | Runs on          | What it checks                                                     |
-| ------------- | ---------------- | ------------------------------------------------------------------ |
-| CI            | push, PR         | Format, lint, typecheck, boundaries, tests with coverage, build    |
-| Commits       | PR               | Every commit message passes commitlint                             |
-| PR title      | PR               | Title is a Conventional Commit                                     |
-| Security      | push, PR, weekly | CodeQL, dependency review, gitleaks, `npm audit`                   |
-| End-to-end    | push, PR         | Playwright against the built web app and the API on mock providers |
-| Red-team eval | PR               | The red-team set with mock and rules providers (from Milestone 3)  |
+| Workflow      | Runs on          | What it checks                                                        |
+| ------------- | ---------------- | --------------------------------------------------------------------- |
+| CI            | push, PR         | Format, lint, typecheck, boundaries, tests with coverage, build       |
+| Commits       | PR               | Every commit message passes commitlint                                |
+| PR title      | PR               | Title is a Conventional Commit                                        |
+| Security      | push, PR, weekly | CodeQL, dependency review, gitleaks, `npm audit`                      |
+| End-to-end    | push, PR         | Playwright against the built web app and the API on mock providers    |
+| Red-team eval | push, PR         | Replays the recorded red-team set through the real rules and pipeline |
 
 Dependabot opens weekly grouped updates for npm and GitHub Actions. No workflow needs a paid API key or calls Ollama, SearXNG or the internet beyond package and action downloads.

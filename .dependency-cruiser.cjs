@@ -43,13 +43,13 @@ module.exports = {
     {
       name: 'providers-only-from-compose',
       comment:
-        'Providers are wired in the composition roots only (ADR-0002): the API compose.ts and the eval runner. Tests may use the mocks.',
+        'Providers are wired in the composition roots only (ADR-0002): the API compose.ts, the live eval runner (real providers) and the eval replay (mocks). Tests may use the mocks.',
       severity: 'error',
       from: {
         pathNot: [
           '^apps/api/src/compose\\.ts$',
           '^packages/providers/',
-          '^packages/eval/',
+          '^packages/eval/src/(live|replay)\\.ts$',
           '\\.test\\.tsx?$',
         ],
       },

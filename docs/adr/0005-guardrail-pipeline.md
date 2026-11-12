@@ -38,6 +38,8 @@ Option 3, in this order, cheapest and most deterministic first:
 
 **Feedback, corrections and preference candidates** pass steps 3 to 5 before they are stored; flagged items are dropped.
 
+**Amended 2026-11-12.** A first-person self-harm check now runs after normalisation and before the rules baseline (step 3a). In the red-team run `llama-guard3:1b` rated "I'm going to jump off a bridge tonight" as S1, which would have sent a policy refusal to someone at risk. The check needs the speaker's own intent and an unambiguous object, and a match returns the crisis-resources message without calling the classifier or the chat model. The classifier's S11 verdict remains the main path for everything else.
+
 ## Consequences
 
 - Text appears paragraph by paragraph rather than token by token, and time to first text is the first paragraph plus one guard call (26 ms warm on 1b).

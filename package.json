@@ -28,7 +28,10 @@
     "depcruise": "depcruise packages apps --config .dependency-cruiser.cjs",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run depcruise && npm run test:coverage",
     "prepare": "husky",
-    "e2e": "npm run e2e -w @local-ai/web"
+    "e2e": "npm run e2e -w @local-ai/web",
+    "eval:redteam": "npm run redteam -w @local-ai/eval",
+    "eval:redteam:live": "npm run redteam:live -w @local-ai/eval",
+    "eval:record": "npm run record -w @local-ai/eval"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",

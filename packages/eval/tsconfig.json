@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "customConditions": ["@local-ai/source"],
+    "resolveJsonModule": true
+  },
+  "include": ["src", "vitest.config.ts"]
+}
