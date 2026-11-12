@@ -64,6 +64,14 @@ module.exports = {
       to: { path: '^packages/providers/', pathNot: '^packages/providers/src/mock/' },
     },
     {
+      name: 'mint-only-from-guards',
+      comment:
+        'ModeratedText is minted only after a pass, so only the input and output guards may call mint.',
+      severity: 'error',
+      from: { pathNot: '^packages/guardrails/src/(input|output)\\.ts$' },
+      to: { path: '^packages/guardrails/src/mint\\.ts$' },
+    },
+    {
       name: 'storage-not-from-routes',
       comment:
         'Routes reach storage only through the assistant, which accepts only moderated text.',
