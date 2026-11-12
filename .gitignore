@@ -11,3 +11,5 @@ playwright-report/
 test-results/
 .expo/
 data/
+playwright-report/
+test-results/

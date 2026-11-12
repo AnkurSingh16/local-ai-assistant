@@ -42,7 +42,7 @@ The guard and the chat model must stay loaded together, and Ollama should run on
 launchctl setenv OLLAMA_NUM_PARALLEL 1
 ```
 
-The doctor script that arrives with `npm run dev` checks the Ollama version, the pulled models and their digests.
+`npm run doctor` (run automatically before `npm run dev`) checks the Ollama version, that the configured models are pulled, and that their digests match the ones pinned in ADR-0010. It also checks that ports 8787 and 5173 are free. Every failure comes with the command that fixes it.
 
 ## SearXNG
 
@@ -50,7 +50,21 @@ SearXNG runs in Docker Compose and needs no API key. The Compose file and settin
 
 ## Running the assistant
 
-`npm run dev` arrives in Milestone 2.
+```bash
+npm run dev
+```
+
+This runs the doctor, then starts the API on `http://127.0.0.1:8787` and the web app on `http://127.0.0.1:5173`. Open the web app in a browser. The web dev server proxies `/v1` to the API, so the browser only ever talks to one origin. Both bind to loopback only.
+
+The first answer after a restart takes longer while Ollama loads the models. The API loads the guard model at startup, and `GET /readyz` turns ready once it answers.
+
+To try the app without Ollama, run the mock providers. Answers are a fixed sentence, and messages containing `MOCK_FLAG` are refused:
+
+```bash
+PROVIDERS=mock npm run dev -w @local-ai/api
+```
+
+If port 5173 is taken by another project's dev server, the doctor says so. Stop that server first; the web app does not move to another port silently.
 
 ## Mobile app with Expo Go
 

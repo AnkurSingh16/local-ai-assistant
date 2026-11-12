@@ -63,7 +63,7 @@ flowchart LR
 
 ## Quick start
 
-What works today is the toolchain:
+You need Node.js 24 and Ollama with `qwen2.5:7b` and `llama-guard3:1b` pulled ([local setup](docs/local-setup.md)).
 
 ```bash
 git clone https://github.com/AnkurSingh16/local-ai-assistant.git
@@ -74,10 +74,10 @@ cd local-ai-assistant && npm ci
 ```
 
 ```bash
-npm run check
+npm run dev
 ```
 
-The five-minute quick start for the running assistant (`npm run dev` with Ollama and SearXNG) arrives with Milestone 2 and is completed in Milestone 4. [`docs/local-setup.md`](docs/local-setup.md) covers installing Ollama and pulling the models now.
+Then open http://127.0.0.1:5173. Today it answers from model knowledge only. Every message and every paragraph of the answer is checked by `llama-guard3` first. Web search with citations arrives in Milestone 4.
 
 ## Documentation
 
