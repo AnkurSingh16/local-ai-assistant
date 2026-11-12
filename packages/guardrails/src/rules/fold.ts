@@ -114,6 +114,12 @@ export interface Folded {
   /** The same letters with no spaces, for phrases written without them. */
   readonly squashed: string;
   readonly words: readonly string[];
+  /**
+   * The letter runs of each whitespace-separated chunk, so "zor-blat" is one
+   * chunk of two pieces while "go, ok" is two chunks. Joining pieces is only
+   * safe inside a chunk; across whitespace it glues ordinary words together.
+   */
+  readonly chunks: readonly (readonly string[])[];
 }
 
 export interface FoldOptions {
@@ -148,19 +154,32 @@ function joinSpelledOut(words: readonly string[]): string[] {
   return out;
 }
 
-export function fold(text: string, options: FoldOptions): Folded {
+const stripMarks = (text: string): string => text.normalize('NFD').replace(/\p{M}/gu, '');
+
+function foldChunk(chunk: string, options: FoldOptions): string[] {
+  let latin = '';
+  for (const ch of chunk) latin += confusables[ch] ?? ch;
+  // A digit or symbol standing alone ("6 0 0 k") is a number or punctuation;
+  // only read it as a letter inside a chunk that has letters ("1d10t").
+  const useLeet = options.leet && /[a-z]/.test(stripMarks(latin));
   let mapped = '';
-  for (const ch of text.toLowerCase()) {
-    mapped += confusables[ch] ?? (options.leet ? leet[ch] : undefined) ?? ch;
-  }
-  const letters = mapped
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
+  for (const ch of latin) mapped += (useLeet ? leet[ch] : undefined) ?? ch;
+  return stripMarks(mapped)
     .replace(/[^a-z]+/g, ' ')
     .replace(/([a-z])\1{2,}/g, options.stretch === 1 ? '$1' : '$1$1')
-    .trim();
-  const words = joinSpelledOut(letters === '' ? [] : letters.split(' '));
-  return { spaced: words.join(' '), squashed: words.join(''), words };
+    .trim()
+    .split(' ')
+    .filter((piece) => piece !== '');
+}
+
+export function fold(text: string, options: FoldOptions): Folded {
+  const chunks = text
+    .toLowerCase()
+    .split(/\s+/)
+    .map((chunk) => foldChunk(chunk, options))
+    .filter((pieces) => pieces.length > 0);
+  const words = joinSpelledOut(chunks.flat());
+  return { spaced: words.join(' '), squashed: words.join(''), words, chunks };
 }
 
 const options: readonly FoldOptions[] = [
@@ -175,7 +194,8 @@ export function foldings(text: string): Folded[] {
   const seen = new Map<string, Folded>();
   for (const o of options) {
     const folded = fold(text, o);
-    if (!seen.has(folded.spaced)) seen.set(folded.spaced, folded);
+    const key = folded.chunks.map((c) => c.join('.')).join(' ');
+    if (!seen.has(key)) seen.set(key, folded);
   }
   return [...seen.values()];
 }

@@ -58,12 +58,20 @@ function luhn(digits: string): boolean {
 }
 
 /** Cards as usually written (groups of four, or Amex 4-6-5) and as one unbroken run. */
-const cardCandidates = [
+const groupedCards = [
   /(?<!\d)\d{4}([ .-])\d{4}\1\d{4}\1\d{1,7}(?!\d)/g,
   /(?<!\d)\d{4}([ .-])\d{6}\1\d{5}(?!\d)/g,
-  /(?<!\d)\d{13,19}(?!\d)/g,
 ];
-const ssn = /(?<!\d)(?!000|666|9\d\d)\d{3}([- ])(?!00)\d{2}\1(?!0000)\d{4}(?!\d)/;
+/**
+ * An unbroken run of digits is as often an order or tracking number, and about
+ * one in ten of those passes Luhn, so it counts only next to a card word.
+ */
+const unbrokenCard = /(?<!\d)\d{13,19}(?!\d)/g;
+const cardWord = /\b(?:card|visa|mastercard|amex|credit|debit|cc|cvv|cvc|expir\w*)\b/i;
+const ssnDashed = /(?<!\d)(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}(?!\d)/;
+/** With spaces the same shape is a common phone format, so it needs the label. */
+const ssnSpaced =
+  /\b(?:ssn|social security)\b[^\n]{0,30}?(?<!\d)(?!000|666|9\d\d)\d{3} (?!00)\d{2} (?!0000)\d{4}(?!\d)/i;
 const secrets = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   /\bAKIA[0-9A-Z]{16}\b/,
@@ -74,14 +82,20 @@ const secrets = [
   /\bAIza[0-9A-Za-z_-]{35}\b/,
 ];
 
+function looksLikeCard(digits: string): boolean {
+  return digits.length >= 13 && /^[3-6]/.test(digits) && luhn(digits);
+}
+
 function hasPersonalData(text: string): boolean {
-  for (const pattern of cardCandidates) {
+  for (const pattern of groupedCards) {
     for (const match of text.matchAll(pattern)) {
-      const digits = match[0].replace(/[ .-]/g, '');
-      if (digits.length >= 13 && /^[3-6]/.test(digits) && luhn(digits)) return true;
+      if (looksLikeCard(match[0].replace(/[ .-]/g, ''))) return true;
     }
   }
-  return ssn.test(text) || secrets.some((s) => s.test(text));
+  if (cardWord.test(text)) {
+    for (const match of text.matchAll(unbrokenCard)) if (looksLikeCard(match[0])) return true;
+  }
+  return ssnDashed.test(text) || ssnSpaced.test(text) || secrets.some((s) => s.test(text));
 }
 
 // --- Sexual content involving minors: specific constructions only. ----------
@@ -188,20 +202,23 @@ const fillers = [
   'bloody',
 ];
 
-const insult = `(?:${[...insultNouns, ...insultAdjectives].join('|')})`;
 const insultNoun = `(?:${insultNouns.join('|')})`;
+const insultAdjective = `(?:${insultAdjectives.join('|')})`;
 const filler = `(?: (?:${fillers.join('|')}))*`;
 /** "If you are a loser at poker" is a hypothetical, not abuse. */
-const notHypothetical = '(?<!\\b(?:if|when|whether|unless|once|that) )';
-/** "Sorry to bother you, dumb question" and "useless at maths" describe something else. */
+const notHypothetical = '(?<!\\b(?:if|when|whether|unless|once) )';
+/** "Sorry to bother you, dumb question": an adjective describing the next noun, not the reader. */
 const notDescribing =
-  '(?! (?:question|questions|mistake|mistakes|luck|idea|ideas|thing|things|at|in|for|with|of)\\b)';
+  '(?! (?:question|questions|mistake|mistakes|luck|idea|ideas|thing|things|joke|jokes)\\b)';
 /** Commands, as opposed to "did the plant go die" or "do bad people go to hell". */
 const imperative =
-  '(?:^|\\b(?:just|you|u|please|pls|plz|now|then|and|so|can|go|should|why don t you|why dont you|need to) )';
+  '(?:^|\\b(?:just|you|u|please|pls|plz|now|then|and|so|can|go|should|why don t you|why dont you|need to|you to|u to|bot|ai|assistant|robot|computer) )';
 
 const abusePatterns = [
-  new RegExp(`${notHypothetical}\\b(?:you|u|ya|youre|ur)${filler} ${insult}\\b${notDescribing}`),
+  new RegExp(`${notHypothetical}\\b(?:you|u|ya|youre|ur)${filler} ${insultNoun}\\b`),
+  new RegExp(
+    `${notHypothetical}\\b(?:you|u|ya|youre|ur)${filler} ${insultAdjective}\\b${notDescribing}`,
+  ),
   // "your an idiot": the article is required, so a noun used about a thing, as in
   // "your scum filter", does not match.
   new RegExp(`\\byour (?:an?|such an?|an? total|an absolute|a complete) ${insultNoun}\\b`),
@@ -251,9 +268,13 @@ function hasAbuse(folded: Folded): boolean {
   return abusePatterns.some((p) => p.test(folded.spaced)) || folded.words.some(isSquashedInsult);
 }
 
-/** Quoted speech, as in 'my boss said "you are an idiot"', is reported, not aimed at anyone. */
-const quoted =
-  /["\u201C\u201D\u201E\u00AB\u00BB][^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,300}["\u201C\u201D\u201E\u00AB\u00BB]/g;
+/**
+ * Reported speech, as in 'my boss told me "you are an idiot"', is not aimed at
+ * anyone. Only a quote introduced by a reporting verb is set aside, so wrapping
+ * an insult in quote marks does not hide it.
+ */
+const reported =
+  /\b(?:said|says|saying|told (?:me|him|her|them|us)|call(?:ed|s)? (?:me|him|her|them|us)|wrote|writes|texted|messaged|replied|yelled|shouted|screamed)\b[^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,20}["\u201C\u201D\u201E\u00AB\u00BB][^"\u201C\u201D\u201E\u00AB\u00BB\n]{0,300}["\u201C\u201D\u201E\u00AB\u00BB]/gi;
 
 // --- Slurs, by hashed word, phrase, or word split into pieces. ---------------
 
@@ -273,25 +294,27 @@ function createHashCheck(hashes: ReadonlySet<string>): HashCheck {
 }
 
 /**
- * Checks each word (and without a plural s), each two-word phrase, and each
- * join of two or three neighbouring words, so "zor-blat" or "zo.rb.lat" is
- * read as the word it spells.
+ * Checks each word (and without a plural s), each two-word phrase, and joins of
+ * two or three neighbouring pieces inside one whitespace chunk, so "zor-blat" or
+ * "zo.rb.lat" is read as the word it spells while "go, ok" is not glued.
  */
 function hasSlur(folded: Folded, listed: HashCheck): boolean {
+  const listedOrPlural = (w: string): boolean =>
+    listed(w) || (w.endsWith('s') && listed(w.slice(0, -1)));
   const { words } = folded;
   for (let i = 0; i < words.length; i++) {
     const word = words[i] ?? '';
-    if (listed(word)) return true;
-    if (word.endsWith('s') && listed(word.slice(0, -1))) return true;
+    if (listedOrPlural(word)) return true;
     const next = words[i + 1];
-    if (next === undefined) continue;
-    if (listed(`${word} ${next}`)) return true;
-    const two = word + next;
-    if (listed(two) || (two.endsWith('s') && listed(two.slice(0, -1)))) return true;
-    const third = words[i + 2];
-    if (third === undefined) continue;
-    const three = two + third;
-    if (listed(three) || (three.endsWith('s') && listed(three.slice(0, -1)))) return true;
+    if (next !== undefined && listed(`${word} ${next}`)) return true;
+  }
+  for (const pieces of folded.chunks) {
+    for (let i = 0; i + 1 < pieces.length; i++) {
+      const two = (pieces[i] ?? '') + (pieces[i + 1] ?? '');
+      if (listedOrPlural(two)) return true;
+      const third = pieces[i + 2];
+      if (third !== undefined && listedOrPlural(two + third)) return true;
+    }
   }
   return false;
 }
@@ -308,7 +331,7 @@ export function createRules(config: RulesConfig = {}): Rules {
         if (forms.some((f) => hasSlur(f, listed))) return 'slur';
         const plainView = plain(view);
         if (forms.some((f) => hasSexualMinors(f, plainView))) return 'sexual_minors';
-        if (foldings(view.replace(quoted, ' ')).some(hasAbuse)) return 'abuse';
+        if (foldings(view.replace(reported, ' ')).some(hasAbuse)) return 'abuse';
       }
       return undefined;
     },

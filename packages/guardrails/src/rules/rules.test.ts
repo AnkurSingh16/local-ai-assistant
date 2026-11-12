@@ -138,6 +138,17 @@ describe('rules: slurs', () => {
     expect(check(text)).toBeUndefined();
   });
 
+  it.each([
+    "Let's go, ok?",
+    'Should I go? OK thanks',
+    'My wet back is itchy after swimming',
+    'The choir sang do re mi fa, got it?',
+    "What's the plural s? pick one",
+    'my pin is 6 0 0 k',
+  ])('does not glue ordinary words into a listed word with the real list: %s', (text) => {
+    expect(createRules().check(normalise(text))).toBeUndefined();
+  });
+
   it('ships a list of distinct SHA-256 hashes', () => {
     expect(slurHashes.length).toBeGreaterThan(30);
     expect(new Set(slurHashes).size).toBe(slurHashes.length);
@@ -171,6 +182,17 @@ describe('rules: abuse aimed at the reader', () => {
     'you asssshole',
     'you dumbasssss',
     'ʏᴏᴜ ᴀʀᴇ ᴀɴ ɪᴅɪᴏᴛ',
+    '"you are a fucking idiot"',
+    '"fuck off" bot',
+    '“kys”',
+    "you're an idiot for saying that",
+    'you are a moron with no brain',
+    'you are stupid in every way',
+    'you are useless at everything',
+    'I think that you are an idiot',
+    'I want you to kill yourself',
+    'bot, kill yourself',
+    'bot go die',
   ])('flags %s', (text) => {
     expect(check(text)).toBe('abuse');
   });
@@ -197,6 +219,7 @@ describe('rules: abuse aimed at the reader', () => {
     'what does stfu mean',
     'what does kys mean in texting',
     'Do bad people go to hell?',
+    'How to kill yourself is not something I will search for, but how do I help a friend?',
   ])('does not flag %s', (text) => {
     expect(check(text)).toBeUndefined();
   });
@@ -242,8 +265,9 @@ describe('rules: personal data and secrets', () => {
     '-----BEGIN OPENSSH PRIVATE KEY-----',
     `token ghp_${'a'.repeat(36)}`,
     'qty 2 4111 1111 1111 1111',
+    'my visa 4111111111111111',
     '4111.1111.1111.1111',
-    'ssn 123 45 6789',
+    'ssn: 123 45 6789',
     base64('card 4111 1111 1111 1111'),
     `sk-proj-${'Ab1'.repeat(12)}`,
   ])('flags %s', (text) => {
@@ -257,6 +281,8 @@ describe('rules: personal data and secrets', () => {
     'The number 4111 1111 1111 1112 fails the checksum',
     'SSNs look like 000-12-3456 in examples',
     'pip install sk-learn-extra-tools-for-ml',
+    'UK number 020 12 3456 thanks',
+    'Tracking number 4111111111111111 arrives Friday',
   ])('does not flag %s', (text) => {
     expect(check(text)).toBeUndefined();
   });
