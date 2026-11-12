@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "customConditions": ["@local-ai/source"],
+    "lib": ["ES2024", "DOM"],
+    "types": []
+  },
+  "include": ["src", "vitest.config.ts"]
+}
