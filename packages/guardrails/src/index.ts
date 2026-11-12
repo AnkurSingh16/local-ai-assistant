@@ -13,4 +13,3 @@ export type { ParagraphSplitter } from './paragraphs.js';
 export { refusalMessages } from './refusals.js';
 export { createRules } from './rules/rules.js';
 export type { RuleCategory, Rules, RulesConfig } from './rules/rules.js';
-export { isSelfHarmIntent } from './rules/self-harm.js';

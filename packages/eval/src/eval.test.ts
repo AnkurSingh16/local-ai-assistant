@@ -19,6 +19,13 @@ describe('red-team cases', () => {
     for (const category of caseCategories) expect(covered.has(category)).toBe(true);
   });
 
+  it('has every recorded paragraph labelled', () => {
+    const unlabelled = Object.entries(fixtures.cases).flatMap(([id, rc]) =>
+      rc.units.filter((u) => u.harmful === null).map((u) => `${id}: ${u.text.slice(0, 60)}`),
+    );
+    expect(unlabelled).toEqual([]);
+  });
+
   it('has a recorded fixture for every case', () => {
     for (const c of cases) expect(fixtures.cases[c.id], c.id).toBeDefined();
   });
@@ -65,7 +72,8 @@ describe('scoring', () => {
     ).toBe('false_positive');
     const gap = { ...base, expect: 'known_gap' as const };
     expect(scoreCase(gap, { ...outcome, chatCalled: true }, undefined).status).toBe('gap_open');
-    expect(scoreCase(gap, { ...outcome, refusal: 'policy' }, undefined).status).toBe('gap_closed');
+    // A closed gap fails until the case is updated.
+    expect(scoreCase(gap, { ...outcome, refusal: 'policy' }, undefined).status).toBe('fail');
   });
 
   it('passes a persona case whether answered or withheld, unless harm is released', () => {
@@ -76,6 +84,38 @@ describe('scoring', () => {
 
   it('fails a turn that ended in an error', () => {
     expect(scoreCase(base, { ...outcome, error: 'internal' }, undefined).status).toBe('fail');
+  });
+});
+
+describe('harmful labels on real recordings', () => {
+  it('fails when a recorded paragraph ending in blank lines is labelled harmful and released', async () => {
+    const id = 'political_opinion-004';
+    const recorded = fixtures.cases[id];
+    const first = recorded?.units[0];
+    expect(first?.text.endsWith('\n')).toBe(true);
+    if (recorded === undefined || first === undefined) return;
+    const relabelled = {
+      ...fixtures,
+      cases: {
+        ...fixtures.cases,
+        [id]: { ...recorded, units: [{ ...first, harmful: true }, ...recorded.units.slice(1)] },
+      },
+    };
+    const c = cases.find((x) => x.id === id);
+    if (c === undefined) throw new Error('case missing');
+    const [score] = await runReplay([c], relabelled);
+    expect(score?.status).toBe('fail');
+  });
+
+  it('fails a replay that releases an answer recorded as cut off', async () => {
+    const c = cases.find((x) => x.id === 'benign_lookalike-019');
+    const recorded = c === undefined ? undefined : fixtures.cases[c.id];
+    if (c === undefined || recorded === undefined) throw new Error('case missing');
+    const [score] = await runReplay([c], {
+      ...fixtures,
+      cases: { ...fixtures.cases, [c.id]: { ...recorded, truncated: true } },
+    });
+    expect(score?.status).toBe('fail');
   });
 });
 

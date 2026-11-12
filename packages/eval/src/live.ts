@@ -26,6 +26,7 @@ async function digestOf(config: LiveConfig, model: string): Promise<string> {
     method: 'GET',
     signal: AbortSignal.timeout(5_000),
   });
+  if (!res.ok) throw new Error(`Ollama /api/tags answered ${String(res.status)}`);
   const tags = tagsSchema.parse(await res.json());
   const found = tags.models.find((m) => m.name === model || m.name === `${model}:latest`);
   if (found === undefined) throw new Error(`${model} is not pulled`);
@@ -70,7 +71,7 @@ const liveTimeouts = { guardMs: 20_000, turnMs: 180_000 };
  * Runs every case against Ollama (ADR-0012) and returns the scores and new
  * fixtures. Labels from earlier fixtures carry over by paragraph text, and
  * synthetic entries are kept as they are; new paragraphs start unlabelled
- * (`harmful: false`) and are listed so I can label them.
+ * (`harmful: null`), are listed, and fail the tests until I label them.
  */
 export async function runLive(
   cases: readonly RedTeamCase[],
@@ -91,7 +92,10 @@ export async function runLive(
     keepAlive: '30m',
     fetch: fetchFn,
   });
-  const labels = new Map<string, boolean>();
+  // Read before the run, so a model pulled mid-run cannot be tagged wrongly.
+  const chatDigest = await digestOf(config, config.chatModel);
+  const guardDigest = await digestOf(config, config.guardModel);
+  const labels = new Map<string, boolean | null>();
   for (const rc of Object.values(previous?.cases ?? {})) {
     for (const u of rc.units) labels.set(u.text, u.harmful);
   }
@@ -110,13 +114,16 @@ export async function runLive(
     const outcome = await runTurn(rec, c.input, liveTimeouts);
     const units = [...rec.captured.units].map(([text, verdict]) => {
       const harmful = labels.get(text);
-      if (harmful === undefined) newParagraphs.push(`${c.id}: ${text.slice(0, 120)}`);
-      return { text, verdict, harmful: harmful ?? false };
+      if (harmful === undefined || harmful === null) {
+        newParagraphs.push(`${c.id}: ${text.slice(0, 120)}`);
+      }
+      return { text, verdict, harmful: harmful ?? null };
     });
     const recorded: RecordedCase = {
       ...(rec.captured.input === undefined ? {} : { input: rec.captured.input }),
       ...(outcome.chatCalled ? { answer: rec.captured.answer } : {}),
       units,
+      ...(outcome.chatCalled && outcome.refusal !== undefined ? { truncated: true } : {}),
     };
     recordedCases[c.id] = recorded;
     scores.push(scoreCase(c, outcome, recorded));
@@ -125,9 +132,9 @@ export async function runLive(
   const fixtures: Fixtures = {
     recordedAt: config.now().toISOString().slice(0, 10),
     chatModel: config.chatModel,
-    chatDigest: await digestOf(config, config.chatModel),
+    chatDigest,
     guardModel: config.guardModel,
-    guardDigest: await digestOf(config, config.guardModel),
+    guardDigest,
     personaVersion,
     cases: recordedCases,
   };

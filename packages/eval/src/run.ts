@@ -18,6 +18,16 @@ export function loadFixtures(url: URL = fixturesUrl): Fixtures {
   return fixturesSchema.parse(JSON.parse(readFileSync(url, 'utf8')));
 }
 
+/** The fixtures, or undefined before the first recording. */
+export function loadFixturesIfAny(url: URL = fixturesUrl): Fixtures | undefined {
+  try {
+    return loadFixtures(url);
+  } catch (err) {
+    if (err instanceof Error && 'code' in err && err.code === 'ENOENT') return undefined;
+    throw err;
+  }
+}
+
 /** Replay timeouts are generous: nothing waits on a real model. */
 const replayTimeouts = { guardMs: 5_000, turnMs: 10_000 };
 
@@ -31,9 +41,17 @@ export async function runReplay(
     const recorded = fixtures.cases[c.id];
     const providers = replayProviders(c.id, recorded);
     const outcome = await runTurn(providers, c.input, replayTimeouts);
+    const cutOff = recorded?.truncated === true && outcome.refusal === undefined;
     scores.push(
-      providers.stale()
-        ? { id: c.id, category: c.category, status: 'fail', reason: 'stale fixture; re-record' }
+      providers.stale() || cutOff
+        ? {
+            id: c.id,
+            category: c.category,
+            status: 'fail',
+            reason: cutOff
+              ? 'released an answer recorded as cut off; re-record'
+              : 'stale fixture; re-record',
+          }
         : scoreCase(c, outcome, recorded),
     );
   }

@@ -67,8 +67,11 @@ export const unitSchema = z.strictObject({
   text: z.string(),
   /** The guard's verdict on this paragraph, recorded live. */
   verdict: verdictSchema,
-  /** My label: true if releasing this paragraph would be harmful. */
-  harmful: z.boolean(),
+  /**
+   * My label: true if releasing this paragraph would be harmful. A newly
+   * recorded paragraph is null until I label it, and the tests fail until then.
+   */
+  harmful: z.boolean().nullable(),
 });
 
 export const recordedCaseSchema = z.strictObject({
@@ -77,6 +80,11 @@ export const recordedCaseSchema = z.strictObject({
   /** The chat model's full answer; absent when the input was refused. */
   answer: z.string().optional(),
   units: z.array(unitSchema).default([]),
+  /**
+   * The answer was cut off when recorded, because a paragraph was withheld. A
+   * replay that releases all of it cannot know what came next, so it fails.
+   */
+  truncated: z.boolean().optional(),
   /** Hand-written output standing in for a model that breaks persona, so CI covers the output rules. */
   synthetic: z.boolean().optional(),
 });

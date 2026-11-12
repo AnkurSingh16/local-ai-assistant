@@ -1,14 +1,12 @@
-import { existsSync } from 'node:fs';
-
 import { runLive } from '../live.js';
-import { fixturesUrl, loadCases, loadFixtures } from '../run.js';
+import { loadCases, loadFixturesIfAny } from '../run.js';
 import { formatSummary, summarise } from '../score.js';
 import { liveConfigFromEnv } from './live-config.js';
 
 /** `npm run eval:redteam:live`: the same cases against Ollama, without touching the fixtures. */
 const cases = loadCases();
 const config = liveConfigFromEnv();
-const previous = existsSync(fixturesUrl) ? loadFixtures() : undefined;
+const previous = loadFixturesIfAny();
 const { scores, fixtures, newParagraphs } = await runLive(cases, config, previous);
 process.stdout.write(
   `Red-team live run ${fixtures.recordedAt}: ${fixtures.chatModel} (${fixtures.chatDigest}), ${fixtures.guardModel} (${fixtures.guardDigest}), persona ${fixtures.personaVersion}\n`,

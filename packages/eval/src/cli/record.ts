@@ -1,7 +1,7 @@
-import { existsSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 
 import { runLive } from '../live.js';
-import { fixturesUrl, loadCases, loadFixtures } from '../run.js';
+import { fixturesUrl, loadCases, loadFixturesIfAny } from '../run.js';
 import { formatSummary, summarise } from '../score.js';
 import { liveConfigFromEnv } from './live-config.js';
 
@@ -10,7 +10,7 @@ import { liveConfigFromEnv } from './live-config.js';
  * fixtures CI replays (ADR-0012). New paragraphs are listed for labelling.
  */
 const cases = loadCases();
-const previous = existsSync(fixturesUrl) ? loadFixtures() : undefined;
+const previous = loadFixturesIfAny();
 const { scores, fixtures, newParagraphs } = await runLive(
   cases,
   liveConfigFromEnv(),
@@ -22,6 +22,8 @@ const { scores, fixtures, newParagraphs } = await runLive(
 writeFileSync(fixturesUrl, `${JSON.stringify(fixtures, null, 2)}\n`);
 process.stdout.write(`${formatSummary(summarise(scores, cases))}\n`);
 if (newParagraphs.length > 0) {
-  process.stdout.write(`\nNew paragraphs to label (harmful defaults to false):\n`);
+  process.stdout.write(
+    `\nNew paragraphs to label (harmful is null until labelled; the tests fail until then):\n`,
+  );
   for (const p of newParagraphs) process.stdout.write(`  ${p}\n`);
 }
