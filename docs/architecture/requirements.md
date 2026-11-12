@@ -11,7 +11,7 @@ A general-purpose assistant that answers from the model's own knowledge and from
 - **Stack:** Node.js 24, TypeScript strict, npm workspaces. Fastify API, React 19 + Vite web client, React Native + Expo mobile client. Vitest, React Testing Library, React Native Testing Library, Playwright. Zod for validation, pino for logging. No other application languages. Infrastructure may run in Docker.
 - **Models (Ollama):** chat model chosen by RAM (16 GB or more: `qwen2.5:7b` or `llama3.1:8b`; less: `llama3.2:3b`); safety classifier `llama-guard3`; embeddings `nomic-embed-text` through Ollama or transformers.js. Everything behind provider interfaces so hosted APIs can be added.
 - **Fresh information:** self-hosted SearXNG in Docker Compose, no API key. Result pages fetched with `@mozilla/readability` + `jsdom`, with size limits, timeouts, https only, and SSRF protection that refuses private, loopback, link-local and reserved addresses and re-checks every redirect.
-- **Storage:** SQLite or PostgreSQL, decided in the architecture debate, for conversations, memory, feedback and a search-result cache.
+- **Storage:** SQLite or PostgreSQL for conversations, memory, feedback and a search-result cache. I chose SQLite in [ADR-0001](../adr/0001-storage-sqlite.md).
 - **Tests and CI:** mock providers for chat, search, embeddings and moderation by default. CI never calls Ollama, SearXNG or the internet.
 
 ## Behaviour

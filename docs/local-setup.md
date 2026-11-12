@@ -6,7 +6,7 @@ Everything runs on one Mac. I use an M1 Pro with 16 GB of RAM.
 
 - Node.js 24 (`.nvmrc` pins the major version; `nvm use` picks it up)
 - Docker Desktop, for SearXNG
-- Ollama
+- Ollama 0.40.15 or newer
 
 ## Ollama and models
 
@@ -22,13 +22,17 @@ With about 16 GB or more I use `qwen2.5:7b`. With less, use `llama3.2:3b`.
 ollama pull qwen2.5:7b
 ```
 
+On 16 GB I use the 1B guard, because the 8B guard cannot stay loaded next to the chat model ([ADR-0006](adr/0006-guard-model-size.md)). With 24 GB or more, pull `llama-guard3:8b` instead.
+
 ```bash
-ollama pull llama-guard3
+ollama pull llama-guard3:1b
 ```
 
 ```bash
 ollama pull nomic-embed-text
 ```
+
+The database lives in `data/`. Exclude that folder from Time Machine, or deleted conversations survive in backups.
 
 ## SearXNG
 

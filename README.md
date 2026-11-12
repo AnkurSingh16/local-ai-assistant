@@ -25,7 +25,7 @@ It is a demo project, separate from my retrieval-only portfolio chatbot.
 
 ## Architecture
 
-This is the target design. Component boundaries are confirmed in the ADRs in [`docs/adr/`](docs/adr/).
+This is the design I settled on in the [architecture decision records](docs/adr/README.md); [docs/architecture](docs/architecture/README.md) walks through a turn end to end.
 
 ```mermaid
 flowchart LR
@@ -39,7 +39,7 @@ flowchart LR
 
   subgraph API[Fastify API]
     RL[Rate and size limits]
-    IM[Input moderation<br/>rules + llama-guard3]
+    IM[Input moderation<br/>rules + llama-guard3:1b]
     AG[Agent loop<br/>bounded steps, timeouts]
     OM[Output moderation<br/>per paragraph]
     RL --> IM --> AG --> OM
@@ -47,17 +47,17 @@ flowchart LR
 
   subgraph Tools
     WS[web_search]
-    RP[read_page<br/>SSRF-safe fetch]
+    RP[read_page<br/>SSRF-safe fetch,<br/>parse in a worker]
     DT[get_current_datetime]
   end
 
   C -- HTTPS + SSE --> RL
   AG --> WS & RP & DT
-  AG -- chat --> OL[(Ollama<br/>qwen2.5:7b)]
+  AG -- chat --> OL[(Ollama<br/>qwen2.5:7b,<br/>llama-guard3:1b)]
   IM & OM -- classify --> OL
   WS --> SX[(SearXNG<br/>Docker)]
   RP --> NET[(Public web)]
-  AG <--> DB[(Storage<br/>conversations, memory,<br/>feedback, search cache)]
+  AG <--> DB[(SQLite<br/>conversations, memory,<br/>feedback, search cache)]
   OM -- SSE stream --> C
 ```
 
