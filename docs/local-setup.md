@@ -34,6 +34,16 @@ ollama pull nomic-embed-text
 
 The database lives in `data/`. Exclude that folder from Time Machine, or deleted conversations survive in backups.
 
+## Ollama settings
+
+The guard and the chat model must stay loaded together, and Ollama should run one request at a time ([ADR-0006](adr/0006-guard-model-size.md), [ADR-0011](adr/0011-search-cache-and-rate-limits.md)). The API asks for a 30-minute `keep_alive` on every call. Set parallelism for the Ollama app, then quit and reopen it:
+
+```bash
+launchctl setenv OLLAMA_NUM_PARALLEL 1
+```
+
+The doctor script that arrives with `npm run dev` checks the Ollama version, the pulled models and their digests.
+
 ## SearXNG
 
 SearXNG runs in Docker Compose and needs no API key. The Compose file and settings arrive in Milestone 4, and this section will cover starting it and checking that it answers.

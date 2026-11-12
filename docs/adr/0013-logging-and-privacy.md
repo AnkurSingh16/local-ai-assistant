@@ -11,7 +11,7 @@ Logs are needed to debug latency, failures and guard decisions, but they must no
 ## Options considered
 
 1. **Log request bodies and rely on pino `redact`.** Easy, but any new field or nested path leaks until someone adds a redaction rule.
-2. **A typed logging helper whose event types have no free-text fields, with pino `redact` as a backstop. Pino wildcards match only one level, so the typed helper, not the redaction list, is the primary control, and the marker test below is what proves it.**
+2. **A typed logging helper whose event types have no free-text fields, with pino `redact` as a backstop.**
 
 ## Decision
 
