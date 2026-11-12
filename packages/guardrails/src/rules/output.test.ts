@@ -61,6 +61,7 @@ describe('output rules: insults and slurs', () => {
     'Use the test card 4111 1111 1111 1111 in Stripe test mode.',
     'Prompt injection often starts with "ignore previous instructions".',
     'If someone tells you "you are an idiot", stay calm.',
+    'When they call you "stupid", ignore it.',
     'Test it with `expect(filter("you are an idiot")).toBe(true)`.',
     '1. Add a test:\n   ```js\n   expect(filter("you are an idiot")).toBe(true);\n   ```',
     '~~~\nexpect(filter("you are an idiot")).toBe(true);\n~~~',

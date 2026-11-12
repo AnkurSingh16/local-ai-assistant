@@ -32,7 +32,7 @@ Milestone 2 ships the first part of these layers, so no answer is ever unmoderat
 
   For the persona checks, quoted text and fenced code are set aside when at least two words are said around them, so a translation of "I love you" or a test fixture passes. Conventions ("I'm afraid I can't", "I'm happy to help") and balanced overviews pass. Personal data and injection phrases are not checked on output, because code answers use test card numbers and an answer about prompt injection quotes the phrases.
 
-  Known gaps: opinions stated without "I" ("Trump is a terrible president"); paraphrased descriptions of the persona; a persona claim wrapped in a quote after a short lead-in ("Here's what I'd say: \"I'm a real person\""). Unquoted first-person fiction or role-play the user asked for is withheld, and so is an answer that names explicit content involving minors, even to say it is banned.
+  Known gaps: opinions stated without "I" ("Trump is a terrible president"); paraphrased descriptions of the persona; a persona claim wrapped in a quote after a short lead-in ("Here's what I'd say: \"I'm a real person\""); an insult the model formats as code. Unquoted first-person fiction or role-play the user asked for is withheld, and so is an answer that names explicit content involving minors, even to say it is banned.
 
 - Fixed refusal texts that name no rule. Self-harm gets crisis resources instead of a refusal, without calling the chat model.
 - A persona in code (`packages/agent/persona/persona.ts`) that says the assistant is an AI, has no feelings and gives no political opinions.

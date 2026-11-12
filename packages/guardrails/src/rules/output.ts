@@ -106,10 +106,10 @@ const opinionPatterns = [
  * dialogue or a test fixture is not the assistant speaking for itself.
  */
 const quotedOrCode =
-  /^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^[ \t]*\1|`[^`\n]{0,300}`|"[^"\n]{0,300}"|“[^”\n]{0,300}”/gm;
+  /^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^[ \t]*\1[ \t]*$|`[^`\n]{0,300}`|"[^"\n]{0,300}"|“[^”\n]{0,300}”/gm;
 
 /** Fenced code, indented or not, with backticks or tildes, as the paragraph splitter reads it. */
-const fencedCode = /^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^[ \t]*\1/gm;
+const fencedCode = /^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^[ \t]*\1[ \t]*$/gm;
 
 /** Inline code that looks like code (brackets, braces, operators), not a backticked word. */
 const inlineSpan = /`[^`\n]{1,600}`/g;
@@ -120,7 +120,7 @@ const inlineSpan = /`[^`\n]{1,600}`/g;
  * at the assistant.
  */
 const adviceAboutQuote =
-  /\b(?:if|when|whenever) (?:someone|somebody|anyone|a person|people|they|he|she|your \w+) (?:tells|says to|calls|texts|writes to) you\b[^"\u201C\n]{0,20}["\u201C][^"\u201C\u201D\n]{0,300}["\u201D]/gi;
+  /\b(?:if|when|whenever) (?:someone|somebody|anyone|a person|people|they|he|she|your \w+) (?:tells?|says? to|calls?|texts?|writes? to) you\b[^"\u201C\n]{0,20}["\u201C][^"\u201C\u201D\n]{0,300}["\u201D]/gi;
 
 /** Opinion is judged sentence by sentence, so a stance and a topic in different sentences do not combine. */
 function sentences(paragraph: string): Folded[] {
