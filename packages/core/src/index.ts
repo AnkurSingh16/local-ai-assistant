@@ -25,3 +25,5 @@ export type {
   SearchQuery,
   SearchResult,
 } from './providers.js';
+export { ProviderError } from './errors.js';
+export type { ProviderErrorKind } from './errors.js';

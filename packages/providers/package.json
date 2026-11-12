@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
+    ".": {
+      "@local-ai/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
     "./mock": {
       "@local-ai/source": "./src/mock/index.ts",
       "types": "./dist/mock/index.d.ts",
@@ -15,6 +20,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@local-ai/core": "0.0.0"
+    "@local-ai/core": "0.0.0",
+    "zod": "^4.6.7"
   }
 }
