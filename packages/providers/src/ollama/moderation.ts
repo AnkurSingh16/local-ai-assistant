@@ -11,7 +11,7 @@ import type { FetchFn } from './http.js';
 import { parseJsonLine, postJson } from './http.js';
 import { readCapped } from './ndjson.js';
 
-/** A guard verdict is a few bytes; this bounds what a broken server can make us buffer. */
+/** A guard verdict or the list of loaded models is small; this bounds what a broken server can make us buffer. */
 const maxGuardResponseChars = 64 * 1024;
 
 export interface OllamaModerationConfig {
@@ -33,6 +33,16 @@ export const guardNumCtx = 2048;
 const withheldUserTurn = '(user message withheld)';
 
 const responseSchema = z.object({ message: z.object({ content: z.string() }) });
+
+/** The part of `GET /api/ps` this needs: which models are loaded. */
+const psSchema = z.object({
+  models: z.array(z.object({ name: z.string(), model: z.string().optional() })),
+});
+
+/** Ollama reports an untagged model as `name:latest`. */
+function sameModel(loaded: string, configured: string): boolean {
+  return loaded === configured || loaded === `${configured}:latest`;
+}
 
 const categorySet: ReadonlySet<string> = new Set(hazardCategories);
 
@@ -63,7 +73,29 @@ export function parseGuardVerdict(content: string): ModerationVerdict {
 
 export function createOllamaModerationProvider(config: OllamaModerationConfig): ModerationProvider {
   const url = new URL('/api/chat', config.baseUrl).toString();
+  const psUrl = new URL('/api/ps', config.baseUrl).toString();
   return {
+    async isResident(signal: AbortSignal): Promise<boolean> {
+      let res: Response;
+      try {
+        res = await config.fetch(psUrl, { method: 'GET', signal });
+      } catch (err) {
+        signal.throwIfAborted();
+        throw new ProviderError('unavailable', undefined, { cause: err });
+      }
+      if (!res.ok || res.body === null) {
+        await res.body?.cancel().catch(() => undefined);
+        throw new ProviderError('unavailable', res.status);
+      }
+      const parsed = psSchema.safeParse(
+        parseJsonLine(await readCapped(res.body, maxGuardResponseChars, signal)),
+      );
+      if (!parsed.success) throw new ProviderError('bad_response', res.status);
+      return parsed.data.models.some(
+        (m) => sameModel(m.name, config.model) || sameModel(m.model ?? '', config.model),
+      );
+    },
+
     async classify(input: ModerationInput, signal: AbortSignal): Promise<ModerationVerdict> {
       const messages =
         input.role === 'user'

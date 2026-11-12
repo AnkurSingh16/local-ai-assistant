@@ -65,4 +65,10 @@ export type ModerationVerdict =
 
 export interface ModerationProvider {
   classify(input: ModerationInput, signal: AbortSignal): Promise<ModerationVerdict>;
+  /**
+   * True when the model is already loaded, so a check needs no load and can use
+   * the short timeout (ADR-0005). Providers that cannot tell leave it out, and
+   * every check then gets the long timeout.
+   */
+  isResident?(signal: AbortSignal): Promise<boolean>;
 }

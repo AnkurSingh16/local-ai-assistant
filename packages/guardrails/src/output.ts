@@ -2,7 +2,7 @@ import type { ModeratedText } from '@local-ai/core';
 import type { RefusalKind } from '@local-ai/contract';
 
 import { classifyOrRefuse } from './classify.js';
-import type { GuardConfig } from './input.js';
+import type { GuardConfig } from './classify.js';
 import { mintModerated } from './mint.js';
 
 export type OutputVerdict =
@@ -17,12 +17,7 @@ export interface OutputGuard {
 export function createOutputGuard(config: GuardConfig): OutputGuard {
   return {
     async checkParagraph(text: string, signal: AbortSignal): Promise<OutputVerdict> {
-      const outcome = await classifyOrRefuse(
-        config.moderation,
-        { role: 'assistant', text },
-        config.timeoutMs,
-        signal,
-      );
+      const outcome = await classifyOrRefuse(config, { role: 'assistant', text }, signal);
       return outcome.ok ? { ok: true, text: mintModerated(text) } : outcome;
     },
   };

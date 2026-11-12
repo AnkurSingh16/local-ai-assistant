@@ -1,18 +1,13 @@
-import type { ModeratedText, ModerationProvider } from '@local-ai/core';
+import type { ModeratedText } from '@local-ai/core';
 import type { RefusalKind } from '@local-ai/contract';
 import { maxMessageChars } from '@local-ai/contract';
 
+import type { GuardConfig } from './classify.js';
 import { classifyOrRefuse } from './classify.js';
 import { mintModerated } from './mint.js';
 import { normalise } from './normalise.js';
 import type { Rules } from './rules/rules.js';
 import { createRules } from './rules/rules.js';
-
-export interface GuardConfig {
-  readonly moderation: ModerationProvider;
-  /** Upper bound on one guard call. It covers a cold model load (ADR-0005). */
-  readonly timeoutMs: number;
-}
 
 export interface InputGuardConfig extends GuardConfig {
   /** The rules baseline; defaults to the built-in lists. */
@@ -41,12 +36,7 @@ export function createInputGuard(config: InputGuardConfig): InputGuard {
       const normalised = normalise(text);
       if (normalised.length > maxMessageChars) return { ok: false, tooLong: true };
       if (rules.check(normalised) !== undefined) return { ok: false, refusal: 'policy' };
-      const outcome = await classifyOrRefuse(
-        config.moderation,
-        { role: 'user', text: normalised },
-        config.timeoutMs,
-        signal,
-      );
+      const outcome = await classifyOrRefuse(config, { role: 'user', text: normalised }, signal);
       return outcome.ok ? { ok: true, text: mintModerated(normalised) } : outcome;
     },
   };

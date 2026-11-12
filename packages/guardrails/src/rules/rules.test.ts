@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
 
+import { createManualClock } from '@local-ai/core';
 import { createMockModerationProvider } from '@local-ai/providers/mock';
 import { describe, expect, it } from 'vitest';
 
+import { createCircuitBreaker } from '../breaker.js';
 import { createInputGuard } from '../input.js';
 import { normalise } from '../normalise.js';
 import { decodedViews, rot13, unescapeAll } from './decode.js';
@@ -198,6 +200,8 @@ describe('rules: abuse aimed at the reader', () => {
     'u r a 1d10t',
     'I said "fuck off"',
     'I said "you are a fucking idiot"',
+    'I just said "fuck off"',
+    'I literally wrote "you are an idiot"',
   ])('flags %s', (text) => {
     expect(check(text)).toBe('abuse');
   });
@@ -301,6 +305,21 @@ describe('input guard with rules', () => {
     const verdict = await guard.check('you are a z​orblat', new AbortController().signal);
     expect(verdict).toEqual({ ok: false, refusal: 'policy' });
     expect(moderation.calls).toHaveLength(0);
+  });
+
+  it('leaves the circuit breaker untouched on a rules hit', async () => {
+    const clock = createManualClock(new Date('2026-11-12T00:00:00Z'));
+    const breaker = createCircuitBreaker({ clock, failureThreshold: 1 });
+    breaker.acquire()?.failure();
+    clock.advance(10_000);
+    const moderation = createMockModerationProvider();
+    const guard = createInputGuard({ moderation, timeoutMs: 1000, rules, breaker });
+    expect(await guard.check('you are a zorblat', new AbortController().signal)).toEqual({
+      ok: false,
+      refusal: 'policy',
+    });
+    // The half-open probe is still available: the rules hit did not use it.
+    expect(breaker.acquire()).toBeDefined();
   });
 
   it('passes clean text on to the classifier', async () => {

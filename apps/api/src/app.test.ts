@@ -356,4 +356,9 @@ describe('readiness tracking', () => {
     await tracked.moderation.classify({ role: 'user', text: 'x' }, signal);
     expect(tracked.isReady()).toBe(true);
   });
+
+  it('keeps the residency check, so the warm timeout still applies', async () => {
+    const tracked = trackReadiness(createMockModerationProvider({ resident: false }));
+    expect(await tracked.moderation.isResident?.(new AbortController().signal)).toBe(false);
+  });
 });
