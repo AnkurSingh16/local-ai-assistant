@@ -10,7 +10,7 @@ The README has the system diagram. This page explains how a turn flows through t
 
 | Package      | Responsibility                                                              | ADR                                                                                            |
 | ------------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `core`       | Domain types, provider interfaces, `Clock`, `ModeratedText`, test fakes     | [0002](../adr/0002-packages-interfaces-boundaries.md)                                          |
+| `core`       | Domain types, provider interfaces, `Clock`, `ModeratedText`                 | [0002](../adr/0002-packages-interfaces-boundaries.md)                                          |
 | `contract`   | Zod schemas for requests and SSE events                                     | [0007](../adr/0007-streaming-contract.md)                                                      |
 | `agent`      | Agent loop, routing, taint rule, context budget, persona                    | [0003](../adr/0003-agent-loop-and-tools.md), [0004](../adr/0004-context-budget-and-history.md) |
 | `guardrails` | Normalisation, rules, moderation pipeline, hold-back buffer, refusals       | [0005](../adr/0005-guardrail-pipeline.md), [0006](../adr/0006-guard-model-size.md)             |

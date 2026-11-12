@@ -18,17 +18,17 @@ Providers (chat, search, embeddings, moderation) must be swappable for hosted AP
 
 Nine packages and three apps:
 
-| Package      | Holds                                                                                             |
-| ------------ | ------------------------------------------------------------------------------------------------- |
-| `core`       | Domain types, provider interfaces, `Clock`, `ModeratedText`, fakes under `@local-ai/core/testing` |
-| `contract`   | Zod schemas for API requests and SSE events, shared by the API and both clients                   |
-| `agent`      | The agent loop, routing, context budget, persona assembly                                         |
-| `guardrails` | Normalisation, rules, moderation pipeline, hold-back buffer, refusal templates                    |
-| `tools`      | `web_search`, `read_page`, `get_current_datetime`, safe fetch, the parse worker                   |
-| `providers`  | Ollama and SearXNG adapters and mock providers                                                    |
-| `storage`    | SQLite repositories and migrations                                                                |
-| `client`     | Headless SSE client over `fetch`                                                                  |
-| `eval`       | Red-team and routing sets and the runner                                                          |
+| Package      | Holds                                                                           |
+| ------------ | ------------------------------------------------------------------------------- |
+| `core`       | Domain types, provider interfaces, `Clock`, `ModeratedText`                     |
+| `contract`   | Zod schemas for API requests and SSE events, shared by the API and both clients |
+| `agent`      | The agent loop, routing, context budget, persona assembly                       |
+| `guardrails` | Normalisation, rules, moderation pipeline, hold-back buffer, refusal templates  |
+| `tools`      | `web_search`, `read_page`, `get_current_datetime`, safe fetch, the parse worker |
+| `providers`  | Ollama and SearXNG adapters and mock providers                                  |
+| `storage`    | SQLite repositories and migrations                                              |
+| `client`     | Headless SSE client over `fetch`                                                |
+| `eval`       | Red-team and routing sets and the runner                                        |
 
 Apps: `apps/api` (Fastify), `apps/web` (React 19 + Vite), `apps/mobile` (Expo).
 

@@ -41,6 +41,36 @@ module.exports = {
       to: { path: 'node_modules/(ollama|openai|@anthropic-ai|@google)' },
     },
     {
+      name: 'providers-only-from-compose',
+      comment:
+        'Providers are wired in the composition roots only (ADR-0002): the API compose.ts and the eval runner. Tests may use the mocks.',
+      severity: 'error',
+      from: {
+        pathNot: [
+          '^apps/api/src/compose\\.ts$',
+          '^packages/providers/',
+          '^packages/eval/',
+          '\\.test\\.tsx?$',
+        ],
+      },
+      to: { path: '^packages/providers/' },
+    },
+    {
+      name: 'storage-not-from-routes',
+      comment:
+        'Routes reach storage only through the assistant, which accepts only moderated text.',
+      severity: 'error',
+      from: { path: '^apps/api/src/routes/' },
+      to: { path: '^packages/storage/' },
+    },
+    {
+      name: 'tools-not-to-storage',
+      comment: 'Tools handle untrusted web content and never write to user stores.',
+      severity: 'error',
+      from: { path: '^packages/tools/' },
+      to: { path: '^packages/storage/' },
+    },
+    {
       name: 'not-to-unresolvable',
       comment: 'An import that cannot be resolved also cannot be checked against the rules above.',
       severity: 'error',

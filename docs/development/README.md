@@ -26,7 +26,24 @@ That runs, in order: Prettier, ESLint (strict type-checked), `tsc -b`, dependenc
 
 ## Workspace packages
 
-Each package exports a custom `@local-ai/source` condition that points at its TypeScript sources. Vitest, the per-package typecheck and dependency-cruiser resolve through it, so tests run without building first and boundary rules see real source paths. The production build (`tsconfig.build.json`) ignores the condition, emits to `dist/` and leaves test files out.
+Each package exports a custom `@local-ai/source` condition that points at its TypeScript sources. Vitest, the per-package typecheck and dependency-cruiser resolve through it, so tests run without building first and boundary rules see real source paths. The production build (`tsconfig.build.json`) ignores the condition, emits to `dist/` and leaves test files out. Vitest runs node tests through Vite's SSR resolver, so each package's `vitest.config.ts` sets the condition under both `resolve` and `ssr.resolve`; without the second, tests silently load a stale `dist/` when one exists.
+
+## Boundaries
+
+dependency-cruiser and ESLint enforce the guard boundary from ADR-0002:
+
+- `providers-only-from-compose`: only `apps/api/src/compose.ts`, the eval runner and test files import `@local-ai/providers`.
+- `storage-not-from-routes` and `tools-not-to-storage`: routes and tools never reach the stores directly.
+- ESLint rejects `as ModeratedText`, `as UntrustedWebText`, the angle-bracket form and generic calls such as `brand<ModeratedText>(x)` everywhere except the two mint files.
+
+## Mock providers
+
+`@local-ai/providers/mock` holds deterministic providers for chat, search, embeddings and moderation. They are the default in tests and CI, and none of them touches the network.
+
+- The chat mock streams a fixed answer in word-sized chunks, or a scripted reply, and records every request in `calls`. A test that expects the model never to be reached asserts `calls` is empty.
+- The moderation mock flags text containing `MOCK_FLAG` (category S1) or `MOCK_FLAG_SELF_HARM` (S11), so tests state intent without containing harmful text. A scripted classifier that throws simulates a guard outage.
+- The embedding mock returns the same unit vector for the same text, with 768 dimensions like `nomic-embed-text`.
+- Every mock honours its `AbortSignal`, and an optional `delayMs` makes streaming and cancellation observable.
 
 ## Workflows
 
