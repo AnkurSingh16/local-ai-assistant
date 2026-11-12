@@ -66,11 +66,26 @@ function fail(
   return new ChatClientError(code, messages[code], retryable, status, retryAfterMs);
 }
 
+/** Upper bound on a server-suggested wait, so a bad value cannot disable retry forever or overflow a timer. */
+const maxRetryAfterMs = 10 * 60_000;
+/** The error body is advisory, so reading it gets only a short time. */
+const errorBodyTimeoutMs = 2000;
+
+function clampRetryAfter(ms: number): number | undefined {
+  return Number.isFinite(ms) && ms >= 0 ? Math.min(ms, maxRetryAfterMs) : undefined;
+}
+
 async function retryAfterMs(res: Response): Promise<number | undefined> {
   const header = res.headers.get('retry-after');
-  if (header !== null && /^\d+$/.test(header)) return Number(header) * 1000;
+  if (header !== null && /^\d+$/.test(header)) {
+    await res.body?.cancel().catch(() => undefined);
+    return clampRetryAfter(Number(header) * 1000);
+  }
   try {
-    const body: unknown = await res.json();
+    const body: unknown = await Promise.race([
+      res.json(),
+      new Promise<undefined>((resolve) => setTimeout(resolve, errorBodyTimeoutMs)),
+    ]);
     if (typeof body === 'object' && body !== null && 'error' in body) {
       const err: unknown = body.error;
       if (
@@ -79,12 +94,13 @@ async function retryAfterMs(res: Response): Promise<number | undefined> {
         'retryAfterMs' in err &&
         typeof err.retryAfterMs === 'number'
       ) {
-        return err.retryAfterMs;
+        return clampRetryAfter(err.retryAfterMs);
       }
     }
   } catch {
     // The body is advisory; the status alone decides the error.
   }
+  await res.body?.cancel().catch(() => undefined);
   return undefined;
 }
 

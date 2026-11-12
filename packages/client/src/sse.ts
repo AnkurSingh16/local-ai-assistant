@@ -94,6 +94,8 @@ export async function* parseSse(
       signal.throwIfAborted();
       armIdleTimer();
       const { done, value } = await reader.read();
+      // Only the wait for data counts as idle, not time the consumer spends.
+      clearTimeout(idleTimer);
       signal.throwIfAborted();
       if (idle.fired) throw new SseIdleTimeoutError();
       if (done) break;

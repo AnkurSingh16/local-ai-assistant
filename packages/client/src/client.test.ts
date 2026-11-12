@@ -297,6 +297,20 @@ describe('chat client', () => {
     expect(busy).toMatchObject({ code: 'busy', retryAfterMs: 10_000 });
     const noHint = await errorOf(new Response('nope', { status: 429 }));
     expect(noHint.retryAfterMs).toBeUndefined();
+    const huge = await errorOf(
+      Response.json({ error: { retryAfterMs: 2 ** 40 } }, { status: 429 }),
+    );
+    expect(huge.retryAfterMs).toBe(600_000);
+    const negative = await errorOf(Response.json({ error: { retryAfterMs: -5 } }, { status: 429 }));
+    expect(negative.retryAfterMs).toBeUndefined();
+  });
+
+  it('does not hang on a stalled error body', async () => {
+    const stalled = new Response(new ReadableStream<Uint8Array>({ start: () => undefined }), {
+      status: 503,
+    });
+    const err = await errorOf(stalled);
+    expect(err.code).toBe('busy');
   });
 
   it('maps a network failure', async () => {
