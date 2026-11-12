@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-11-12
 - **Deciders:** Ankur Pawar
+- **Amended:** 2026-11-12. The package table listed mock providers under both `core` and `providers`; they live only in `providers` (`@local-ai/providers/mock`). The cast ban is a type-aware ESLint rule rather than a syntax selector, because a selector on the type name missed aliases, renamed imports and qualified names.
 
 ## Context
 
@@ -18,17 +19,17 @@ Providers (chat, search, embeddings, moderation) must be swappable for hosted AP
 
 Nine packages and three apps:
 
-| Package      | Holds                                                                                             |
-| ------------ | ------------------------------------------------------------------------------------------------- |
-| `core`       | Domain types, provider interfaces, `Clock`, `ModeratedText`, fakes under `@local-ai/core/testing` |
-| `contract`   | Zod schemas for API requests and SSE events, shared by the API and both clients                   |
-| `agent`      | The agent loop, routing, context budget, persona assembly                                         |
-| `guardrails` | Normalisation, rules, moderation pipeline, hold-back buffer, refusal templates                    |
-| `tools`      | `web_search`, `read_page`, `get_current_datetime`, safe fetch, the parse worker                   |
-| `providers`  | Ollama and SearXNG adapters and mock providers                                                    |
-| `storage`    | SQLite repositories and migrations                                                                |
-| `client`     | Headless SSE client over `fetch`                                                                  |
-| `eval`       | Red-team and routing sets and the runner                                                          |
+| Package      | Holds                                                                           |
+| ------------ | ------------------------------------------------------------------------------- |
+| `core`       | Domain types, provider interfaces, `Clock`, `ModeratedText`                     |
+| `contract`   | Zod schemas for API requests and SSE events, shared by the API and both clients |
+| `agent`      | The agent loop, routing, context budget, persona assembly                       |
+| `guardrails` | Normalisation, rules, moderation pipeline, hold-back buffer, refusal templates  |
+| `tools`      | `web_search`, `read_page`, `get_current_datetime`, safe fetch, the parse worker |
+| `providers`  | Ollama and SearXNG adapters and mock providers                                  |
+| `storage`    | SQLite repositories and migrations                                              |
+| `client`     | Headless SSE client over `fetch`                                                |
+| `eval`       | Red-team and routing sets and the runner                                        |
 
 Apps: `apps/api` (Fastify), `apps/web` (React 19 + Vite), `apps/mobile` (Expo).
 
@@ -58,7 +59,7 @@ Tool-call arguments stay `unknown` until each tool's Zod schema parses them.
 **Guard boundary, enforced three ways:**
 
 1. **Composition root.** Only `apps/api/src/compose.ts` (and the eval runner, a second composition root) imports `packages/providers`. It builds `createAssistant(deps)`, which exposes `handleTurn(input, signal): AsyncIterable<SseEvent>`. Routes see nothing else.
-2. **Branded types.** `ModeratedText` is declared in `core` and minted in exactly one place, `guardrails/src/mint.ts`, which the pipeline calls after a pass. An ESLint `no-restricted-syntax` rule forbids `as ModeratedText` (and `<ModeratedText>`) everywhere except that file. Likewise `UntrustedWebText` is minted only by the wrapping function in `tools` ([ADR-0008](0008-fetch-safety.md)), and prompt assembly accepts web content only as `UntrustedWebText`, so page text cannot reach a prompt unwrapped. `ConversationRepo.append`, `MemoryRepo.add`, `FeedbackRepo.add` and the agent's user-message slot accept only `ModeratedText`. The search cache is the one store that holds unmoderated text by design (public web results, wrapped as untrusted on every read), and it takes plain strings.
+2. **Branded types.** `ModeratedText` is declared in `core` and minted in exactly one place, `guardrails/src/mint.ts`, which the pipeline calls after a pass. A type-aware ESLint rule (`eslint-rules/no-brand-cast.js`) forbids code that asserts a branded type without producing one (casts, type arguments, type predicates, bodiless signatures and ambient declarations) and casts that contain `never` or a type parameter, everywhere except the mint files. A comment that disables it is itself an error. It is a tripwire, not a proof, so the route-inventory test below, required before any route merges, carries the end-to-end guarantee. Likewise `UntrustedWebText` is minted only by the wrapping function in `tools` ([ADR-0008](0008-fetch-safety.md)), and prompt assembly accepts web content only as `UntrustedWebText`, so page text cannot reach a prompt unwrapped. `ConversationRepo.append`, `MemoryRepo.add`, `FeedbackRepo.add` and the agent's user-message slot accept only `ModeratedText`. The search cache is the one store that holds unmoderated text by design (public web results, wrapped as untrusted on every read), and it takes plain strings.
 3. **Checks:** dependency-cruiser rules `providers-only-from-compose` (from anything matching `pathNot: ['^apps/api/src/compose\.ts$', '^packages/providers/', '^packages/eval/', '\.test\.tsx?$']` to `^packages/providers/`; the eval runner is a second composition root that wires mock and real providers, and tests may use the mock providers), `storage-not-from-routes` (from `^apps/api/src/routes/` to `^packages/storage/`) and `tools-not-to-storage`; plus a route-inventory test that registers every POST route with a mock moderator that flags everything and asserts the mock chat provider was called zero times.
 
 A rule restricting chat-provider imports by module path was proposed and dropped: dependency-cruiser sees files, not interfaces, so the brand and the route-inventory test carry that guarantee instead.
@@ -67,7 +68,7 @@ Wiring is a manual composition root of about 60 lines. Tests call `createAssista
 
 ## Consequences
 
-- Skipping the guard does not compile, and a new route that reaches the model fails a test.
+- Passing unmoderated text to a store or the agent fails the typecheck, the common ways of hiding it fail lint, and a new route that reaches the model fails a test.
 - Nine `package.json` files to maintain. The per-package config is small and identical.
 - I revisit the container decision at around 30 injectables with lifetimes.
 

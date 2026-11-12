@@ -4,7 +4,11 @@ export default defineConfig({
   // Tests run against workspace sources, so no package has to be built first.
   resolve: { conditions: ['@local-ai/source'] },
   test: {
-    projects: ['packages/*/vitest.config.ts', 'apps/*/vitest.config.ts'],
+    projects: [
+      'packages/*/vitest.config.ts',
+      'apps/*/vitest.config.ts',
+      'eslint-rules/vitest.config.ts',
+    ],
     exclude: [...configDefaults.exclude, '**/dist/**'],
     coverage: {
       provider: 'v8',

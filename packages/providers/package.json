@@ -1,0 +1,20 @@
+{
+  "name": "@local-ai/providers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./mock": {
+      "@local-ai/source": "./src/mock/index.ts",
+      "types": "./dist/mock/index.d.ts",
+      "import": "./dist/mock/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@local-ai/core": "0.0.0"
+  }
+}

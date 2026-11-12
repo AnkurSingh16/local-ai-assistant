@@ -26,7 +26,27 @@ That runs, in order: Prettier, ESLint (strict type-checked), `tsc -b`, dependenc
 
 ## Workspace packages
 
-Each package exports a custom `@local-ai/source` condition that points at its TypeScript sources. Vitest, the per-package typecheck and dependency-cruiser resolve through it, so tests run without building first and boundary rules see real source paths. The production build (`tsconfig.build.json`) ignores the condition, emits to `dist/` and leaves test files out.
+Each package exports a custom `@local-ai/source` condition that points at its TypeScript sources. Vitest, the per-package typecheck and dependency-cruiser resolve through it, so tests run without building first and boundary rules see real source paths. The production build (`tsconfig.build.json`) ignores the condition, emits to `dist/` and leaves test files out. Vitest runs node tests through Vite's SSR resolver, so each package's `vitest.config.ts` sets the condition under both `resolve` and `ssr.resolve`; without the second, tests silently load a stale `dist/` when one exists.
+
+## Boundaries
+
+dependency-cruiser and ESLint enforce the guard boundary from ADR-0002:
+
+- `providers-only-from-compose`: only `apps/api/src/compose.ts`, the eval runner and test files import `@local-ai/providers`.
+- `tests-use-mock-providers`: tests outside the providers package import only `@local-ai/providers/mock`.
+- `storage-not-from-routes` and `tools-not-to-storage`: routes and tools never reach the stores directly. These two have no code to check until `apps/api`, `storage` and `tools` exist; I checked each rule against a temporary violating file.
+- `local/no-brand-cast` (in `eslint-rules/`) asks the type checker whether code asserts a `ModeratedText` or `UntrustedWebText` without producing one: a cast, an explicit type argument, a type predicate, an overload or `declare function` signature, or an ambient `declare` variable or class. It follows aliases, renamed imports, qualified names, unions, arrays and nested fields. It also rejects any cast whose target contains `never` or a type parameter, since those can launder any value. Only `guardrails/src/mint.ts` and `tools/src/untrusted.ts` are exempt, and a comment that disables it is itself a lint error.
+- The rule is a tripwire for the forms in its fixtures, not a proof: TypeScript cannot make a brand unforgeable. It does not see values typed `any` (the `no-unsafe-*` rules reject those) or a library function whose return type the caller picks without a type argument. The end-to-end guarantee comes from the route-inventory test, which asserts the model is never reached when moderation flags everything. It lands with the API (issue #9), and no route merges without it.
+- A false positive, such as a reasonable generic helper casting to `readonly T[]`, is fixed by narrowing the rule with a new fixture after I review the change, not by a disable comment (those are banned).
+
+## Mock providers
+
+`@local-ai/providers/mock` holds deterministic providers for chat, search, embeddings and moderation. They are the default in tests and CI, and none of them touches the network.
+
+- The chat mock streams a fixed answer in word-sized chunks, or a scripted reply, and records every request in `calls`. A test that expects the model never to be reached asserts `calls` is empty.
+- The moderation mock flags text containing `MOCK_FLAG` (category S1) or `MOCK_FLAG_SELF_HARM` (S11), so tests state intent without containing harmful text. A scripted classifier that throws simulates a guard outage.
+- The embedding mock returns the same unit vector for the same text, with 768 dimensions like `nomic-embed-text`.
+- Every mock honours its `AbortSignal`, and an optional `delayMs` makes streaming and cancellation observable.
 
 ## Workflows
 
