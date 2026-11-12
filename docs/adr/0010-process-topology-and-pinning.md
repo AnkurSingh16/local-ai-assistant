@@ -22,7 +22,7 @@ Option 2.
 - **The API** binds `127.0.0.1` by default. `npm run dev:mobile` sets `HOST=0.0.0.0` so a phone on the same Wi-Fi can reach it, and the API logs a warning when bound beyond loopback. A public demo puts a TLS-terminating proxy or tunnel in front of the API only.
 - **`npm run dev`** starts SearXNG with `docker compose up -d --wait`, then the API (`tsx watch` with the `@local-ai/source` condition) and the web app with `concurrently`. A `predev` doctor script checks the Ollama version, that the configured models are pulled, and that SearXNG answers, and prints the exact fix when something is missing. The Expo app has its own `npm run dev:mobile`, because Expo's interactive terminal does not mix with `concurrently`.
 - **Configuration** is one Zod schema in `apps/api/src/config.ts` over environment variables, with defaults for everything. Node's `--env-file-if-exists=.env` replaces dotenv; `.env.example` documents the variables.
-- **Pinned model digests** (from `ollama list` on 2026-11-12) are recorded in configuration, checked by the doctor script, and printed in every eval report: `qwen2.5:7b` 845dbda0ea48, `llama-guard3:1b` 494147e06bf9, `llama-guard3:8b` 46f211c3d866. `nomic-embed-text` is pinned when Milestone 5 adds it.
+- **Pinned model digests** (from `ollama list` on 2026-11-12) are recorded in configuration, checked by the doctor script, and printed in every eval report: `qwen2.5:7b` 845dbda0ea48, `llama-guard3:1b` 494147e06bf9, `llama-guard3:8b` 46f211c3d866. `nomic-embed-text` 0a109f422b47 (pulled 2026-11-12), added to configuration and the doctor when Milestone 5 uses it.
 
 ## Consequences
 
