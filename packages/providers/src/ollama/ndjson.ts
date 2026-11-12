@@ -52,12 +52,17 @@ export async function readCapped(
 ): Promise<string> {
   const decoder = new TextDecoder();
   const reader = body.getReader();
+  const onAbort = (): void => {
+    void reader.cancel(signal.reason).catch(() => undefined);
+  };
+  signal.addEventListener('abort', onAbort, { once: true });
   let text = '';
   let finished = false;
   try {
     for (;;) {
       signal.throwIfAborted();
       const { done, value } = await reader.read();
+      signal.throwIfAborted();
       if (done) break;
       text += decoder.decode(value, { stream: true });
       if (text.length > maxChars) throw new ProviderError('bad_response');
@@ -65,6 +70,7 @@ export async function readCapped(
     finished = true;
     return text + decoder.decode();
   } finally {
+    signal.removeEventListener('abort', onAbort);
     if (!finished) await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }

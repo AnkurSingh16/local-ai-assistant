@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { FetchFn } from './http.js';
 import { createOllamaChatProvider } from './chat.js';
 import { createOllamaModerationProvider, parseGuardVerdict } from './moderation.js';
-import { readLines } from './ndjson.js';
+import { readCapped, readLines } from './ndjson.js';
 
 const encoder = new TextEncoder();
 
@@ -127,6 +127,16 @@ describe('readLines', () => {
     controller.abort();
     const err: unknown = await run.catch((e: unknown) => e);
     expect(isAbortError(err)).toBe(true);
+  });
+});
+
+describe('readCapped', () => {
+  it('stops when the signal aborts while a read is pending', async () => {
+    const controller = new AbortController();
+    const body = new ReadableStream<Uint8Array>({ start: () => undefined });
+    const pending = readCapped(body, 100, controller.signal).catch((e: unknown) => e);
+    controller.abort();
+    expect(isAbortError(await pending)).toBe(true);
   });
 });
 
