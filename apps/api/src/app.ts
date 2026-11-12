@@ -72,7 +72,6 @@ export async function createApp(deps: AppDeps): Promise<FastifyInstance> {
     origin: [...allowedOrigins],
     methods: ['GET', 'POST'],
     allowedHeaders: ['content-type'],
-    credentials: true,
     maxAge: 600,
   });
 

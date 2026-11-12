@@ -23,9 +23,8 @@ async function main(): Promise<void> {
   const logger = createLogger(config.logLevel, config.nodeEnv === 'development');
   const logEvent = createLogEvent(logger);
   const newId = (): string => randomUUID();
-  const { assistant, moderation } = compose(config, newId);
+  const { assistant, moderation, isReady } = compose(config, newId);
 
-  let ready = false;
   const app = await createApp({
     config,
     assistant,
@@ -33,7 +32,7 @@ async function main(): Promise<void> {
     logger,
     logEvent,
     newId,
-    isReady: () => ready,
+    isReady,
   });
 
   await app.listen({ host: config.host, port: config.port });
@@ -52,13 +51,12 @@ async function main(): Promise<void> {
       { role: 'user', text: 'Hello.' },
       AbortSignal.timeout(config.guardTimeoutMs),
     );
-    ready = true;
   } catch {
-    // Turns still fail closed; readiness stays false until a restart.
+    // Turns still fail closed; the API becomes ready on the first check that succeeds.
   }
   logEvent({
     event: 'guard_warmup',
-    ok: ready,
+    ok: isReady(),
     latencyMs: Math.round(systemClock.monotonicMs() - started),
   });
 

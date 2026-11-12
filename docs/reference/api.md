@@ -22,15 +22,15 @@ id: <messageId>:<seq>
 data: {"type":"delta","text":"A rainbow is ..."}
 ```
 
-| Event      | Payload                                                                                                          |
-| ---------- | ---------------------------------------------------------------------------------------------------------------- |
-| `meta`     | `conversationId`, `messageId`                                                                                    |
-| `status`   | `phase`: `moderating`, `searching`, `reading` or `answering`; optional `detail`                                  |
-| `delta`    | `text`: one paragraph of the answer that has passed output moderation                                            |
-| `citation` | `n`, `url` (https only), `title`                                                                                 |
-| `refusal`  | `kind`: `policy`, `self_harm`, `unavailable` or `rate_limited`; a fixed `message`                                |
-| `error`    | `code`: `bad_request`, `internal`, `model_unavailable` or `timeout`; generic `message`, `requestId`, `retryable` |
-| `done`     | `finishReason`: `stop`, `length`, `refused` or `error`                                                           |
+| Event      | Payload                                                                                                                                      |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meta`     | `conversationId`, `messageId`                                                                                                                |
+| `status`   | `phase`: `moderating`, `searching`, `reading` or `answering`; optional `detail`                                                              |
+| `delta`    | `text`: the next unit of the answer, already moderated. It keeps its trailing line breaks; concatenate deltas in order to rebuild the answer |
+| `citation` | `n`, `url` (https only), `title`                                                                                                             |
+| `refusal`  | `kind`: `policy`, `self_harm`, `unavailable` or `rate_limited`; a fixed `message`                                                            |
+| `error`    | `code`: `bad_request`, `internal`, `model_unavailable` or `timeout`; generic `message`, `requestId`, `retryable`                             |
+| `done`     | `finishReason`: `stop`, `length`, `refused` or `error`                                                                                       |
 
 A turn always ends with `done`, unless the client disconnects. Disconnecting aborts the turn and stops generation. A `: ping` comment arrives every 15 seconds on a quiet stream. There is no resume: to retry, send the turn again.
 
@@ -38,7 +38,7 @@ A turn goes through these steps:
 
 1. `meta`, then `status: moderating`.
 2. The message is normalised and checked by the guard model. If it is flagged, the turn ends with `refusal` and `done: refused`, and the message never reaches the chat model. If the guard is down, the refusal kind is `unavailable`.
-3. `status: answering`. The answer arrives one paragraph at a time, and each paragraph passes the guard before it is sent. If a paragraph is flagged, generation stops, the paragraphs already sent stay, and the turn ends with `refusal`.
+3. `status: answering`. The answer arrives one unit at a time: a paragraph, a sentence-aligned piece of a long paragraph, or a fenced code block. A long block arrives in line-aligned chunks of at most 2,000 characters. Each unit passes the guard before it is sent, while the model keeps generating the next. If a paragraph is flagged, generation stops, the paragraphs already sent stay, and the turn ends with `refusal`.
 
 Errors before the stream starts come back as JSON:
 

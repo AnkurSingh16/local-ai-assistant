@@ -2,6 +2,7 @@ import type { SseEvent } from '@local-ai/contract';
 import { chatRequestSchema, encodeSseEvent, sseEventId, ssePing } from '@local-ai/contract';
 import type { FastifyInstance } from 'fastify';
 import { once } from 'node:events';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 import type { AppDeps } from '../deps.js';
 import { apiError } from '../http.js';
@@ -69,27 +70,27 @@ export function registerChatRoute(app: FastifyInstance, deps: AppDeps, slots: Tu
       }
 
       const started = deps.clock.monotonicMs();
-      reply.hijack();
       const res = reply.raw;
-      res.writeHead(200, {
-        'content-type': 'text/event-stream; charset=utf-8',
-        'cache-control': 'no-cache, no-transform',
-        connection: 'keep-alive',
-        'x-accel-buffering': 'no',
-        'x-content-type-options': 'nosniff',
-        ...corsHeaders(request.headers.origin, deps.config.allowedOrigins),
-      });
-
-      const ping = setInterval(() => {
-        if (!res.writableEnded) res.write(ssePing);
-      }, deps.pingIntervalMs ?? defaultPingIntervalMs);
-
+      let ping: ReturnType<typeof setInterval> | undefined;
       let messageId = '';
       let seq = 0;
       let last: SseEvent | undefined;
       let refusalKind: string | undefined;
       let errorCode: string | undefined;
       try {
+        reply.hijack();
+        res.writeHead(200, {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-cache, no-transform',
+          connection: 'keep-alive',
+          'x-accel-buffering': 'no',
+          'x-content-type-options': 'nosniff',
+          ...corsHeaders(request.headers.origin, deps.config.allowedOrigins),
+        });
+        ping = setInterval(() => {
+          if (!res.writableEnded) res.write(ssePing);
+        }, deps.pingIntervalMs ?? defaultPingIntervalMs);
+
         for await (const event of deps.assistant.handleTurn(
           { ...parsed.data, requestId: request.id },
           client.signal,
@@ -100,11 +101,24 @@ export function registerChatRoute(app: FastifyInstance, deps: AppDeps, slots: Tu
           last = event;
           if (client.signal.aborted) break;
           if (!res.write(encodeSseEvent(event, sseEventId(messageId, seq++)))) {
-            await Promise.race([once(res, 'drain'), once(res, 'close')]);
+            // A client that stops reading must not hold a turn slot forever.
+            const settle = new AbortController();
+            const opts = { signal: settle.signal };
+            const drained = await Promise.race([
+              once(res, 'drain', opts).then(() => true),
+              once(res, 'close', opts).then(() => false),
+              sleep(deps.config.turnTimeoutMs, undefined, opts).then(() => false),
+            ]).catch(() => false);
+            // Removes the losing listeners and the timer.
+            settle.abort();
+            if (!drained) {
+              client.abort();
+              break;
+            }
           }
         }
       } finally {
-        clearInterval(ping);
+        if (ping !== undefined) clearInterval(ping);
         release();
         reply.raw.off('close', onClose);
         if (!res.writableEnded) res.end();
@@ -131,7 +145,6 @@ function corsHeaders(
   if (origin === undefined || !allowed.includes(origin)) return {};
   return {
     'access-control-allow-origin': origin,
-    'access-control-allow-credentials': 'true',
     vary: 'Origin',
   };
 }

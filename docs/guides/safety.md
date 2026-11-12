@@ -25,7 +25,13 @@ Milestone 2 ships the first part of these layers, so no answer is ever unmoderat
 - A persona in code (`packages/agent/persona/persona.ts`) that says the assistant is an AI, has no feelings and gives no political opinions.
 - Typed log events with no field for message text, and a test that checks a marker string never reaches the logs.
 
-The rules baseline, jailbreak detection, persona output rules, the circuit breaker and the red-team set come in Milestone 3.
+Coming in Milestone 3:
+
+- the rules baseline and jailbreak detection;
+- persona output rules;
+- the circuit breaker;
+- the shorter 2-second guard timeout once Ollama reports the guard model loaded (until then every check gets the 20-second cold-load timeout);
+- the red-team set.
 
 ## Measured results
 

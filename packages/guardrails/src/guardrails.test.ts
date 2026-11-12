@@ -7,7 +7,7 @@ import {
   createInputGuard,
   createOutputGuard,
   createParagraphSplitter,
-  maxCodeChunkChars,
+  maxUnitChars,
   neutraliseTemplateTokens,
   normalise,
   refusalMessages,
@@ -135,53 +135,136 @@ describe('paragraph splitter', () => {
     const s = createParagraphSplitter();
     return [...chunks.flatMap((c) => s.push(c)), ...s.flush()];
   }
+  /** Same words in the same order: no content lost, duplicated or reordered. */
+  const words = (t: string): string => t.replace(/\s+/g, ' ').trim();
 
-  it('releases at blank lines, holding the rest until the end', () => {
+  /** Feeds the text in every chunk size from 1 to 7 and in one piece; all must agree. */
+  function allChunkings(text: string): string[] {
+    const whole = run([text]);
+    expect(words(whole.join(''))).toBe(words(text));
+    for (const unit of whole) {
+      expect(unit.length).toBeLessThanOrEqual(maxUnitChars);
+      expect(unit.trim()).not.toBe('');
+      expect(unit).not.toMatch(/^\s*\n/);
+    }
+    for (let size = 1; size <= 7; size++) {
+      const chunks = text.match(new RegExp(`[\\s\\S]{1,${String(size)}}`, 'g')) ?? [];
+      expect(run(chunks)).toEqual(whole);
+    }
+    return whole;
+  }
+
+  it('releases at blank lines, keeping separators so the units rebuild the answer', () => {
     const s = createParagraphSplitter();
     expect(s.push('One para')).toEqual([]);
-    expect(s.push('graph.\n\nTwo')).toEqual(['One paragraph.']);
+    expect(s.push('graph.\n\nTwo')).toEqual(['One paragraph.\n\n']);
     expect(s.flush()).toEqual(['Two']);
+    expect(allChunkings('A.\n\nB line one\nB line two\n\n\nC.')).toEqual([
+      'A.\n\n',
+      'B line one\nB line two\n\n',
+      'C.',
+    ]);
   });
 
-  it('cuts a long paragraph at a sentence boundary after the soft limit', () => {
-    const sentence = 'This sentence is about fifty characters in length. ';
-    const out = run([sentence.repeat(15)]);
+  it('cuts a long paragraph at a sentence end after the soft limit', () => {
+    const text = 'This sentence is about fifty characters in length. '.repeat(15).trim();
+    const out = allChunkings(text);
     expect(out.length).toBeGreaterThan(1);
     expect(out[0]?.length).toBeGreaterThanOrEqual(500);
-    expect(out[0]?.endsWith('.')).toBe(true);
-    expect(out.join(' ')).toBe(sentence.repeat(15).trim());
+    expect(out[0]?.trimEnd().endsWith('.')).toBe(true);
+  });
+
+  it('hard-cuts prose with no sentence end at whitespace before the limit', () => {
+    const text = 'word '.repeat(1000);
+    expect(allChunkings(text).map((u) => u.length)).toEqual([2000, 2000, 1000]);
+    expect(run(['x'.repeat(4500)]).map((u) => u.length)).toEqual([2000, 2000, 500]);
   });
 
   it('holds a fenced code block whole, including blank lines inside it', () => {
-    const code = '```ts\nconst a = 1;\n\nconst b = 2;\n```';
-    expect(run(['Intro:\n', code.slice(0, 10), code.slice(10), '\n\nAfter.'])).toEqual([
-      'Intro:',
-      code,
+    const text = 'Intro:\n```ts\nconst a = 1;\n\nconst b = 2;\n```\n\nAfter.';
+    expect(allChunkings(text)).toEqual([
+      'Intro:\n',
+      '```ts\nconst a = 1;\n\nconst b = 2;\n```\n',
       'After.',
     ]);
   });
 
-  it('splits a long code block at line boundaries into chunks within the limit', () => {
+  it('supports tilde fences and needs a matching fence to close', () => {
+    const text = '~~~~\nhas ``` inside\n~~~\nstill code\n~~~~\nProse.';
+    expect(allChunkings(text)).toEqual(['~~~~\nhas ``` inside\n~~~\nstill code\n~~~~\n', 'Prose.']);
+  });
+
+  it('splits a long code block into line-aligned chunks and keeps tracking the fence', () => {
     const line = 'x'.repeat(99);
-    const code = '```\n' + Array.from({ length: 50 }, () => line).join('\n') + '\n```';
-    const out = run([code, '\n\nDone.']);
-    expect(out.at(-1)).toBe('Done.');
-    for (const chunk of out) expect(chunk.length).toBeLessThanOrEqual(maxCodeChunkChars);
-    expect(out.slice(0, -1).join('\n')).toBe(code);
+    const code = '```\n' + Array.from({ length: 50 }, () => line).join('\n') + '\n```\n';
+    const text = code + '\nDone.\n\n```js\nlet a;\n```\n\nThird.';
+    const out = allChunkings(text);
+    expect(out.slice(-3)).toEqual(['Done.\n\n', '```js\nlet a;\n```\n', 'Third.']);
+  });
+
+  it('closes a fence that arrives right after a chunk was released (regression)', () => {
+    const text =
+      '```\n' +
+      'x'.repeat(1994) +
+      '\n```\n\nProse after code.\n\nSecond para.\n\n```js\nlet a;\n```\n\nThird.\n\n';
+    const out = allChunkings(text);
+    expect(out.slice(-4)).toEqual([
+      'Prose after code.\n\n',
+      'Second para.\n\n',
+      '```js\nlet a;\n```\n',
+      'Third.\n\n',
+    ]);
+  });
+
+  it('hard-cuts a single overlong code line at the limit', () => {
+    const text = '```\n' + 'y'.repeat(2500) + '\n```\n';
+    expect(allChunkings(text).map((u) => u.length)).toEqual([4, 2000, 505]);
   });
 
   it('releases an unclosed code block at the end of the stream', () => {
     expect(run(['```\ncode without end'])).toEqual(['```\ncode without end']);
   });
 
-  it('splits a single overlong code line hard at the limit', () => {
-    const out = run(['```\n' + 'y'.repeat(2500)]);
-    for (const chunk of out) expect(chunk.length).toBeLessThanOrEqual(maxCodeChunkChars);
-    // Chunks are released whole; only line breaks at chunk edges are not repeated.
-    expect(out.join('').replace(/\n/g, '')).toBe('```' + 'y'.repeat(2500));
+  it('drops whitespace-only runs and ignores empty pushes', () => {
+    expect(run(['', '\n\n', '  \n\n', 'Text'])).toEqual(['Text']);
+    expect(run([' '.repeat(5000)])).toEqual([]);
   });
 
-  it('ignores empty pushes and whitespace-only paragraphs', () => {
-    expect(run(['', '\n\n', '  \n\n', 'Text'])).toEqual(['Text']);
+  it('treats a backtick run with backticks after it as prose, not a fence', () => {
+    expect(run(['```inline``` code\n\nNext.'])).toEqual(['```inline``` code\n\n', 'Next.']);
+  });
+
+  it('keeps its invariants over many generated answers and chunkings', () => {
+    let seed = 42;
+    const rand = (n: number): number => {
+      seed = (seed * 1103515245 + 12345) % 2 ** 31;
+      return seed % n;
+    };
+    const pieces = [
+      () => 'Short sentence. ',
+      () => 'word '.repeat(rand(600)),
+      () => '\n\n',
+      () => '\n',
+      () => '```py\n' + 'print(1)\n'.repeat(rand(400)) + '```\n',
+      () => '~~~\n' + 'z'.repeat(rand(3000)) + '\n~~~\n',
+      () => 'A long run of prose without any sentence end '.repeat(rand(80)),
+    ];
+    for (let i = 0; i < 60; i++) {
+      let text = '';
+      const n = 1 + rand(12);
+      for (let j = 0; j < n; j++) text += (pieces[rand(pieces.length)] ?? (() => ''))();
+      const chunks: string[] = [];
+      for (let k = 0; k < text.length;) {
+        const size = 1 + rand(40);
+        chunks.push(text.slice(k, k + size));
+        k += size;
+      }
+      const out = run(chunks);
+      expect(words(out.join(''))).toBe(words(text));
+      for (const unit of out) {
+        expect(unit.length).toBeLessThanOrEqual(maxUnitChars);
+        expect(unit.trim()).not.toBe('');
+      }
+    }
   });
 });

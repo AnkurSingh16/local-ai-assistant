@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { AppDeps } from './app.js';
 import { bodyLimitBytes, createApp } from './app.js';
+import { trackReadiness } from './compose.js';
 import { parseConfig } from './config.js';
 import { createLogEvent } from './logging.js';
 
@@ -332,5 +333,27 @@ describe('client disconnect', () => {
     await expect
       .poll(() => logs.some((l) => l.includes('"clientAborted":true')), { timeout: 2000 })
       .toBe(true);
+  });
+});
+
+describe('readiness tracking', () => {
+  it('becomes ready on the first successful classification, not on a failure', async () => {
+    let fail = true;
+    const tracked = trackReadiness(
+      createMockModerationProvider({
+        classify: () => {
+          if (fail) throw new Error('loading');
+          return { flagged: false };
+        },
+      }),
+    );
+    const signal = new AbortController().signal;
+    await expect(
+      tracked.moderation.classify({ role: 'user', text: 'x' }, signal),
+    ).rejects.toThrow();
+    expect(tracked.isReady()).toBe(false);
+    fail = false;
+    await tracked.moderation.classify({ role: 'user', text: 'x' }, signal);
+    expect(tracked.isReady()).toBe(true);
   });
 });

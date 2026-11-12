@@ -68,7 +68,7 @@ describe('assistant turn', () => {
       },
       { type: 'status', phase: 'moderating' },
       { type: 'status', phase: 'answering' },
-      { type: 'delta', text: 'First paragraph.' },
+      { type: 'delta', text: 'First paragraph.\n\n' },
       { type: 'delta', text: 'Second paragraph.' },
       { type: 'done', finishReason: 'stop' },
     ]);
@@ -131,9 +131,43 @@ describe('assistant turn', () => {
     });
     const events = await run(deps, 'Hello');
     expect(types(events)).toEqual(['meta', 'status', 'status', 'delta', 'refusal', 'done']);
-    expect(events[3]).toEqual({ type: 'delta', text: 'Fine.' });
+    expect(events[3]).toEqual({ type: 'delta', text: 'Fine.\n\n' });
     expect(events[5]).toEqual({ type: 'done', finishReason: 'refused' });
     expect(chatSignal?.aborted).toBe(true);
+  });
+
+  it('keeps generating while earlier paragraphs are being checked', async () => {
+    let chatFinished = false;
+    const seenAtCheck: boolean[] = [];
+    const base = createMockChatProvider({
+      reply: (req) => mockReply('One.\n\nTwo.\n\nThree.', req),
+    });
+    const { deps } = setup(
+      {
+        chat: {
+          async *chat(req, signal) {
+            yield* base.chat(req, signal);
+            chatFinished = true;
+          },
+        },
+      },
+      {
+        delayMs: 20,
+        classify: (input) => {
+          if (input.role === 'assistant') seenAtCheck.push(chatFinished);
+          return { flagged: false };
+        },
+      },
+    );
+    const events = await run(deps, 'Hello');
+    expect(
+      events
+        .filter((e) => e.type === 'delta')
+        .map((e) => e.text)
+        .join(''),
+    ).toBe('One.\n\nTwo.\n\nThree.');
+    // The model had finished before the second paragraph's check completed.
+    expect(seenAtCheck.slice(1)).toContain(true);
   });
 
   it('refuses a message over the user slot before calling the model', async () => {

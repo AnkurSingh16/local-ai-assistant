@@ -100,50 +100,88 @@ export function createAssistant(deps: AssistantDeps): Assistant {
         }
 
         yield { type: 'status', phase: 'answering' };
-        const splitter = createParagraphSplitter();
-        let finish: FinishReason = 'stop';
 
-        const release = async function* (
-          paragraphs: readonly string[],
-        ): AsyncGenerator<SseEvent, boolean> {
-          for (const paragraph of paragraphs) {
-            const checked = await deps.outputGuard.checkParagraph(paragraph, signal);
+        // Generation and moderation run side by side (ADR-0005): a pump reads the
+        // model stream into the hold-back buffer while this loop checks and
+        // releases units in order. The pump never yields to the client itself.
+        const splitter = createParagraphSplitter();
+        const pending: string[] = [];
+        // Shared with the pump; an object so the compiler does not narrow it away.
+        const pumpState: { done: boolean; error: unknown; finish: FinishReason } = {
+          done: false,
+          error: undefined,
+          finish: 'stop',
+        };
+        let wake: (() => void) | undefined;
+        const notify = (): void => {
+          wake?.();
+          wake = undefined;
+        };
+        const pump = (async () => {
+          try {
+            const stream = deps.chat.chat(
+              {
+                messages,
+                options: {
+                  numCtx: contextBudget.numCtx,
+                  maxOutputTokens: contextBudget.output,
+                  ...(deps.temperature === undefined ? {} : { temperature: deps.temperature }),
+                },
+              },
+              signal,
+            );
+            for await (const chunk of stream) {
+              if (chunk.type === 'text') {
+                pending.push(...splitter.push(chunk.text));
+                notify();
+              } else if (chunk.type === 'done') {
+                pumpState.finish = chunk.finishReason === 'length' ? 'length' : 'stop';
+              }
+              // No tools are offered yet, so tool_call chunks are ignored.
+            }
+            pending.push(...splitter.flush());
+          } catch (err) {
+            pumpState.error = err;
+          } finally {
+            pumpState.done = true;
+            notify();
+          }
+        })();
+
+        try {
+          for (;;) {
+            const unit = pending.shift();
+            if (unit === undefined) {
+              if (pumpState.done) break;
+              await new Promise<void>((resolve) => {
+                wake = resolve;
+              });
+              continue;
+            }
+            const checked = await deps.outputGuard.checkParagraph(unit, signal);
             if (!checked.ok) {
-              stop.abort();
               yield {
                 type: 'refusal',
                 kind: checked.refusal,
                 message: refusalMessages[checked.refusal],
               };
               yield done('refused');
-              return false;
+              return;
             }
             yield { type: 'delta', text: checked.text };
           }
-          return true;
-        };
-
-        const stream = deps.chat.chat(
-          {
-            messages,
-            options: {
-              numCtx: contextBudget.numCtx,
-              maxOutputTokens: contextBudget.output,
-              ...(deps.temperature === undefined ? {} : { temperature: deps.temperature }),
-            },
-          },
-          signal,
-        );
-        for await (const chunk of stream) {
-          if (chunk.type === 'text') {
-            if (!(yield* release(splitter.push(chunk.text)))) return;
-          } else if (chunk.type === 'done') {
-            finish = chunk.finishReason === 'length' ? 'length' : 'stop';
+          if (pumpState.error !== undefined) {
+            throw pumpState.error instanceof Error
+              ? pumpState.error
+              : new Error('chat stream failed');
           }
-          // No tools are offered yet, so tool_call chunks are ignored.
+          yield done(pumpState.finish);
+        } finally {
+          // Stops generation on a refusal, an error or an early exit, and waits
+          // for the pump so nothing keeps running after the turn.
+          stop.abort();
+          await pump;
         }
-        if (!(yield* release(splitter.flush()))) return;
-        yield done(finish);
       } catch (err) {
         if (clientSignal.aborted) return;
         if (isAbortError(err)) {

@@ -14,6 +14,26 @@ import type { Config } from './config.js';
 export interface Composition {
   readonly assistant: Assistant;
   readonly moderation: ModerationProvider;
+  /** True once any guard classification has succeeded (ADR-0005). */
+  readonly isReady: () => boolean;
+}
+
+/** Marks the API ready on the first successful classification, whether warm-up or a real turn. */
+export function trackReadiness(moderation: ModerationProvider): {
+  moderation: ModerationProvider;
+  isReady: () => boolean;
+} {
+  let ready = false;
+  return {
+    isReady: () => ready,
+    moderation: {
+      async classify(input, signal) {
+        const verdict = await moderation.classify(input, signal);
+        ready = true;
+        return verdict;
+      },
+    },
+  };
 }
 
 export function compose(config: Config, newId: () => string): Composition {
@@ -37,7 +57,8 @@ export function compose(config: Config, newId: () => string): Composition {
       fetch: fetchFn,
     });
   }
-  const guard = { moderation, timeoutMs: config.guardTimeoutMs };
+  const tracked = trackReadiness(moderation);
+  const guard = { moderation: tracked.moderation, timeoutMs: config.guardTimeoutMs };
   const assistant = createAssistant({
     chat,
     inputGuard: createInputGuard(guard),
@@ -45,5 +66,5 @@ export function compose(config: Config, newId: () => string): Composition {
     newId,
     turnTimeoutMs: config.turnTimeoutMs,
   });
-  return { assistant, moderation };
+  return { assistant, moderation: tracked.moderation, isReady: tracked.isReady };
 }

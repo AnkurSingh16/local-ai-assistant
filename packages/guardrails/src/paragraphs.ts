@@ -1,15 +1,19 @@
 /**
- * Hold-back buffer for streamed answers (ADR-0005). Text is released one unit at
- * a time so each unit can be moderated before the client sees it:
- * - at a blank line;
- * - at a sentence boundary once the paragraph passes 500 characters;
- * - a fenced code block is held whole up to 2,000 characters, and a longer one
- *   is released in chunks of at most 2,000 characters split at line boundaries.
+ * Hold-back buffer for streamed answers (ADR-0005). The answer is released one
+ * unit at a time so each unit can be moderated before the client sees it:
+ * - prose at a blank line;
+ * - prose at a sentence end once the unit passes 500 characters, and at the
+ *   last whitespace before 2,000 characters if no sentence ends by then;
+ * - a fenced code block (``` or ~~~) whole, up to 2,000 characters; a longer
+ *   block in chunks of whole lines of at most 2,000 characters.
+ *
+ * Units are slices of the stream that keep their trailing line breaks, so
+ * concatenating them in order rebuilds the answer. Blank lines that would start
+ * a unit are dropped, since they carry nothing to moderate or show. Every unit has at most
+ * `maxUnitChars` characters, which keeps each guard call well inside its context.
  */
 export const softParagraphChars = 500;
-export const maxCodeChunkChars = 2000;
-
-const fence = /^\s*```/;
+export const maxUnitChars = 2000;
 
 export interface ParagraphSplitter {
   /** Adds streamed text and returns any units now complete. */
@@ -18,95 +22,126 @@ export interface ParagraphSplitter {
   flush(): string[];
 }
 
+interface Fence {
+  readonly char: '`' | '~';
+  readonly length: number;
+}
+
+const fenceLine = /^ {0,3}(`{3,}|~{3,})/;
+
+function openingFence(line: string): Fence | undefined {
+  const m = fenceLine.exec(line);
+  const run = m?.[1];
+  if (run === undefined) return undefined;
+  // A backtick fence's info string may not contain backticks (CommonMark).
+  if (run.startsWith('`') && line.slice(m?.[0].length).includes('`')) return undefined;
+  return { char: run.startsWith('`') ? '`' : '~', length: run.length };
+}
+
+function closesFence(line: string, fence: Fence): boolean {
+  const m = /^ {0,3}(`{3,}|~{3,})\s*$/.exec(line);
+  const run = m?.[1];
+  return run !== undefined && run.startsWith(fence.char) && run.length >= fence.length;
+}
+
+/** End of the first sentence that ends at or after the soft limit, including its trailing whitespace. */
 function sentenceCut(text: string): number {
-  // The last sentence end at or after the soft limit, followed by whitespace.
-  const re = /[.!?]["')\]]?\s/g;
-  let cut = -1;
+  const re = /[.!?]["')\]]?\s+/g;
   for (let m = re.exec(text); m !== null; m = re.exec(text)) {
     const end = m.index + m[0].length;
-    if (end >= softParagraphChars) {
-      cut = end;
-      break;
-    }
+    if (end >= softParagraphChars && end <= maxUnitChars) return end;
+    if (end > maxUnitChars) return -1;
   }
-  return cut;
+  return -1;
+}
+
+/** Last position before the limit just after whitespace, or the limit itself. */
+function hardCut(text: string, preferLineEnd: boolean): number {
+  const window = text.slice(0, maxUnitChars);
+  const at = preferLineEnd
+    ? window.lastIndexOf('\n')
+    : Math.max(window.lastIndexOf(' '), window.lastIndexOf('\n'));
+  return at > 0 ? at + 1 : maxUnitChars;
 }
 
 export function createParagraphSplitter(): ParagraphSplitter {
   let buffer = '';
-  let inCode = false;
+  // Offset up to which complete lines of `buffer` have been examined.
+  let scanned = 0;
+  let fence: Fence | undefined;
+
+  function emit(out: string[], end: number): void {
+    const unit = buffer.slice(0, end);
+    buffer = buffer.slice(end);
+    scanned = Math.max(0, scanned - end);
+    // A whitespace-only run carries nothing to moderate or show, so it is dropped.
+    if (unit.trim() !== '') out.push(unit);
+  }
 
   function drain(final: boolean): string[] {
     const out: string[] = [];
     for (;;) {
-      if (inCode) {
-        const lines = buffer.split('\n');
-        // Find the closing fence (not the opening one at index 0).
-        const close = lines.findIndex((l, i) => i > 0 && fence.test(l));
-        if (close !== -1) {
-          const block = lines.slice(0, close + 1).join('\n');
-          if (block.length <= maxCodeChunkChars) {
-            out.push(block);
-            buffer = lines
-              .slice(close + 1)
-              .join('\n')
-              .replace(/^\n+/, '');
-            inCode = false;
+      const nl = buffer.indexOf('\n', scanned);
+      if (nl !== -1) {
+        const line = buffer.slice(scanned, nl);
+        const lineEnd = nl + 1;
+        if (fence === undefined) {
+          const opening = openingFence(line);
+          if (opening !== undefined) {
+            const start = scanned;
+            fence = opening;
+            if (buffer.slice(0, start).trim() !== '') {
+              emit(out, start);
+              scanned = lineEnd - start;
+            } else {
+              scanned = lineEnd;
+            }
             continue;
           }
-        }
-        if (buffer.length > maxCodeChunkChars || (final && buffer !== '')) {
-          // Release whole lines up to the chunk limit; the block stays open.
-          let size = 0;
-          let count = 0;
-          for (const line of lines) {
-            const next = size + line.length + 1;
-            if (next > maxCodeChunkChars && count > 0) break;
-            size = next;
-            count++;
+          if (line.trim() === '') {
+            // A blank line ends a paragraph; blank lines before any content are dropped.
+            emit(out, lineEnd);
+            continue;
           }
-          const chunk = lines.slice(0, count).join('\n');
-          const head = chunk.length > maxCodeChunkChars ? chunk.slice(0, maxCodeChunkChars) : chunk;
-          out.push(head);
-          buffer = buffer.slice(head.length).replace(/^\n/, '');
-          if (final && buffer === '') break;
-          continue;
+          scanned = lineEnd;
+        } else {
+          if (closesFence(line, fence)) {
+            let end = lineEnd;
+            while (end > maxUnitChars) {
+              const cut = hardCut(buffer, true);
+              emit(out, cut);
+              end -= cut;
+            }
+            fence = undefined;
+            emit(out, end);
+            continue;
+          }
+          scanned = lineEnd;
         }
-        break;
+        // Cut inside the examined lines until they fit; unexamined text may still close a fence.
+        while (scanned > maxUnitChars) emit(out, hardCut(buffer, fence !== undefined));
+        continue;
       }
 
-      const fenceAt = buffer.search(/(^|\n)\s*```/);
-      const blank = buffer.indexOf('\n\n');
-      if (fenceAt !== -1 && (blank === -1 || fenceAt < blank)) {
-        const start = buffer[fenceAt] === '\n' ? fenceAt + 1 : fenceAt;
-        const before = buffer.slice(0, start).trim();
-        if (before !== '') out.push(before);
-        buffer = buffer.slice(start);
-        inCode = true;
-        continue;
-      }
-      if (blank !== -1) {
-        const para = buffer.slice(0, blank).trim();
-        if (para !== '') out.push(para);
-        buffer = buffer.slice(blank).replace(/^\n+/, '');
-        continue;
-      }
-      if (buffer.length >= softParagraphChars) {
+      // No complete line left to examine: apply the length cuts to what is buffered.
+      if (fence === undefined && buffer.length >= softParagraphChars) {
         const cut = sentenceCut(buffer);
         if (cut !== -1) {
-          out.push(buffer.slice(0, cut).trim());
-          buffer = buffer.slice(cut);
+          emit(out, cut);
           continue;
         }
       }
-      if (final) {
-        const rest = buffer.trim();
-        if (rest !== '') out.push(rest);
-        buffer = '';
+      if (buffer.length > maxUnitChars) {
+        emit(out, hardCut(buffer, fence !== undefined));
+        continue;
       }
-      break;
+      if (final && buffer.trim() !== '') {
+        out.push(buffer);
+        buffer = '';
+        scanned = 0;
+      }
+      return out;
     }
-    return out;
   }
 
   return {
@@ -115,7 +150,11 @@ export function createParagraphSplitter(): ParagraphSplitter {
       return drain(false);
     },
     flush(): string[] {
-      return drain(true);
+      const out = drain(true);
+      buffer = '';
+      scanned = 0;
+      fence = undefined;
+      return out;
     },
   };
 }
