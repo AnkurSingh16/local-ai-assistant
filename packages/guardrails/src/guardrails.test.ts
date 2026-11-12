@@ -125,8 +125,8 @@ describe('refusal messages', () => {
       'self_harm',
       'unavailable',
     ]);
-    expect(refusalMessages.self_harm).toMatch(/988/);
-    expect(refusalMessages.self_harm).toMatch(/findahelpline\.com/);
+    expect(refusalMessages.self_harm).toContain('988');
+    expect(refusalMessages.self_harm).toContain('findahelpline.com');
   });
 });
 
