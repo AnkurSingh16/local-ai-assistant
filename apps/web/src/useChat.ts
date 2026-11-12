@@ -54,7 +54,7 @@ export function useChat(client: ChatClient): Chat {
       } catch (err) {
         if (abort.signal.aborted) update(id, cancelTurn);
         else if (err instanceof ChatClientError)
-          update(id, (v) => failTurn(v, err.message, err.retryable));
+          update(id, (v) => failTurn(v, err.message, err.retryable, err.retryAfterMs));
         else update(id, (v) => failTurn(v, genericFailure, true));
       } finally {
         controller.current = null;

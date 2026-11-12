@@ -1,4 +1,6 @@
 import { createServer } from 'node:net';
+import { pathToFileURL } from 'node:url';
+import { z } from 'zod';
 
 import type { Config } from './config.js';
 import { ConfigError, loadConfig } from './config.js';
@@ -26,9 +28,14 @@ export interface CheckResult {
 
 export type DoctorFetch = (url: string, init: { signal: AbortSignal }) => Promise<Response>;
 
-/** Compares dotted versions numerically: 0.40.15 is newer than 0.9.0. */
+/**
+ * Compares dotted versions numerically (0.40.15 is newer than 0.9.0). A
+ * pre-release such as 0.40.15-rc1 comes before its release, so it does not
+ * meet that minimum.
+ */
 export function versionAtLeast(actual: string, minimum: string): boolean {
-  const a = actual.split(/[.-]/).map((p) => Number.parseInt(p, 10));
+  const [core = '', pre] = actual.split('-', 2);
+  const a = core.split('.').map((p) => Number.parseInt(p, 10));
   const b = minimum.split('.').map((p) => Number.parseInt(p, 10));
   for (let i = 0; i < b.length; i++) {
     const x = a[i] ?? 0;
@@ -36,8 +43,13 @@ export function versionAtLeast(actual: string, minimum: string): boolean {
     if (Number.isNaN(x)) return false;
     if (x !== y) return x > y;
   }
-  return true;
+  return pre === undefined;
 }
+
+const versionSchema = z.object({ version: z.string() });
+const tagsSchema = z.object({
+  models: z.array(z.object({ name: z.string(), digest: z.string() })),
+});
 
 async function getJson(fetchFn: DoctorFetch, url: string): Promise<unknown> {
   const res = await fetchFn(url, { signal: AbortSignal.timeout(3000) });
@@ -61,13 +73,7 @@ export async function checkOllama(config: Config, fetchFn: DoctorFetch): Promise
     ];
   }
   const results: CheckResult[] = [];
-  const v =
-    typeof version === 'object' &&
-    version !== null &&
-    'version' in version &&
-    typeof version.version === 'string'
-      ? version.version
-      : 'unknown';
+  const v = versionSchema.safeParse(version).data?.version ?? 'unknown';
   results.push(
     versionAtLeast(v, minOllamaVersion)
       ? { ok: true, name: 'Ollama', detail: `version ${v}` }
@@ -91,21 +97,9 @@ export async function checkOllama(config: Config, fetchFn: DoctorFetch): Promise
     });
     return results;
   }
-  const models = new Map<string, string>();
-  if (typeof tags === 'object' && tags !== null && 'models' in tags && Array.isArray(tags.models)) {
-    for (const m of tags.models as unknown[]) {
-      if (
-        typeof m === 'object' &&
-        m !== null &&
-        'name' in m &&
-        'digest' in m &&
-        typeof m.name === 'string' &&
-        typeof m.digest === 'string'
-      ) {
-        models.set(m.name, m.digest);
-      }
-    }
-  }
+  const models = new Map(
+    (tagsSchema.safeParse(tags).data?.models ?? []).map((m) => [m.name, m.digest] as const),
+  );
   for (const model of [config.chatModel, config.guardModel]) {
     const digest = models.get(model);
     const pinned = pinnedDigests[model];
@@ -179,4 +173,5 @@ async function main(): Promise<void> {
 }
 
 // Runs only when executed directly, so tests can import the checks.
-if (import.meta.url === `file://${process.argv[1] ?? ''}`) void main();
+const entry = process.argv[1];
+if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) void main();

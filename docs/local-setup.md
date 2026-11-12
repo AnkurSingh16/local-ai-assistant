@@ -54,7 +54,7 @@ SearXNG runs in Docker Compose and needs no API key. The Compose file and settin
 npm run dev
 ```
 
-This runs the doctor, then starts the API on `http://127.0.0.1:8787` and the web app on `http://127.0.0.1:5173`. Open the web app in a browser. The web dev server proxies `/v1` to the API, so the browser only ever talks to one origin. Both bind to loopback only.
+This runs the doctor, then starts the API on `http://127.0.0.1:8787` and the web app on `http://127.0.0.1:5173`. Open the web app in a browser. The web dev server proxies `/v1` to the API, so the browser only ever talks to one origin. Both bind to loopback only. The dev server runs without the Content Security Policy, because Vite's fast refresh needs an inline script; the production build adds the policy, and the end-to-end tests run against that build.
 
 The first answer after a restart takes longer while Ollama loads the models. The API loads the guard model at startup, and `GET /readyz` turns ready once it answers.
 

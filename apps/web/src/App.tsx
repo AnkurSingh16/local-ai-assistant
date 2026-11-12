@@ -15,6 +15,23 @@ const phaseLabels: Partial<Record<TurnView['phase'], string>> = {
   answering: 'Writing…',
 };
 
+/** True once the server's requested wait has passed, so Try again cannot hit the same limit at once. */
+function useRetryReady(retryAfterMs: number | undefined): boolean {
+  // The delay whose timer has run out. Ready only when it matches the current
+  // delay, so a new error is never briefly retryable before its timer starts.
+  const [expired, setExpired] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    if (retryAfterMs === undefined) return undefined;
+    const timer = setTimeout(() => {
+      setExpired(retryAfterMs);
+    }, retryAfterMs);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [retryAfterMs]);
+  return retryAfterMs === undefined || expired === retryAfterMs;
+}
+
 function TurnItem({
   turn,
   onRetry,
@@ -26,6 +43,7 @@ function TurnItem({
 }): ReactElement {
   const { view } = turn;
   const label = phaseLabels[view.phase];
+  const retryReady = useRetryReady(view.error?.retryAfterMs);
   return (
     <li className="turn">
       <div className="question" aria-label="You">
@@ -51,7 +69,7 @@ function TurnItem({
             {view.error.retryable && (
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || !retryReady}
                 onClick={() => {
                   onRetry(turn.question);
                 }}

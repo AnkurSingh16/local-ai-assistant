@@ -33,7 +33,8 @@ describe('doctor', () => {
     expect(versionAtLeast('0.40.15', '0.40.15')).toBe(true);
     expect(versionAtLeast('0.41.0', '0.40.15')).toBe(true);
     expect(versionAtLeast('0.9.9', '0.40.15')).toBe(false);
-    expect(versionAtLeast('0.40.15-rc1', '0.40.15')).toBe(true);
+    expect(versionAtLeast('0.40.15-rc1', '0.40.15')).toBe(false);
+    expect(versionAtLeast('0.40.16-rc1', '0.40.15')).toBe(true);
     expect(versionAtLeast('unknown', '0.40.15')).toBe(false);
   });
 

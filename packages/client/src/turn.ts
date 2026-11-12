@@ -16,7 +16,14 @@ export interface TurnView {
     readonly title: string;
   }[];
   readonly refusal: { readonly kind: RefusalKind; readonly message: string } | undefined;
-  readonly error: { readonly message: string; readonly retryable: boolean } | undefined;
+  readonly error:
+    | {
+        readonly message: string;
+        readonly retryable: boolean;
+        /** Wait this long before retrying, when the server said so (429 or 503). */
+        readonly retryAfterMs?: number;
+      }
+    | undefined;
   /** True when the answer stopped at the output token limit. */
   readonly truncated: boolean;
 }
@@ -60,8 +67,17 @@ export function reduceTurn(view: TurnView, event: SseEvent): TurnView {
 }
 
 /** The view after the turn could not be delivered at all (network, rate limit, busy). */
-export function failTurn(view: TurnView, message: string, retryable: boolean): TurnView {
-  return { ...view, phase: 'failed', error: { message, retryable } };
+export function failTurn(
+  view: TurnView,
+  message: string,
+  retryable: boolean,
+  retryAfterMs?: number,
+): TurnView {
+  return {
+    ...view,
+    phase: 'failed',
+    error: { message, retryable, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) },
+  };
 }
 
 export function cancelTurn(view: TurnView): TurnView {

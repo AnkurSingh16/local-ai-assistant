@@ -94,6 +94,23 @@ describe('web app', () => {
     expect(client.bodies[1]?.message).toBe('Hello');
   });
 
+  it('keeps Try again disabled until the retry delay has passed', async () => {
+    const client = fakeClient(() =>
+      (async function* () {
+        await Promise.resolve();
+        yield* [];
+        throw new ChatClientError('rate_limited', 'Slow down.', true, 429, 80);
+      })(),
+    );
+    render(<App client={client} />);
+    await ask('Hello');
+    const button = within(await screen.findByRole('alert')).getByRole('button', {
+      name: 'Try again',
+    });
+    expect(button).toBeDisabled();
+    await waitFor(() => expect(button).toBeEnabled(), { timeout: 1000 });
+  });
+
   it('stops a turn and marks it stopped', async () => {
     const client = fakeClient((_n, signal) =>
       (async function* () {
