@@ -80,7 +80,7 @@ interface Override {
    * Whether a following scope ("for one line", "in Instagram", "printed on the
    * box") can show the override is about something other than the assistant.
    */
-  readonly scoped?: 'unless_your' | 'always';
+  readonly scoped?: 'unless_your' | 'place_only';
 }
 
 /** Instruction overrides, which a user correcting their own request can also match. */
@@ -109,7 +109,7 @@ const overrides: readonly Override[] = [
   {
     pattern:
       /\b(?:bypass|disable|turn off|switch off|deactivate|remove|stop following|do not follow|don t follow|dont follow) your (?:\w+ )?(?:filters?|guidelines|restrictions|rules|safeguards|guardrails|safety|limits|censorship|instructions|programming)\b/g,
-    scoped: 'always',
+    scoped: 'place_only',
   },
   {
     pattern:
@@ -134,15 +134,63 @@ function isSelfRevision(matched: string, after: string): boolean {
   return attachedCue.test(after) || (correctionCue.test(after) && !/\ball\b/.test(matched));
 }
 
-const scope = /^ (?:in|on|for|printed|from|when|of|about|regarding)\b/;
-/** Scopes that still point at this conversation or at the assistant's own rules. */
-const scopeAtAssistant =
-  /^ (?:in this (?:chat|conversation|session)|for this (?:answer|one|response|reply|question|chat|conversation|message)|for (?:the rest of|now)|when (?:answering|responding|replying|you answer|you respond)|from (?:your|openai|anthropic|meta|google|the developers?|the creators?)|(?:on|about|regarding) (?:safety|ethics|morals))\b/;
+const scope = /^ (in|on|for|printed|from|when|of|about|regarding)((?: \w+){0,4})/;
+/**
+ * Words that show a scope still points at this conversation or the assistant's
+ * own rules. Determiners such as "this" are left out: "in this old Makefile" is
+ * about the Makefile, while "in this response" is caught by "response".
+ */
+const conversationWords = new Set([
+  'me',
+  'us',
+  'you',
+  'your',
+  'answer',
+  'answers',
+  'reply',
+  'replies',
+  'response',
+  'responses',
+  'message',
+  'messages',
+  'question',
+  'questions',
+  'task',
+  'chat',
+  'conversation',
+  'session',
+  'content',
+  'policy',
+  'policies',
+  'safety',
+  'ethics',
+  'morals',
+  'harmful',
+  'openai',
+  'anthropic',
+  'developers',
+  'developer',
+  'creators',
+  'answering',
+  'responding',
+  'replying',
+]);
 
+/**
+ * "ignore all rules for one line" or "any instructions printed on the box" are
+ * scoped to something else. The exemption never applies when the next few words
+ * point back at the conversation or the assistant ("for me", "for this task",
+ * "about content policy"), and for "turn off your filters" only a place such as
+ * "in Instagram" exempts it.
+ */
 function isScopedElsewhere(override: Override, matched: string, after: string): boolean {
   if (override.scoped === undefined) return false;
   if (override.scoped === 'unless_your' && /\byour\b/.test(matched)) return false;
-  return scope.test(after) && !scopeAtAssistant.test(after);
+  const found = scope.exec(after);
+  if (found === null) return false;
+  if (override.scoped === 'place_only' && found[1] !== 'in') return false;
+  const next = (found[2] ?? '').trim().split(' ');
+  return next[0] !== '' && !next.some((w) => conversationWords.has(w));
 }
 
 /** Every match is tested, so an exempt sentence cannot hide a later override. */
