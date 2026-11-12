@@ -221,6 +221,19 @@ describe('paragraph splitter', () => {
     expect(allChunkings(text).map((u) => u.length)).toEqual([4, 2000, 505]);
   });
 
+  it('does not open a fence in the middle of a long line that was cut', () => {
+    const text = 'word '.repeat(399) + 'word ```x more text\n\nNext paragraph.';
+    const out = allChunkings(text);
+    expect(out.at(-1)).toBe('Next paragraph.');
+  });
+
+  it('applies the sentence cut when a long paragraph arrives in one chunk', () => {
+    const text = 'This sentence is about fifty characters in length. '.repeat(30) + '\n\nEnd.';
+    const out = run([text]);
+    expect(out.length).toBeGreaterThan(2);
+    for (const unit of out.slice(0, -1)) expect(unit.length).toBeLessThan(600);
+  });
+
   it('releases an unclosed code block at the end of the stream', () => {
     expect(run(['```\ncode without end'])).toEqual(['```\ncode without end']);
   });

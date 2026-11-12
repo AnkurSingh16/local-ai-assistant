@@ -107,8 +107,14 @@ export function createAssistant(deps: AssistantDeps): Assistant {
         const splitter = createParagraphSplitter();
         const pending: string[] = [];
         // Shared with the pump; an object so the compiler does not narrow it away.
-        const pumpState: { done: boolean; error: unknown; finish: FinishReason } = {
+        const pumpState: {
+          done: boolean;
+          failed: boolean;
+          error: unknown;
+          finish: FinishReason;
+        } = {
           done: false,
+          failed: false,
           error: undefined,
           finish: 'stop',
         };
@@ -141,6 +147,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
             }
             pending.push(...splitter.flush());
           } catch (err) {
+            pumpState.failed = true;
             pumpState.error = err;
           } finally {
             pumpState.done = true;
@@ -153,6 +160,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
             const unit = pending.shift();
             if (unit === undefined) {
               if (pumpState.done) break;
+              // Safe: the check above and setting wake below happen in the same tick.
               await new Promise<void>((resolve) => {
                 wake = resolve;
               });
@@ -170,7 +178,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
             }
             yield { type: 'delta', text: checked.text };
           }
-          if (pumpState.error !== undefined) {
+          if (pumpState.failed) {
             throw pumpState.error instanceof Error
               ? pumpState.error
               : new Error('chat stream failed');

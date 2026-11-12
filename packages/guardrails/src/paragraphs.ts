@@ -69,9 +69,13 @@ export function createParagraphSplitter(): ParagraphSplitter {
   // Offset up to which complete lines of `buffer` have been examined.
   let scanned = 0;
   let fence: Fence | undefined;
+  // Whether `buffer` starts at the beginning of a line. After a cut in the
+  // middle of a long line it does not, and a fence can only open at a line start.
+  let atLineStart = true;
 
   function emit(out: string[], end: number): void {
     const unit = buffer.slice(0, end);
+    atLineStart = unit.endsWith('\n');
     buffer = buffer.slice(end);
     scanned = Math.max(0, scanned - end);
     // A whitespace-only run carries nothing to moderate or show, so it is dropped.
@@ -85,8 +89,9 @@ export function createParagraphSplitter(): ParagraphSplitter {
       if (nl !== -1) {
         const line = buffer.slice(scanned, nl);
         const lineEnd = nl + 1;
+        const lineStart = scanned > 0 || atLineStart;
         if (fence === undefined) {
-          const opening = openingFence(line);
+          const opening = lineStart ? openingFence(line) : undefined;
           if (opening !== undefined) {
             const start = scanned;
             fence = opening;
@@ -104,8 +109,13 @@ export function createParagraphSplitter(): ParagraphSplitter {
             continue;
           }
           scanned = lineEnd;
+          // Large chunks can bring many lines at once, so the sentence cut also runs here.
+          for (let cut = sentenceCut(buffer.slice(0, scanned)); cut !== -1;) {
+            emit(out, cut);
+            cut = sentenceCut(buffer.slice(0, scanned));
+          }
         } else {
-          if (closesFence(line, fence)) {
+          if (lineStart && closesFence(line, fence)) {
             let end = lineEnd;
             while (end > maxUnitChars) {
               const cut = hardCut(buffer, true);
@@ -135,11 +145,7 @@ export function createParagraphSplitter(): ParagraphSplitter {
         emit(out, hardCut(buffer, fence !== undefined));
         continue;
       }
-      if (final && buffer.trim() !== '') {
-        out.push(buffer);
-        buffer = '';
-        scanned = 0;
-      }
+      if (final && buffer.trim() !== '') emit(out, buffer.length);
       return out;
     }
   }
@@ -154,6 +160,7 @@ export function createParagraphSplitter(): ParagraphSplitter {
       buffer = '';
       scanned = 0;
       fence = undefined;
+      atLineStart = true;
       return out;
     },
   };
