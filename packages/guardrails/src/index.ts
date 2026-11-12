@@ -1,5 +1,8 @@
 export { createInputGuard } from './input.js';
-export type { GuardConfig, InputGuard, InputVerdict } from './input.js';
+export type { InputGuard, InputVerdict } from './input.js';
+export { createCircuitBreaker } from './breaker.js';
+export type { BreakerConfig, BreakerPermit, CircuitBreaker } from './breaker.js';
+export type { GuardConfig } from './classify.js';
 export { neutraliseTemplateTokens, normalise } from './normalise.js';
 export { createOutputGuard } from './output.js';
 export type { OutputGuard, OutputVerdict } from './output.js';

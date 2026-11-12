@@ -1,7 +1,7 @@
 import type { Assistant } from '@local-ai/agent';
 import { createAssistant } from '@local-ai/agent';
-import type { ChatProvider, ModerationProvider } from '@local-ai/core';
-import { createInputGuard, createOutputGuard } from '@local-ai/guardrails';
+import type { ChatProvider, Clock, ModerationProvider } from '@local-ai/core';
+import { createCircuitBreaker, createInputGuard, createOutputGuard } from '@local-ai/guardrails';
 import { createOllamaChatProvider, createOllamaModerationProvider } from '@local-ai/providers';
 import { createMockChatProvider, createMockModerationProvider } from '@local-ai/providers/mock';
 
@@ -24,6 +24,7 @@ export function trackReadiness(moderation: ModerationProvider): {
   isReady: () => boolean;
 } {
   let ready = false;
+  const isResident = moderation.isResident?.bind(moderation);
   return {
     isReady: () => ready,
     moderation: {
@@ -32,11 +33,12 @@ export function trackReadiness(moderation: ModerationProvider): {
         ready = true;
         return verdict;
       },
+      ...(isResident === undefined ? {} : { isResident }),
     },
   };
 }
 
-export function compose(config: Config, newId: () => string): Composition {
+export function compose(config: Config, newId: () => string, clock: Clock): Composition {
   let chat: ChatProvider;
   let moderation: ModerationProvider;
   if (config.providers === 'mock') {
@@ -58,7 +60,14 @@ export function compose(config: Config, newId: () => string): Composition {
     });
   }
   const tracked = trackReadiness(moderation);
-  const guard = { moderation: tracked.moderation, timeoutMs: config.guardTimeoutMs };
+  // One breaker for both guards: they share one model, so they fail together (ADR-0005).
+  const guard = {
+    moderation: tracked.moderation,
+    timeoutMs: config.guardTimeoutMs,
+    warmTimeoutMs: config.guardWarmTimeoutMs,
+    // The lease outlasts the longest check (residency read plus the cold timeout).
+    breaker: createCircuitBreaker({ clock, probeLeaseMs: config.guardTimeoutMs + 1_000 }),
+  };
   const assistant = createAssistant({
     chat,
     inputGuard: createInputGuard(guard),

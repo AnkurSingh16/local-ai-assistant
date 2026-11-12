@@ -23,7 +23,7 @@ async function main(): Promise<void> {
   const logger = createLogger(config.logLevel, config.nodeEnv === 'development');
   const logEvent = createLogEvent(logger);
   const newId = (): string => randomUUID();
-  const { assistant, moderation, isReady } = compose(config, newId);
+  const { assistant, moderation, isReady } = compose(config, newId, systemClock);
 
   const app = await createApp({
     config,

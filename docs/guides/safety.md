@@ -20,7 +20,7 @@ Milestone 2 ships the first part of these layers, so no answer is ever unmoderat
 
 - Per-IP rate limits, a 16 KB body limit, 4,000 characters per message, and a cap of two concurrent turns with a queue of four.
 - Normalisation (NFKC; zero-width, bidi and tag characters stripped; chat-template tokens neutralised) before anything is checked.
-- `llama-guard3` on every user message and on every paragraph of the answer before it is sent. If the guard errors, times out or answers in an unexpected format, the turn is refused with `unavailable`; there is no fail-open setting.
+- `llama-guard3` on every user message and on every paragraph of the answer before it is sent. If the guard errors, times out or answers in an unexpected format, the turn is refused with `unavailable`; there is no fail-open setting. A check gets 2 seconds when Ollama reports the guard model loaded and 20 seconds when it may need a load, plus up to half a second to ask Ollama which models are loaded; a provider that ignores its timeout is cut off at the same deadline. After 5 failed checks in a row a circuit breaker refuses every check with `unavailable` for 10 seconds, then lets one probe through; a probe that never answers counts as failed after its lease runs out.
 - Fixed refusal texts that name no rule. Self-harm gets crisis resources instead of a refusal, without calling the chat model.
 - A persona in code (`packages/agent/persona/persona.ts`) that says the assistant is an AI, has no feelings and gives no political opinions.
 - Typed log events with no field for message text, and a test that checks a marker string never reaches the logs.
@@ -29,8 +29,6 @@ Coming in Milestone 3:
 
 - the rules baseline and jailbreak detection;
 - persona output rules;
-- the circuit breaker;
-- the shorter 2-second guard timeout once Ollama reports the guard model loaded (until then every check gets the 20-second cold-load timeout);
 - the red-team set.
 
 ## Measured results
