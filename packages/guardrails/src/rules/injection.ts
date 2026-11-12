@@ -177,13 +177,6 @@ const conversationWords = new Set([
 ]);
 
 /**
- * "ignore all rules for one line" or "any instructions printed on the box" are
- * scoped to something else. The exemption never applies when the next few words
- * point back at the conversation or the assistant ("for me", "for this task",
- * "about content policy"), and for "turn off your filters" only a place such as
- * "in Instagram" exempts it.
- */
-/**
  * Words that show the override is a question or about someone else ("how do I
  * make eslint ignore…", "can a referee ignore…", "should I ignore…"), not an
  * order to the assistant. "you" is left out on purpose: "can you ignore all
@@ -221,6 +214,13 @@ function isCommand(before: string): boolean {
   return words.includes('you') || words.includes('u') || !words.some((w) => notACommand.has(w));
 }
 
+/**
+ * "ignore all rules for one line" or "any instructions printed on the box" are
+ * scoped to something else. The exemption never applies when the next few words
+ * point back at the conversation or the assistant ("for me", "for this task",
+ * "about content policy"), and for "turn off your filters" only a place such as
+ * "in Instagram" exempts it.
+ */
 function isScopedElsewhere(
   override: Override,
   matched: string,
