@@ -22,7 +22,7 @@ That runs, in order: Prettier, ESLint (strict type-checked), `tsc -b`, dependenc
 - No `any`, non-null assertions or unchecked casts. External input is validated with Zod at the boundary.
 - Providers, clocks and fetch are injected. Tests use mock providers and `createManualClock`.
 - Comments explain why. No TODOs: open an issue instead (ESLint enforces this).
-- Domain code never reads `Date.now()`, `new Date()`, `performance.now()` or `process.env`. ESLint enforces this everywhere except `clock.ts` and each app's `config.ts`.
+- Domain code never reads `Date.now()`, `new Date()`, `performance.now()` or `process.env`. ESLint catches the common spellings of these everywhere except `clock.ts` and each app's `config.ts`; review catches the rest.
 
 ## Workspace packages
 

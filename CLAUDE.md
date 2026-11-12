@@ -32,7 +32,7 @@ npm run build          # build all workspaces
 ## Code rules
 
 - No `any`, no non-null assertions, no unchecked casts. Validate every external input with Zod at the boundary.
-- Inject providers, clocks (`Clock` from `@local-ai/core`), fetch and randomness. Domain code never reads `Date.now()`, `new Date()`, `performance.now()`, `process.env` or a vendor SDK; ESLint enforces this outside `clock.ts` and app config modules.
+- Inject providers, clocks (`Clock` from `@local-ai/core`), fetch and randomness. Domain code never reads `Date.now()`, `new Date()`, `performance.now()`, `process.env` or a vendor SDK; ESLint catches the common spellings outside `clock.ts` and app config modules.
 - Every long-running call takes an `AbortSignal` and has a timeout.
 - Logs never contain message text, page content or personal data by default.
 - Comments explain why. No TODOs, no emoji, no commented-out code.
