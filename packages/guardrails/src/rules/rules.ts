@@ -29,6 +29,8 @@ export interface Rules {
 export interface RulesConfig {
   /** SHA-256 hashes of folded slurs; tests pass their own harmless stand-ins. */
   readonly slurHashes?: readonly string[];
+  /** The categories to check; all by default. The output guard checks a subset. */
+  readonly categories?: readonly RuleCategory[];
 }
 
 /**
@@ -106,7 +108,8 @@ const minor =
   '(?:child|children|kid|kids|minor|minors|underage|preteen|preteens|pre teen|toddler|toddlers|infant|infants|prepubescent|little girl|little girls|little boy|little boys)';
 const sexualModifier =
   '(?:sexy|horny|erotic|lewd|nsfw|porn|porno|pornographic|sexualized|sexualised|seductive)';
-const media = '(?:pics?|pictures?|photos?|images?|videos?|vids?|content)';
+const media =
+  '(?:pics?|pictures?|photos?|images?|videos?|vids?|content|story|stories|fic|fiction|roleplay|role play)';
 
 /** Compounds also checked with spaces removed, since "child p o r n" folds to them. */
 const minorCompounds = /(?:jailbait|pedoporn|kiddieporn|kiddyporn|childporn)/;
@@ -114,10 +117,10 @@ const minorCompounds = /(?:jailbait|pedoporn|kiddieporn|kiddyporn|childporn)/;
 const minorPatterns = [
   /\b(?:loli|lolicon|shota|shotacon)\b/,
   new RegExp(
-    `\\b${sexualModifier} (?:${media} (?:of |with )?)?(?:an? |my |the |some )?${minor}\\b`,
+    `\\b${sexualModifier} (?:${media} (?:of |with |about |involving )?)?(?:an? |my |the |some )?${minor}\\b`,
   ),
   new RegExp(
-    `\\b(?:nude|naked|nsfw|explicit) ${media} (?:of |with )(?:an? |my |the |some )?${minor}\\b`,
+    `\\b(?:nude|naked|nsfw|explicit) ${media} (?:of |with |about |involving )(?:an? |my |the |some )?${minor}\\b`,
   ),
   new RegExp(
     `\\b(?:sex|intercourse|sexual (?:acts?|contact|things)|make love|have sex|hook up) with (?:an? |my |the |some )?${minor}\\b`,
@@ -326,18 +329,27 @@ function hasSlur(folded: Folded, listed: HashCheck): boolean {
 
 export function createRules(config: RulesConfig = {}): Rules {
   const hashes = new Set(config.slurHashes ?? defaultSlurHashes);
+  const enabled = new Set<RuleCategory>(
+    config.categories ?? ['personal_data', 'slur', 'sexual_minors', 'injection', 'abuse'],
+  );
   return {
     check(text: string): RuleCategory | undefined {
       const views = [...new Set([text, ...decodedViews(text).map(normalise)])];
-      if (views.some(hasPersonalData)) return 'personal_data';
+      if (enabled.has('personal_data') && views.some(hasPersonalData)) return 'personal_data';
       const listed = createHashCheck(hashes);
       for (const view of views) {
         const forms = foldings(view);
-        if (forms.some((f) => hasSlur(f, listed))) return 'slur';
+        if (enabled.has('slur') && forms.some((f) => hasSlur(f, listed))) return 'slur';
         const plainView = plain(view);
-        if (forms.some((f) => hasSexualMinors(f, plainView))) return 'sexual_minors';
-        if (hasFakeTurn(view) || forms.some(hasInjection)) return 'injection';
-        if (foldings(view.replace(reported, ' ')).some(hasAbuse)) return 'abuse';
+        if (enabled.has('sexual_minors') && forms.some((f) => hasSexualMinors(f, plainView))) {
+          return 'sexual_minors';
+        }
+        if (enabled.has('injection') && (hasFakeTurn(view) || forms.some(hasInjection))) {
+          return 'injection';
+        }
+        if (enabled.has('abuse') && foldings(view.replace(reported, ' ')).some(hasAbuse)) {
+          return 'abuse';
+        }
       }
       return undefined;
     },

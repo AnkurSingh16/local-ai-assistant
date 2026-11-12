@@ -5,7 +5,9 @@ export type { BreakerConfig, BreakerPermit, CircuitBreaker } from './breaker.js'
 export type { GuardConfig } from './classify.js';
 export { neutraliseTemplateTokens, normalise } from './normalise.js';
 export { createOutputGuard } from './output.js';
-export type { OutputGuard, OutputVerdict } from './output.js';
+export type { OutputGuard, OutputGuardConfig, OutputVerdict } from './output.js';
+export { createOutputRules } from './rules/output.js';
+export type { OutputRuleCategory, OutputRules, OutputRulesConfig } from './rules/output.js';
 export { createParagraphSplitter, maxUnitChars, softParagraphChars } from './paragraphs.js';
 export type { ParagraphSplitter } from './paragraphs.js';
 export { refusalMessages } from './refusals.js';

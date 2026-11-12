@@ -1,7 +1,12 @@
 import type { Assistant } from '@local-ai/agent';
-import { createAssistant } from '@local-ai/agent';
+import { createAssistant, persona, personaCanary } from '@local-ai/agent';
 import type { ChatProvider, Clock, ModerationProvider } from '@local-ai/core';
-import { createCircuitBreaker, createInputGuard, createOutputGuard } from '@local-ai/guardrails';
+import {
+  createCircuitBreaker,
+  createInputGuard,
+  createOutputGuard,
+  createOutputRules,
+} from '@local-ai/guardrails';
 import { createOllamaChatProvider, createOllamaModerationProvider } from '@local-ai/providers';
 import { createMockChatProvider, createMockModerationProvider } from '@local-ai/providers/mock';
 
@@ -71,7 +76,10 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
   const assistant = createAssistant({
     chat,
     inputGuard: createInputGuard(guard),
-    outputGuard: createOutputGuard(guard),
+    outputGuard: createOutputGuard({
+      ...guard,
+      rules: createOutputRules({ systemPrompt: persona, canary: personaCanary }),
+    }),
     newId,
     turnTimeoutMs: config.turnTimeoutMs,
   });
