@@ -1,5 +1,4 @@
 import type { HazardCategory, ModerationInput, ModerationProvider } from '@local-ai/core';
-import { isAbortError } from '@local-ai/core';
 import type { RefusalKind } from '@local-ai/contract';
 
 import type { CircuitBreaker } from './breaker.js';
@@ -17,6 +16,7 @@ export interface GuardConfig {
   /**
    * Upper bound on a check when the provider reports the model already loaded.
    * Without it, or when residency is unknown, every check gets `timeoutMs`.
+   * Reading residency adds at most half a second before either bound starts.
    */
   readonly warmTimeoutMs?: number;
   /** Shared by the input and output guards, so failures on either count together. */
@@ -36,10 +36,31 @@ async function timeoutFor(config: GuardConfig, signal: AbortSignal): Promise<num
     );
     return resident ? config.warmTimeoutMs : config.timeoutMs;
   } catch (err) {
-    if (signal.aborted && isAbortError(err)) throw err;
+    if (signal.aborted) throw err;
     // Unknown residency gets the long timeout; the check itself still fails closed.
     return config.timeoutMs;
   }
+}
+
+/**
+ * Settles when the provider does or when the deadline passes, whichever is
+ * first, so a provider that ignores its signal cannot hold a check open.
+ */
+function withDeadline<T>(work: Promise<T>, deadline: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => {
+      const reason: unknown = deadline.reason;
+      reject(
+        reason instanceof Error ? reason : new DOMException('Guard check aborted', 'AbortError'),
+      );
+    };
+    // Attached first, so a provider that rejects after the deadline is still handled.
+    work.then(resolve, reject).finally(() => {
+      deadline.removeEventListener('abort', onAbort);
+    });
+    if (deadline.aborted) onAbort();
+    else deadline.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 /**
@@ -59,15 +80,15 @@ export async function classifyOrRefuse(
   }
   try {
     const timeoutMs = await timeoutFor(config, signal);
-    const verdict = await config.moderation.classify(
-      input,
-      AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
-    );
+    signal.throwIfAborted();
+    const deadline = AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
+    const verdict = await withDeadline(config.moderation.classify(input, deadline), deadline);
     permit?.success();
     if (!verdict.flagged) return { ok: true };
     return { ok: false, refusal: verdict.categories.includes(selfHarm) ? 'self_harm' : 'policy' };
   } catch (err) {
-    if (signal.aborted && isAbortError(err)) {
+    // The caller's own signal decides, whatever reason it was aborted with.
+    if (signal.aborted) {
       permit?.cancel();
       throw err;
     }

@@ -430,6 +430,36 @@ describe('Ollama guard residency', () => {
     expect(await provider.isResident?.(signal)).toBe(true);
   });
 
+  it('also matches on the model field', async () => {
+    const provider = createOllamaModerationProvider({
+      ...guardBase,
+      fetch: psFetch(() =>
+        Response.json({ models: [{ name: 'guard-alias', model: 'llama-guard3:1b' }] }),
+      ),
+    });
+    expect(await provider.isResident?.(signal)).toBe(true);
+  });
+
+  it('caps the response size and honours the caller abort', async () => {
+    const big = createOllamaModerationProvider({
+      ...guardBase,
+      fetch: psFetch(() => new Response('x'.repeat(70_000))),
+    });
+    await expect(big.isResident?.(signal)).rejects.toBeInstanceOf(ProviderError);
+    const controller = new AbortController();
+    controller.abort();
+    const aborted = createOllamaModerationProvider({
+      ...guardBase,
+      fetch: (_url, init) =>
+        init.signal?.aborted === true
+          ? Promise.reject(new DOMException('aborted', 'AbortError'))
+          : Promise.resolve(Response.json({ models: [] })),
+    });
+    await expect(aborted.isResident?.(controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+  });
+
   it('reports not resident when only other models are loaded', async () => {
     const provider = createOllamaModerationProvider({
       ...guardBase,

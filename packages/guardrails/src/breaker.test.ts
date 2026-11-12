@@ -66,6 +66,21 @@ describe('circuit breaker', () => {
     expect(breaker.acquire()).toBeUndefined();
   });
 
+  it('counts a probe that overruns its lease as failed, and ignores its late result', () => {
+    const clock = createManualClock(start);
+    const breaker = createCircuitBreaker({ clock, failureThreshold: 1, probeLeaseMs: 5_000 });
+    failTimes(breaker, 1);
+    clock.advance(10_000);
+    const stuck = breaker.acquire();
+    expect(stuck).toBeDefined();
+    clock.advance(5_000);
+    expect(breaker.acquire()).toBeUndefined(); // lease expired: reopened from now
+    stuck?.success();
+    expect(breaker.acquire()).toBeUndefined();
+    clock.advance(10_000);
+    expect(breaker.acquire()).toBeDefined();
+  });
+
   it('ignores late failures from checks that started before it opened, and repeat settles', () => {
     const clock = createManualClock(start);
     const breaker = createCircuitBreaker({ clock, failureThreshold: 2 });
@@ -126,6 +141,62 @@ describe('guards with the breaker and warm timeout', () => {
     controller.abort();
     await pending;
     expect(breaker.acquire()).toBeDefined();
+  });
+
+  it('treats any abort of the caller signal as a cancel, whatever its reason', async () => {
+    const breaker = createCircuitBreaker({ clock: createManualClock(start), failureThreshold: 1 });
+    const guard = createInputGuard({
+      moderation: createMockModerationProvider({ delayMs: 200 }),
+      timeoutMs: 1000,
+      breaker,
+    });
+    const controller = new AbortController();
+    const pending = guard.check('hi', controller.signal).catch((e: unknown) => e);
+    controller.abort(new Error('client gone'));
+    expect(await pending).toBeInstanceOf(Error);
+    expect(breaker.acquire()).toBeDefined();
+  });
+
+  it('cancels, not fails, when the caller aborts during the residency read', async () => {
+    const breaker = createCircuitBreaker({ clock: createManualClock(start), failureThreshold: 1 });
+    const moderation = {
+      ...createMockModerationProvider(),
+      isResident: (s: AbortSignal): Promise<boolean> =>
+        new Promise((_, reject) => {
+          s.addEventListener('abort', () => {
+            reject(new DOMException('aborted', 'AbortError'));
+          });
+        }),
+    };
+    const guard = createInputGuard({ moderation, timeoutMs: 1000, warmTimeoutMs: 20, breaker });
+    const controller = new AbortController();
+    const pending = guard.check('hi', controller.signal).catch(() => 'aborted');
+    controller.abort();
+    expect(await pending).toBe('aborted');
+    expect(breaker.acquire()).toBeDefined();
+  });
+
+  it('falls back to the long timeout when the residency read hangs', async () => {
+    const moderation = {
+      ...createMockModerationProvider({ delayMs: 50 }),
+      isResident: (s: AbortSignal): Promise<boolean> =>
+        new Promise((_, reject) => {
+          s.addEventListener('abort', () => {
+            reject(new DOMException('aborted', 'AbortError'));
+          });
+        }),
+    };
+    const guard = createInputGuard({ moderation, timeoutMs: 2000, warmTimeoutMs: 10 });
+    expect(await guard.check('hi', signal)).toEqual({ ok: true, text: 'hi' });
+  });
+
+  it('refuses at the deadline even if the provider ignores its signal', async () => {
+    const moderation = {
+      ...createMockModerationProvider(),
+      classify: (): Promise<never> => new Promise(() => undefined),
+    };
+    const guard = createInputGuard({ moderation, timeoutMs: 30 });
+    expect(await guard.check('hi', signal)).toEqual({ ok: false, refusal: 'unavailable' });
   });
 
   it('uses the short timeout only when the guard is resident', async () => {

@@ -65,7 +65,8 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
     moderation: tracked.moderation,
     timeoutMs: config.guardTimeoutMs,
     warmTimeoutMs: config.guardWarmTimeoutMs,
-    breaker: createCircuitBreaker({ clock }),
+    // The lease outlasts the longest check (residency read plus the cold timeout).
+    breaker: createCircuitBreaker({ clock, probeLeaseMs: config.guardTimeoutMs + 1_000 }),
   };
   const assistant = createAssistant({
     chat,

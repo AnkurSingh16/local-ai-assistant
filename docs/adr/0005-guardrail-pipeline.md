@@ -42,6 +42,7 @@ Option 3, in this order, cheapest and most deterministic first:
 
 - Text appears paragraph by paragraph rather than token by token, and time to first text is the first paragraph plus one guard call (26 ms warm on 1b).
 - If Ollama's guard model is down, the assistant refuses rather than answering unmoderated.
+- Residency is read just before each check, not held. If another load evicts the guard in between (which happens on 16 GB, [ADR-0006](0006-guard-model-size.md)), that check gets the 2 s timeout for a reload and is refused with `unavailable`. This fails closed; it costs an occasional spurious refusal.
 - The rules baseline is the only layer for injection and insults, so it carries a large share of the red-team set and is tested against evasion (casing, spacing, leetspeak, confusables, encodings).
 
 ## Evidence
@@ -49,4 +50,5 @@ Option 3, in this order, cheapest and most deterministic first:
 - On 2026-11-12, both `llama-guard3:8b` and `llama-guard3:1b` rated an insult and "ignore previous instructions" as safe in my spike, confirming the rules layer is necessary.
 - Llama Guard 3 model card (hazard categories S1 to S14; no injection detection claimed): https://huggingface.co/meta-llama/Llama-Guard-3-8B (accessed 2026-11-12).
 - Microsoft on Tay: https://blogs.microsoft.com/blog/2016/03/25/learning-tays-introduction/ (accessed 2026-11-12).
+- On 2026-11-12 I polled `/api/ps` every 0.3 s while `llama-guard3:1b` loaded from cold: it was not listed for the first 1.5 s and was listed from 1.8 s, so a model still loading is not reported as resident.
 - OWASP LLM07 System Prompt Leakage, which advises keeping nothing secret in the system prompt: https://genai.owasp.org/llmrisk/llm072025-system-prompt-leakage/ (accessed 2026-11-12).
