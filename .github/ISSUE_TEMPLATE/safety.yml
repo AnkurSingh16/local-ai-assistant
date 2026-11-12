@@ -1,0 +1,28 @@
+name: Safety issue
+description: A guardrail failed or harmful output got through
+labels: [type:safety, priority:high]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Hate or harassment
+        - Sexual content
+        - Violence
+        - Self-harm
+        - Extremism
+        - Illegal activity
+        - Personal data
+        - Jailbreak or persona change
+        - Prompt injection from web content
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: Describe the failure. Paraphrase harmful text rather than pasting it in full.
+    validations:
+      required: true
