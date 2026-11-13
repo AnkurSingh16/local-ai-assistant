@@ -14,7 +14,7 @@ import type { FlagLog, MemoryRepo, ReviewItem, ReviewKind, ReviewRepo } from '@l
 /**
  * A recalled item must be at least this similar to the message (cosine,
  * nomic-embed-text). Chosen on the memory recall eval (`npm run eval:memory`,
- * ADR-0001): at 0.35 nearly every item passed, so unrelated memory filled the
+ * ADR-0001): at 0.35 three mostly unrelated items went into nearly every
  * prompt; 0.46 had the best balance on the dev messages.
  */
 const minSimilarity = 0.46;

@@ -113,11 +113,17 @@ export function atThreshold(
   return { threshold, recall, precision, f1 };
 }
 
-/** The threshold with the best F1 on the given pairs, from 0.30 to 0.80 in steps of 0.01. */
-export function bestThreshold(pairs: readonly ScoredPair[]): ThresholdResult {
-  let best = atThreshold(pairs, 0.3);
+/**
+ * The threshold with the best F1 on the given pairs, from 0.30 to 0.80 in steps
+ * of 0.01, counting at most `topK` items per message, as the API recalls.
+ */
+export function bestThreshold(
+  pairs: readonly ScoredPair[],
+  topK = Number.POSITIVE_INFINITY,
+): ThresholdResult {
+  let best = atThreshold(pairs, 0.3, topK);
   for (let t = 31; t <= 80; t++) {
-    const r = atThreshold(pairs, t / 100);
+    const r = atThreshold(pairs, t / 100, topK);
     if (r.f1 > best.f1) best = r;
   }
   return best;

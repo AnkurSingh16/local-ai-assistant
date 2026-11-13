@@ -32,7 +32,7 @@ for (const [name, prefixes] of [
   const pairs = await scorePairs(set, embeddings, prefixes, AbortSignal.timeout(120_000));
   const dev = pairs.filter((p) => p.split === 'dev');
   const held = pairs.filter((p) => p.split === 'heldout');
-  const best = bestThreshold(dev);
+  const best = bestThreshold(dev, productionTopK);
   for (const [label, t] of [
     ['first guess 0.35', 0.35],
     [`API ${apiThreshold.toFixed(2)}`, apiThreshold],

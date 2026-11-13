@@ -206,4 +206,23 @@ describe('memory recall eval', () => {
     expect(atThreshold(pairs, 0.5, 2).recall).toBe(0);
     expect(atThreshold(pairs, 0.75, 3).precision).toBe(0);
   });
+
+  it('chooses the threshold with the cap applied when the cap changes the answer', () => {
+    const pair = (messageId: string, itemId: string, score: number, relevant: boolean) => ({
+      split: 'dev' as const,
+      messageId,
+      itemId,
+      score,
+      relevant,
+    });
+    // Without a cap, 0.30 keeps the relevant item; with a cap of one, the
+    // irrelevant higher-scoring item takes the slot unless the threshold rises.
+    const pairs = [
+      pair('m1', 'x', 0.6, false),
+      pair('m1', 'y', 0.5, true),
+      pair('m2', 'z', 0.65, true),
+    ];
+    expect(bestThreshold(pairs).threshold).toBeCloseTo(0.3);
+    expect(bestThreshold(pairs, 1).recall).toBeLessThan(1);
+  });
 });
