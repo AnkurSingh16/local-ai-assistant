@@ -2,10 +2,10 @@ import type { ChatChunk, ChatRequest } from '@local-ai/core';
 import { isAbortError, ProviderError } from '@local-ai/core';
 import { describe, expect, it } from 'vitest';
 
-import type { FetchFn } from './http.js';
+import type { FetchFn } from '../shared/http.js';
 import { createOllamaChatProvider } from './chat.js';
 import { createOllamaModerationProvider, parseGuardVerdict } from './moderation.js';
-import { readCapped, readLines } from './ndjson.js';
+import { readCapped, readLines } from '../shared/ndjson.js';
 
 const encoder = new TextEncoder();
 

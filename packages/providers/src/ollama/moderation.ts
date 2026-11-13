@@ -7,9 +7,9 @@ import type {
 import { hazardCategories, ProviderError } from '@local-ai/core';
 import { z } from 'zod';
 
-import type { FetchFn } from './http.js';
-import { parseJsonLine, postJson } from './http.js';
-import { readCapped } from './ndjson.js';
+import type { FetchFn } from '../shared/http.js';
+import { parseJsonLine, postJson } from '../shared/http.js';
+import { readCapped } from '../shared/ndjson.js';
 
 /** A guard verdict or the list of loaded models is small; this bounds what a broken server can make us buffer. */
 const maxGuardResponseChars = 64 * 1024;

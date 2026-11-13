@@ -24,6 +24,8 @@ Option 2.
 - **Configuration** is one Zod schema in `apps/api/src/config.ts` over environment variables, with defaults for everything. Node's `--env-file-if-exists=.env` replaces dotenv; `.env.example` documents the variables.
 - **Pinned model digests** (from `ollama list` on 2026-11-12) are recorded in configuration, checked by the doctor script, and printed in every eval report: `qwen2.5:7b` 845dbda0ea48, `llama-guard3:1b` 494147e06bf9, `llama-guard3:8b` 46f211c3d866. `nomic-embed-text` 0a109f422b47 (pulled 2026-11-12), added to configuration and the doctor when Milestone 5 uses it.
 
+**Amended 2026-11-13 (Milestone 4).** SearXNG is pinned as `searxng/searxng:<version>@sha256:<digest>`, so the version is readable and the digest is what is pulled, and Dependabot's `docker-compose` ecosystem is configured to propose updates; I will confirm the first update it opens. The container also runs as the image's unprivileged `searxng` user with memory and process limits. A test (`apps/api/src/topology.test.ts`) asserts every Compose port is published on `127.0.0.1` and the API's default host is loopback. Accepted risk: SearXNG does not check the `Host` header, so a page open in my browser could send searches to `127.0.0.1:8888`; it can only use it as a search proxy, and the results reach that page only through DNS rebinding.
+
 ## Consequences
 
 - Nothing listens beyond loopback unless I opt in. A CI check asserts every Compose `ports` entry starts with `127.0.0.1:` and the API's default host is loopback. No test probes the network from CI.

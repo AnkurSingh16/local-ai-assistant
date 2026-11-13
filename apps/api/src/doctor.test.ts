@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseConfig } from './config.js';
 import type { DoctorFetch } from './doctor.js';
-import { checkOllama, checkPortFree, format, versionAtLeast } from './doctor.js';
+import { checkOllama, checkPortFree, checkSearxng, format, versionAtLeast } from './doctor.js';
 
 const config = parseConfig({});
 
@@ -90,5 +90,27 @@ describe('doctor', () => {
       }),
     );
     expect((await checkPortFree('127.0.0.1', port, 'API')).ok).toBe(true);
+  });
+});
+
+describe('SearXNG check', () => {
+  const config = parseConfig({});
+  it('passes when the health endpoint answers', async () => {
+    const urls: string[] = [];
+    const fetchFn: DoctorFetch = (url) => {
+      urls.push(url);
+      return Promise.resolve(new Response('OK'));
+    };
+    expect((await checkSearxng(config, fetchFn)).ok).toBe(true);
+    expect(urls).toEqual(['http://127.0.0.1:8888/healthz']);
+  });
+
+  it('fails with the command that starts it', async () => {
+    const down: DoctorFetch = () => Promise.reject(new TypeError('fetch failed'));
+    const result = await checkSearxng(config, down);
+    expect(result.ok).toBe(false);
+    expect(result.fix).toContain('npm run searxng:up');
+    const bad: DoctorFetch = () => Promise.resolve(new Response('x', { status: 502 }));
+    expect((await checkSearxng(config, bad)).ok).toBe(false);
   });
 });

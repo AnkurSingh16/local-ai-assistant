@@ -22,6 +22,8 @@ Option 3.
 - **Rate limits:** `@fastify/rate-limit` with a store backed by the injected `Clock`, keyed per session and per IP (IPv6 grouped by /64): 20 turns per 10 minutes per session, 60 per 10 minutes per IP, 10 new sessions per hour per IP. A global cap allows 2 concurrent turns with a queue of 4; beyond that the API answers 503 with `Retry-After`. I set `OLLAMA_NUM_PARALLEL=1` explicitly, so two concurrent turns already queue for the GPU and more would only add waiting.
 - Limits live in memory behind the store interface. Restarting the API resets them, which is acceptable for one process.
 
+**Amended 2026-11-13.** Until the storage package arrives in Milestone 5, the cache is an in-memory map with the same keys, lifetimes and size (`packages/tools/src/cache.ts`). It holds no query text either and is emptied on restart, as the table would be.
+
 ## Consequences
 
 - Limits are deterministic in tests and need no extra container.
