@@ -1,12 +1,18 @@
-import type { ChatClient } from '@local-ai/client';
+import type { AccountClient, ChatClient, TurnView } from '@local-ai/client';
+import { initialTurn } from '@local-ai/client';
 import { createChatClient, toBlocks } from '@local-ai/client';
 import type { ChatRequestBody, SseEvent } from '@local-ai/contract';
 import { chatRequestSchema, encodeSseEvent, sseEventId } from '@local-ai/contract';
 import { fixtureMessageId, fixtureTurns } from '@local-ai/contract/fixtures';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native/dist/pure';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
-import { ChatScreen } from './ChatScreen';
+import { ChatScreen, spokenSummary } from './ChatScreen';
+import { scrollToEndCalls } from './test/react-native';
+
+beforeEach(() => {
+  scrollToEndCalls.length = 0;
+});
 
 const encoder = new TextEncoder();
 
@@ -177,5 +183,271 @@ describe('mobile chat screen', () => {
     );
     await fireEvent.press(screen.getByRole('button', { name: 'What I remember' }));
     expect(opened).toBe(true);
+  });
+});
+
+function feedbackAccount(reply?: string, failing = false) {
+  const sent: string[] = [];
+  const account: AccountClient = {
+    startSession: () => Promise.resolve('t'.repeat(43)),
+    hasSession: () => Promise.resolve(true),
+    memory: () => Promise.resolve([]),
+    forget: () => Promise.resolve(),
+    deleteEverything: () => Promise.resolve(),
+    sendFeedback: (kind, text) => {
+      sent.push(`${kind}: ${text}`);
+      return failing ? Promise.reject(new Error('down')) : Promise.resolve(reply);
+    },
+  };
+  return { account, sent };
+}
+
+describe('mobile feedback', () => {
+  it('sends feedback of the chosen kind on an answered turn', async () => {
+    const { client } = chatWith(fixtureTurns.answered ?? []);
+    const { account, sent } = feedbackAccount();
+    const spoken: string[] = [];
+    await render(
+      <ChatScreen
+        client={client}
+        account={account}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
+    await ask('Hello');
+    await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
+    await fireEvent.press(screen.getByRole('radio', { name: 'Correction' }));
+    await fireEvent.changeText(screen.getByLabelText('Details'), 'The year is wrong.');
+    await fireEvent.press(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByText(/I review feedback before anything changes/)).toBeTruthy();
+    expect(sent).toEqual(['correction: The year is wrong.']);
+    expect(spoken.at(-1)).toBe('Thanks. I review feedback before anything changes.');
+  });
+
+  it('shows crisis resources when the server answers with them', async () => {
+    const { client } = chatWith(fixtureTurns.answered ?? []);
+    const crisis = feedbackAccount('Call or text 988.');
+    await render(<ChatScreen client={client} account={crisis.account} openUrl={() => undefined} />);
+    await ask('Hello');
+    await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
+    await fireEvent.changeText(screen.getByLabelText('Details'), 'I feel hopeless');
+    await fireEvent.press(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByText('Call or text 988.')).toBeTruthy();
+  });
+
+  it('keeps the text and says so when feedback cannot be sent', async () => {
+    const { client } = chatWith(fixtureTurns.answered ?? []);
+    const { account } = feedbackAccount(undefined, true);
+    const spoken: string[] = [];
+    await render(
+      <ChatScreen
+        client={client}
+        account={account}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
+    await ask('Hello');
+    await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
+    await fireEvent.changeText(screen.getByLabelText('Details'), 'Great answer');
+    await fireEvent.press(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.getByLabelText('Details').props.value).toBe('Great answer');
+    expect(spoken.at(-1)).toBe('Feedback could not be sent. Please try again.');
+  });
+
+  it('offers no feedback on a refused turn', async () => {
+    const { client } = chatWith(fixtureTurns.refusedMidAnswer ?? []);
+    const { account } = feedbackAccount();
+    await render(<ChatScreen client={client} account={account} openUrl={() => undefined} />);
+    await ask('Hello');
+    await screen.findByText("I can't help with that.");
+    expect(screen.queryByRole('button', { name: 'Send feedback' })).toBeNull();
+  });
+
+  it('announces a finished answer once, for screen readers that ignore live regions', async () => {
+    const { client } = chatWith(fixtureTurns.refused ?? []);
+    const spoken: string[] = [];
+    await render(
+      <ChatScreen client={client} openUrl={() => undefined} announce={(m) => spoken.push(m)} />,
+    );
+    await ask('Hello');
+    await screen.findByText("I can't help with that.");
+    await waitFor(() => {
+      expect(spoken).toEqual(["I can't help with that."]);
+    });
+  });
+});
+
+describe('mobile announcements and scrolling', () => {
+  /** A client whose turn streams the given deltas, then waits until released. */
+  function controlledClient(deltas: readonly string[]) {
+    let release: () => void = () => undefined;
+    const done = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const client: ChatClient = {
+      async *send(_body, signal) {
+        yield { type: 'status', phase: 'answering' };
+        for (const text of deltas) {
+          await Promise.resolve();
+          yield { type: 'delta', text };
+        }
+        // Like the real client, an abort ends the turn with an error.
+        await Promise.race([
+          done,
+          new Promise<never>((_, reject) => {
+            signal.addEventListener('abort', () => {
+              reject(new Error('aborted'));
+            });
+          }),
+        ]);
+        yield { type: 'done', finishReason: 'stop' };
+      },
+    };
+    return {
+      client,
+      release: () => {
+        release();
+      },
+    };
+  }
+
+  it('says nothing while an answer streams, then its first paragraph once', async () => {
+    const turn = controlledClient(['First paragraph.\n\n', 'Second paragraph.']);
+    const spoken: string[] = [];
+    await render(
+      <ChatScreen
+        client={turn.client}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
+    await ask('Hello');
+    await screen.findByText('Second paragraph.');
+    expect(spoken).toEqual([]);
+    turn.release();
+    await waitFor(() => {
+      expect(spoken).toEqual(['First paragraph.']);
+    });
+    await fireEvent.changeText(screen.getByLabelText('Message'), 'typing more');
+    expect(spoken).toEqual(['First paragraph.']);
+  });
+
+  it('says Stopped after Stop, not the partial answer', async () => {
+    const turn = controlledClient(['Partial text.']);
+    const spoken: string[] = [];
+    await render(
+      <ChatScreen
+        client={turn.client}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
+    await ask('Hello');
+    await screen.findByText('Partial text.');
+    await fireEvent.press(screen.getByRole('button', { name: 'Stop' }));
+    await waitFor(() => {
+      expect(spoken).toEqual(['Stopped.']);
+    });
+  });
+
+  it('reads out an error as shown, and offers no feedback on failed or stopped turns', async () => {
+    const { client } = chatWith(fixtureTurns.failed ?? []);
+    const spoken: string[] = [];
+    const { account } = feedbackAccount();
+    await render(
+      <ChatScreen
+        client={client}
+        account={account}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
+    await ask('Hello');
+    await screen.findByText('The assistant is not available right now.');
+    await waitFor(() => {
+      expect(spoken).toEqual(['The assistant is not available right now.']);
+    });
+    expect(screen.queryByRole('button', { name: 'Send feedback' })).toBeNull();
+  });
+
+  it('reads out the feedback outcome, crisis resources included', async () => {
+    const { client } = chatWith(fixtureTurns.answered ?? []);
+    const spoken: string[] = [];
+    const { account } = feedbackAccount('Call or text 988.');
+    await render(
+      <ChatScreen
+        client={client}
+        account={account}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
+    await ask('Hello');
+    await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
+    await fireEvent.changeText(screen.getByLabelText('Details'), 'I feel hopeless');
+    await fireEvent.press(screen.getByRole('button', { name: 'Submit' }));
+    await screen.findByText('Call or text 988.');
+    expect(spoken.at(-1)).toBe('Call or text 988.');
+  });
+
+  it('follows new text only during a turn and only while the reader is at the end', async () => {
+    const turn = controlledClient(['One.\n\n', 'Two.']);
+    await render(<ChatScreen client={turn.client} openUrl={() => undefined} />);
+    const list = screen.getByLabelText('Conversation');
+    scrollToEndCalls.length = 0;
+    await ask('Hello');
+    await fireEvent(list, 'contentSizeChange', 100, 500);
+    expect(scrollToEndCalls).toHaveLength(1);
+    // The reader scrolls up to read; new text no longer moves the view.
+    await fireEvent.scroll(list, {
+      nativeEvent: {
+        contentOffset: { y: 0 },
+        layoutMeasurement: { height: 400 },
+        contentSize: { height: 1200 },
+      },
+    });
+    await fireEvent(list, 'contentSizeChange', 100, 1300);
+    expect(scrollToEndCalls).toHaveLength(1);
+    turn.release();
+    await screen.findByRole('button', { name: 'Send' });
+    // Back at the end, but the turn is over: content added now (opening
+    // feedback, the source list) does not move the view.
+    await fireEvent.scroll(list, {
+      nativeEvent: {
+        contentOffset: { y: 900 },
+        layoutMeasurement: { height: 400 },
+        contentSize: { height: 1300 },
+      },
+    });
+    await fireEvent(list, 'contentSizeChange', 100, 1400);
+    expect(scrollToEndCalls).toHaveLength(1);
+  });
+});
+
+describe('spoken summaries', () => {
+  const base: TurnView = { ...initialTurn, phase: 'done' };
+
+  it('reads a refusal before an error, an error as shown, and Stopped after Stop', () => {
+    const refusal = { kind: 'policy' as const, message: 'Refused.' };
+    const error = { message: 'Broken.', retryable: true };
+    expect(spokenSummary({ ...base, refusal, error })).toBe('Refused.');
+    expect(spokenSummary({ ...base, error })).toBe('Broken.');
+    expect(spokenSummary({ ...base, phase: 'cancelled', text: 'Half an answer' })).toBe('Stopped.');
+  });
+
+  it('reads the first paragraph, cut at a word, and mentions sources', () => {
+    const long = `${'word '.repeat(80)}end`;
+    const spoken = spokenSummary({
+      ...base,
+      text: `${long}\n\nSecond.`,
+      citations: [{ n: 1, url: 'https://example.com/', title: 'Example' }],
+    });
+    expect(spoken.endsWith('… Sources are listed below.')).toBe(true);
+    expect(spoken).not.toContain('Second.');
+    expect(spoken.length).toBeLessThan(340);
+    expect(spokenSummary({ ...base, text: '```\ncode\n```' })).toBe('Answer ready.');
   });
 });

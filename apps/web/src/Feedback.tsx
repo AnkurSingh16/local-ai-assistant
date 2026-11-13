@@ -1,8 +1,7 @@
 import type { AccountClient, FeedbackKind } from '@local-ai/client';
+import { maxFeedbackChars } from '@local-ai/contract';
 import type { ReactElement, SyntheticEvent } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
-
-const maxFeedbackChars = 1000;
 
 const kindLabels: Record<FeedbackKind, string> = {
   feedback: 'Feedback on this answer',
