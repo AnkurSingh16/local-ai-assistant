@@ -1,0 +1,30 @@
+{
+  "name": "@local-ai/tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "@local-ai/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@local-ai/core": "0.0.0",
+    "@local-ai/guardrails": "0.0.0",
+    "@mozilla/readability": "^0.6.0",
+    "ipaddr.js": "^2.5.0",
+    "jsdom": "^31.0.0",
+    "undici": "^8.12.4",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@local-ai/providers": "0.0.0",
+    "@types/jsdom": "^30.0.0"
+  }
+}

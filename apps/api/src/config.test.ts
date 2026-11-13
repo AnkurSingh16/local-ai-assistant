@@ -38,3 +38,12 @@ describe('config', () => {
     expect(() => parseConfig({ NODE_ENV: 'production', PROVIDERS: 'mock' })).toThrow(ConfigError);
   });
 });
+
+describe('SearXNG address', () => {
+  it('accepts loopback and refuses any other host', () => {
+    expect(parseConfig({ SEARXNG_URL: 'http://localhost:8888' }).searxngUrl).toBe(
+      'http://localhost:8888',
+    );
+    expect(() => parseConfig({ SEARXNG_URL: 'http://searx.example.org' })).toThrow();
+  });
+});

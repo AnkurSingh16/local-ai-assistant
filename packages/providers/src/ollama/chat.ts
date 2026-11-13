@@ -9,9 +9,9 @@ import type {
 import { ProviderError } from '@local-ai/core';
 import { z } from 'zod';
 
-import type { FetchFn } from './http.js';
-import { parseJsonLine, postJson } from './http.js';
-import { readLines } from './ndjson.js';
+import type { FetchFn } from '../shared/http.js';
+import { parseJsonLine, postJson } from '../shared/http.js';
+import { readLines } from '../shared/ndjson.js';
 
 export interface OllamaChatConfig {
   /** For example http://127.0.0.1:11434. */

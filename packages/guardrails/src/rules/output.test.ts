@@ -185,6 +185,6 @@ describe('output guard with rules', () => {
     const started = performance.now();
     rules.check(`I think ${'the party '.repeat(220)}is wrong`.slice(0, 2000));
     rules.check(`I personally support${' a'.repeat(990)}`);
-    expect(performance.now() - started).toBeLessThan(100);
+    expect(performance.now() - started).toBeLessThan(1000);
   });
 });

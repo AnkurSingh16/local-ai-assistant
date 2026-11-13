@@ -119,6 +119,24 @@ export async function checkOllama(config: Config, fetchFn: DoctorFetch): Promise
   return results;
 }
 
+/** SearXNG answers on loopback (ADR-0010). Its health endpoint makes no outgoing search. */
+export async function checkSearxng(config: Config, fetchFn: DoctorFetch): Promise<CheckResult> {
+  try {
+    const res = await fetchFn(new URL('/healthz', config.searxngUrl).toString(), {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
+    return { ok: true, name: 'SearXNG', detail: config.searxngUrl };
+  } catch {
+    return {
+      ok: false,
+      name: 'SearXNG',
+      detail: `not answering at ${config.searxngUrl}`,
+      fix: 'npm run searxng:up (needs Docker Desktop running)',
+    };
+  }
+}
+
 export function checkPortFree(host: string, port: number, name: string): Promise<CheckResult> {
   return new Promise((resolve) => {
     const server = createServer();
@@ -165,8 +183,13 @@ async function main(): Promise<void> {
   ];
   if (config.providers === 'ollama') {
     results.push(...(await checkOllama(config, (url, init) => fetch(url, init))));
+    results.push(await checkSearxng(config, (url, init) => fetch(url, init)));
   } else {
-    results.push({ ok: true, name: 'Providers', detail: 'mock providers; Ollama not needed' });
+    results.push({
+      ok: true,
+      name: 'Providers',
+      detail: 'mock providers; Ollama and SearXNG not needed',
+    });
   }
   process.stdout.write(`${format(results)}\n`);
   if (results.some((r) => !r.ok)) process.exit(1);

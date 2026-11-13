@@ -1,0 +1,34 @@
+# SearXNG for fresh web results (ADR-0010). Published on loopback only, so it is
+# never an open search proxy on the network.
+name: local-ai-assistant
+
+services:
+  searxng:
+    # The tag is the image's own version label; the digest is what is actually pulled.
+    image: searxng/searxng:2026.11.12-de722ab1b@sha256:0b104e2e1117b0ca83a36f3ac6ecda7d9ee948ccea6ead74750a03e1b856229a
+    ports:
+      - '127.0.0.1:8888:8080'
+    environment:
+      # Generated at random on each start by scripts/searxng-up.mjs; it only signs
+      # SearXNG's own cookies and image-proxy URLs.
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?start SearXNG with npm run searxng:up}
+      FORCE_OWNERSHIP: 'false'
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    # The image's own unprivileged user: SearXNG parses untrusted upstream HTML.
+    user: '977:977'
+    read_only: true
+    mem_limit: 512m
+    pids_limit: 128
+    tmpfs:
+      - /tmp
+      - /var/cache/searxng
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/healthz']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
