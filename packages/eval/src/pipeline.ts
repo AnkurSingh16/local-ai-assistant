@@ -1,6 +1,7 @@
 import { createAssistant, leakCheckPrompt, personaCanary } from '@local-ai/agent';
 import type { RefusalKind } from '@local-ai/contract';
 import type { ChatProvider, ModerationProvider } from '@local-ai/core';
+import { systemClock } from '@local-ai/core';
 import { createInputGuard, createOutputGuard, createOutputRules } from '@local-ai/guardrails';
 
 /** What one turn did, as the scorer needs it. */
@@ -44,6 +45,8 @@ export async function runTurn(
     }),
     newId: () => `00000000-0000-4000-8000-${String(++ids).padStart(12, '0')}`,
     turnTimeoutMs: timeouts.turnMs,
+    // The red-team set runs without web tools, so the clock only feeds the router.
+    clock: systemClock,
     temperature: 0,
   });
 

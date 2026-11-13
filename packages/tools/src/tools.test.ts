@@ -83,6 +83,16 @@ describe('web_search tool', () => {
     expect(search.calls).toHaveLength(0);
   });
 
+  it('refuses a query that carries personal data, without searching', async () => {
+    const search = createMockSearchProvider();
+    const tool = createWebSearch({ search, cache: cacheFor(), timeoutMs: 1000 });
+    expect(await tool.run({ query: 'my card 4111 1111 1111 1111 balance' }, signal)).toEqual({
+      ok: false,
+      error: 'blocked_query',
+    });
+    expect(search.calls).toHaveLength(0);
+  });
+
   it('serves a repeat query from the cache, ignoring case and spacing', async () => {
     const search = createMockSearchProvider();
     const tool = createWebSearch({ search, cache: cacheFor(), timeoutMs: 1000 });

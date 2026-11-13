@@ -1,5 +1,6 @@
 import type { SearchProvider, SearchResult, ToolDefinition } from '@local-ai/core';
 import { isAbortError } from '@local-ai/core';
+import { createRules } from '@local-ai/guardrails';
 import { z } from 'zod';
 
 import type { TtlCache } from './cache.js';
@@ -30,7 +31,7 @@ const argsSchema = z.strictObject({ query: z.string().trim().min(1).max(maxQuery
 
 export type WebSearchOutcome =
   | { readonly ok: true; readonly query: string; readonly results: readonly SearchResult[] }
-  | { readonly ok: false; readonly error: 'invalid_arguments' | 'unavailable' };
+  | { readonly ok: false; readonly error: 'invalid_arguments' | 'blocked_query' | 'unavailable' };
 
 export interface WebSearch {
   run(args: unknown, signal: AbortSignal): Promise<WebSearchOutcome>;
@@ -42,6 +43,14 @@ export interface WebSearchConfig {
   /** ADR-0003: a search gets 5 s. */
   readonly timeoutMs: number;
 }
+
+/**
+ * ADR-0003: a query that carries personal data (card numbers, social security
+ * numbers, keys) never goes to a search engine. Checked here, inside the tool,
+ * so forced and model-chosen queries both pass through it. The approved-memory
+ * overlap check joins it when memory arrives in Milestone 5.
+ */
+const personalData = createRules({ categories: ['personal_data'] });
 
 /** Spacing and case do not change the results, so they do not split the cache. */
 const normalise = (query: string): string => query.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -57,6 +66,7 @@ export function createWebSearch(config: WebSearchConfig): WebSearch {
       const parsed = argsSchema.safeParse(args);
       if (!parsed.success) return { ok: false, error: 'invalid_arguments' };
       const query = parsed.data.query;
+      if (personalData.check(query) !== undefined) return { ok: false, error: 'blocked_query' };
       const key = normalise(query);
       const cached = config.cache.get(key);
       if (cached !== undefined) return { ok: true, query, results: cached };

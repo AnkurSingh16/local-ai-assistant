@@ -77,7 +77,7 @@ cd local-ai-assistant && npm ci
 npm run dev
 ```
 
-Then open http://127.0.0.1:5173. Today it answers from model knowledge only. Every message is checked by input rules (self-harm, slurs, abuse, sexual content involving minors, injection, personal data) and `llama-guard3` before the model sees it, and every paragraph of the answer is checked by persona rules and `llama-guard3` before it is sent; the red-team results are in the [safety guide](docs/guides/safety.md#measured-results). Web search with citations arrives in Milestone 4.
+Then open http://127.0.0.1:5173. It answers from model knowledge, and searches the web through SearXNG for anything time-sensitive, citing sources with numbered links. Every message is checked by input rules (self-harm, slurs, abuse, sexual content involving minors, injection, personal data) and `llama-guard3` before the model sees it, and every paragraph of the answer is checked by persona rules and `llama-guard3` before it is sent; the red-team results are in the [safety guide](docs/guides/safety.md#measured-results).
 
 ## Documentation
 

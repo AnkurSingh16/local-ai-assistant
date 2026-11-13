@@ -50,6 +50,15 @@ describe('web app', () => {
     expect(screen.queryByText('Writing…')).not.toBeInTheDocument();
   });
 
+  it('lists cited sources as numbered links that open safely', async () => {
+    render(<App client={fakeClient(() => events(fixtureTurns.answered ?? []))} />);
+    await userEvent.type(screen.getByLabelText('Message'), 'Hi{Enter}');
+    const sources = await screen.findByRole('list', { name: 'Sources' });
+    const link = within(sources).getByRole('link', { name: 'Example' });
+    expect(link).toHaveAttribute('href', 'https://example.com/a?b=c');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
   it('sends the conversation id from the first turn with the next one', async () => {
     const client = fakeClient(() => events(fixtureTurns.answered ?? []));
     render(<App client={client} />);

@@ -1,4 +1,6 @@
-import type { Assistant } from '@local-ai/agent';
+import { randomBytes } from 'node:crypto';
+
+import type { Assistant, WebTools } from '@local-ai/agent';
 import { createAssistant, leakCheckPrompt, personaCanary } from '@local-ai/agent';
 import type { ChatProvider, Clock, ModerationProvider } from '@local-ai/core';
 import {
@@ -7,8 +9,31 @@ import {
   createOutputGuard,
   createOutputRules,
 } from '@local-ai/guardrails';
-import { createOllamaChatProvider, createOllamaModerationProvider } from '@local-ai/providers';
-import { createMockChatProvider, createMockModerationProvider } from '@local-ai/providers/mock';
+import {
+  createOllamaChatProvider,
+  createOllamaModerationProvider,
+  createSearxngSearchProvider,
+} from '@local-ai/providers';
+import {
+  createMockChatProvider,
+  createMockModerationProvider,
+  createMockSearchProvider,
+} from '@local-ai/providers/mock';
+import type { HopFetch } from '@local-ai/tools';
+import {
+  createPageParser,
+  createReadPage,
+  createSafeFetch,
+  createTtlCache,
+  createUndiciHop,
+  createWebSearch,
+  maxCacheEntries,
+  pageCacheTtlMs,
+  searchCacheTtlMs,
+  systemResolve,
+} from '@local-ai/tools';
+
+import type { FetchFn } from '@local-ai/providers';
 
 import type { Config } from './config.js';
 
@@ -43,14 +68,67 @@ export function trackReadiness(moderation: ModerationProvider): {
   };
 }
 
+/** A fixed page for mock mode, so the read path runs without the network. */
+const mockHop: HopFetch = () => {
+  const body = new Response(
+    '<html><head><title>Mock page</title></head><body><article><p>A fixed page from the mock web, used in tests.</p></article></body></html>',
+    { headers: { 'content-type': 'text/html; charset=utf-8' } },
+  ).body;
+  return Promise.resolve({
+    status: 200,
+    ok: true,
+    headers: new Headers({ 'content-type': 'text/html; charset=utf-8' }),
+    body:
+      body === null
+        ? null
+        : { getReader: () => body.getReader(), cancel: (reason?: unknown) => body.cancel(reason) },
+  });
+};
+
+/**
+ * Web search and page reading (ADR-0003, ADR-0008). The cache key and the
+ * delimiter nonces come from fresh randomness held only in memory.
+ */
+function webTools(config: Config, clock: Clock, fetchFn: FetchFn): WebTools {
+  const hmacKey = randomBytes(32);
+  const mock = config.providers === 'mock';
+  const search = mock
+    ? createMockSearchProvider()
+    : createSearxngSearchProvider({ baseUrl: config.searxngUrl, fetch: fetchFn });
+  const safeFetch = mock
+    ? createSafeFetch({
+        resolve: () => Promise.resolve([{ address: '93.184.215.14', family: 4 }]),
+        hop: mockHop,
+      })
+    : createSafeFetch({ resolve: systemResolve, hop: createUndiciHop() });
+  return {
+    search: createWebSearch({
+      search,
+      cache: createTtlCache({
+        clock,
+        ttlMs: searchCacheTtlMs,
+        maxEntries: maxCacheEntries,
+        hmacKey,
+      }),
+      timeoutMs: config.searchTimeoutMs,
+    }),
+    readPage: createReadPage({
+      fetch: safeFetch,
+      parse: createPageParser(),
+      cache: createTtlCache({ clock, ttlMs: pageCacheTtlMs, maxEntries: maxCacheEntries, hmacKey }),
+    }),
+    nonce: () => randomBytes(12).toString('hex'),
+  };
+}
+
 export function compose(config: Config, newId: () => string, clock: Clock): Composition {
+  const fetchFn: FetchFn = (input, init) => fetch(input, init);
   let chat: ChatProvider;
   let moderation: ModerationProvider;
   if (config.providers === 'mock') {
     chat = createMockChatProvider({ delayMs: 20 });
     moderation = createMockModerationProvider();
   } else {
-    const fetchFn = (input: string, init: RequestInit): Promise<Response> => fetch(input, init);
     chat = createOllamaChatProvider({
       baseUrl: config.ollamaBaseUrl,
       model: config.chatModel,
@@ -82,6 +160,8 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
     }),
     newId,
     turnTimeoutMs: config.turnTimeoutMs,
+    clock,
+    web: webTools(config, clock, fetchFn),
   });
   return { assistant, moderation: tracked.moderation, isReady: tracked.isReady };
 }

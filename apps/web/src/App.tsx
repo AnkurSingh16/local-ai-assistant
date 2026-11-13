@@ -56,6 +56,18 @@ function TurnItem({
         aria-busy={label !== undefined}
       >
         {view.text !== '' && <Answer text={view.text} />}
+        {view.citations.length > 0 && (
+          <ol className="sources" aria-label="Sources">
+            {view.citations.map((c) => (
+              <li key={c.n} value={c.n}>
+                {/* The contract allows only https URLs here; noopener keeps the opened page from reaching back. */}
+                <a href={c.url} target="_blank" rel="noopener noreferrer">
+                  {c.title === '' ? new URL(c.url).hostname : c.title}
+                </a>
+              </li>
+            ))}
+          </ol>
+        )}
         {label !== undefined && <p className="status">{label}</p>}
         {view.truncated && <p className="note">The answer reached its length limit.</p>}
         {view.refusal !== undefined && (

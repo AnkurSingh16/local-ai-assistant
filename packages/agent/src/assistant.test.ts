@@ -12,6 +12,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import type { AssistantDeps } from './index.js';
+import { createManualClock } from '@local-ai/core';
 import { buildMessages, contextBudget, createAssistant, estimateTokens, persona } from './index.js';
 
 function ids(): () => string {
@@ -37,6 +38,7 @@ function setup(
     }),
     newId: ids(),
     turnTimeoutMs: 5000,
+    clock: createManualClock(new Date('2026-11-13T12:00:00Z')),
     ...overrides,
   };
   return { deps, chat };
