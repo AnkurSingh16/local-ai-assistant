@@ -54,12 +54,14 @@ const personalDataRules = createRules({ categories: ['personal_data'] });
 
 /** The ADR-0009 patterns the input rules do not cover: they guard chat, not queries. */
 const queryPatterns: readonly RegExp[] = [
-  // An email address.
-  /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/,
-  // Six or more digits in a row: account, order, ID and most phone numbers.
-  /\d{6,}/,
-  // A phone number written in groups, such as 555-123-4567 or +44 20 7946 0958.
-  /(?:\+\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-]\d{3,4}[\s.-]\d{3,4}\b/,
+  // An email address, with a letters-only top-level domain so "lodash@4.17.21" passes.
+  /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b/i,
+  // Six or more digits in a row: account, order, ID and most phone numbers. Hex
+  // error codes and Windows KB numbers are excluded, since people search for them.
+  /(?<![\w.])(?!0x)(?<!kb)\d{6,}/i,
+  // A phone number written in groups, such as 555-123-4567 or +44 20 7946 0958,
+  // but not a run of years such as "2024 2025 2026".
+  /(?:\+\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-](?!(?:19|20)\d\d\b)\d{3,4}[\s.-](?!(?:19|20)\d\d\b)\d{3,4}\b/,
   // A URL with a query string, which often carries tokens or identifiers.
   /\bhttps?:\/\/\S*\?\S*=/i,
 ];

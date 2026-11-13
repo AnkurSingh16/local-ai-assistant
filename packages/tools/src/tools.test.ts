@@ -104,6 +104,12 @@ describe('web_search tool', () => {
     'node 24.11.1 release notes',
     'weather in London today',
     'https://nodejs.org/en/about/previous-releases',
+    'lodash@4.17.21 changelog',
+    'typescript@5.7 release notes',
+    'windows error 0x80070005',
+    'KB5034441 install failed',
+    'tax brackets 2024 2025 2026',
+    'covid cases 2020 2021 2022',
   ])('lets an ordinary query through: %s', async (query) => {
     const search = createMockSearchProvider();
     const tool = createWebSearch({ search, cache: cacheFor(), timeoutMs: 1000 });

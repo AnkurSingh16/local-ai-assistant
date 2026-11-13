@@ -53,15 +53,18 @@ const shortenings: readonly { readonly snippet: number; readonly title: number }
 /**
  * Wraps search results to fit the snippet slot of the context budget
  * (ADR-0004): long snippets and titles are shortened first, so more results
- * fit, and only then are the last results dropped.
+ * fit, and only then are the last results dropped. The injection check runs on
+ * the full text first, so shortening cannot hide a trigger phrase from it.
  */
 export function wrapResults(
   results: readonly WebSource[],
   nonce: string,
 ): ReturnType<typeof wrapWebContent> {
-  for (let n = results.length; n > 0; n--) {
+  const clean = new Set(wrapWebContent(results, nonce).kept.map((s) => s.id));
+  const safe = results.filter((r) => clean.has(r.id));
+  for (let n = safe.length; n > 0; n--) {
     for (const s of shortenings) {
-      const shortened = results
+      const shortened = safe
         .slice(0, n)
         .map((r) => ({ ...r, title: r.title.slice(0, s.title), text: r.text.slice(0, s.snippet) }));
       const wrapped = wrapWebContent(shortened, nonce);
@@ -74,6 +77,9 @@ export function wrapResults(
 /** Wraps one page, shortening its text until it fits half the page slot (two pages per turn). */
 export function wrapPage(page: WebSource, nonce: string): ReturnType<typeof wrapWebContent> {
   const budget = contextBudget.pages / maxPagesPerTurn;
+  // The whole page is checked for injection before it is shortened.
+  const whole = wrapWebContent([page], nonce);
+  if (whole.kept.length === 0) return whole;
   let text = page.text;
   for (;;) {
     const wrapped = wrapWebContent([{ ...page, text }], nonce);
