@@ -5,8 +5,8 @@
  * looks for (Text, TextInput). It checks behaviour, not native rendering; the
  * device check is in apps/mobile/README.md.
  */
-import type { ReactElement, ReactNode } from 'react';
-import { createElement } from 'react';
+import type { ReactElement, ReactNode, Ref } from 'react';
+import { createElement, useImperativeHandle } from 'react';
 
 type Props = Record<string, unknown> & { readonly children?: ReactNode };
 
@@ -19,7 +19,21 @@ function host(name: string): (props: Props) => ReactElement {
 export const View = host('View');
 export const Text = host('Text');
 export const TextInput = host('TextInput');
-export const ScrollView = host('RCTScrollView');
+/** Every scrollToEnd call, so tests can check when the list follows new text. */
+export const scrollToEndCalls: number[] = [];
+
+export function ScrollView({
+  ref,
+  ...props
+}: Props & { readonly ref?: Ref<unknown> }): ReactElement {
+  // Components call scrollToEnd on the ref; the stand-in records each call.
+  useImperativeHandle(ref, () => ({
+    scrollToEnd: () => {
+      scrollToEndCalls.push(1);
+    },
+  }));
+  return createElement('RCTScrollView', props);
+}
 export const SafeAreaView = host('View');
 
 export function Pressable({ children, disabled, onPress, ...rest }: Props): ReactElement {
@@ -54,3 +68,5 @@ export const StyleSheet = {
 export const Linking = { openURL: (): Promise<void> => Promise.resolve() };
 
 export const Platform = { OS: 'ios' };
+
+export const AccessibilityInfo = { announceForAccessibility: (): void => undefined };

@@ -59,6 +59,7 @@ export function App(): ReactElement {
           <ChatScreen
             key={chatKey}
             client={clients.chat}
+            account={clients.account}
             openUrl={(url) => void Linking.openURL(url)}
             onShowMemory={() => {
               setShowMemory(true);

@@ -21,7 +21,8 @@ Replace `192.168.1.20` with the Mac's address on the Wi-Fi. This is plain HTTP, 
 - **Streaming.** React Native's built-in `fetch` does not stream response bodies, so the app passes `expo/fetch` to the client (ADR-0007).
 - **Session.** The app gets a session token from `POST /v1/sessions` and keeps it in `expo-secure-store` (the iOS Keychain or Android Keystore). It sends the token as `Authorization: Bearer`; the web app uses an HttpOnly cookie instead (ADR-0009). Requests omit cookies, so the API's `Set-Cookie` never reaches the native cookie jar, and refuse redirects, so the token never follows one (`src/fetch.ts`). "Delete everything" removes the token from the device as well as the data on the server.
 - **Sources** open in the system browser. Answers render as plain text, with code blocks in a monospace font. There is no HTML, no Markdown links and no images.
-- Feedback is sent from the web app only for now.
+- **Feedback** works as on the web: feedback, a correction or something to remember, reviewed by me before anything changes; text that reads as self-harm gets crisis resources back.
+- **Accessibility.** While an answer streams, the conversation follows the newest text only if the reader is already at the end; scrolling up to read, or giving feedback on an earlier answer, leaves the view alone. VoiceOver ignores live regions, so on iOS the end of a turn is read out once with `AccessibilityInfo`: an answer's first paragraph, a refusal or error as shown, or "Stopped." after Stop. The outcome of sending feedback, crisis resources included, is read out too. I have not yet checked these on a device with VoiceOver on.
 
 ## Tests
 
