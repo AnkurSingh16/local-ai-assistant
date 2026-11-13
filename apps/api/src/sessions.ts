@@ -15,7 +15,9 @@ export interface SessionService {
   /** True when the conversation is new or already belongs to this session. */
   claimConversation(conversationId: string, sessionId: string): Promise<boolean>;
   /** Everything remembered about the session (ADR-0009). */
-  memory(sessionId: string): Promise<{ id: string; content: string; createdAt: Date }[]>;
+  memory(
+    sessionId: string,
+  ): Promise<{ id: string; content: string; createdAt: Date; always: boolean }[]>;
   /** Forgets one remembered item; false if it does not belong to this session. */
   forget(sessionId: string, memoryId: string): Promise<boolean>;
   /** Deletes the session and everything stored under it, for real. */

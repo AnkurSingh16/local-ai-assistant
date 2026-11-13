@@ -39,7 +39,7 @@ async function ask(text: string): Promise<void> {
 }
 
 function fakeAccount(
-  items: { id: string; content: string; createdAt: string }[],
+  items: { id: string; content: string; createdAt: string; always: boolean }[],
   feedbackFails = false,
 ) {
   const calls: string[] = [];
@@ -212,7 +212,7 @@ describe('answer blocks', () => {
 describe('memory view', () => {
   it('lists what is remembered, with the disclosure, and forgets one item', async () => {
     const { account, calls } = fakeAccount([
-      { id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00Z' },
+      { id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00Z', always: false },
     ]);
     render(<App client={fakeClient(() => events([]))} account={account} />);
     await userEvent.click(screen.getByRole('button', { name: 'What I remember' }));

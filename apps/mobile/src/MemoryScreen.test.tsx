@@ -34,7 +34,7 @@ function fakeAccount(items: MemoryEntry[], failures = 0) {
   return { account, calls };
 }
 
-const sam = { id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00Z' };
+const sam = { id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00Z', always: false };
 
 describe('mobile memory screen', () => {
   it('lists what is remembered with the disclosure, and forgets one item', async () => {

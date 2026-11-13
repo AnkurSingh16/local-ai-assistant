@@ -2,63 +2,78 @@
   "items": [
     {
       "id": "m01",
-      "text": "Please call me Sam."
+      "text": "Please call me Sam.",
+      "always": false
     },
     {
       "id": "m02",
-      "text": "I prefer metric units: kilometres, kilograms and Celsius."
+      "text": "I prefer metric units: kilometres, kilograms and Celsius.",
+      "always": false
     },
     {
       "id": "m03",
-      "text": "I am vegetarian and I don't eat fish either."
+      "text": "I am vegetarian and I don't eat fish either.",
+      "always": false
     },
     {
       "id": "m04",
-      "text": "I live in Leeds in the north of England."
+      "text": "I live in Leeds in the north of England.",
+      "always": false
     },
     {
       "id": "m05",
-      "text": "I write most of my code in TypeScript and use Node.js."
+      "text": "I write most of my code in TypeScript and use Node.js.",
+      "always": false
     },
     {
       "id": "m06",
-      "text": "Keep answers short, a few sentences at most."
+      "text": "Keep answers short, a few sentences at most.",
+      "always": false
     },
     {
       "id": "m07",
-      "text": "I'm allergic to peanuts."
+      "text": "I'm allergic to peanuts.",
+      "always": true
     },
     {
       "id": "m08",
-      "text": "My daughter is seven and loves dinosaurs."
+      "text": "My daughter is seven and loves dinosaurs.",
+      "always": false
     },
     {
       "id": "m09",
-      "text": "I am learning Spanish and I'm at an intermediate level."
+      "text": "I am learning Spanish and I'm at an intermediate level.",
+      "always": false
     },
     {
       "id": "m10",
-      "text": "I use a Mac with an M1 Pro chip."
+      "text": "I use a Mac with an M1 Pro chip.",
+      "always": false
     },
     {
       "id": "m11",
-      "text": "I run three times a week and I'm training for a half marathon."
+      "text": "I run three times a week and I'm training for a half marathon.",
+      "always": false
     },
     {
       "id": "m12",
-      "text": "I work night shifts as a nurse."
+      "text": "I work night shifts as a nurse.",
+      "always": false
     },
     {
       "id": "m13",
-      "text": "Use British spelling in your answers."
+      "text": "Use British spelling in your answers.",
+      "always": false
     },
     {
       "id": "m14",
-      "text": "I have a cat called Miso."
+      "text": "I have a cat called Miso.",
+      "always": false
     },
     {
       "id": "m15",
-      "text": "My budget for a new laptop is about 1,200 pounds."
+      "text": "My budget for a new laptop is about 1,200 pounds.",
+      "always": false
     }
   ],
   "messages": [

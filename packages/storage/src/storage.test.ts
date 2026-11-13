@@ -61,10 +61,10 @@ describe('database', () => {
     expect(db.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
     expect(db.prepare('PRAGMA journal_mode').get()).toEqual({ journal_mode: 'wal' });
     expect(db.prepare('PRAGMA secure_delete').get()).toEqual({ secure_delete: 1 });
-    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 1 });
+    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 });
     db.close();
     db = openDatabase(path);
-    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 1 });
+    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 });
   });
 });
 

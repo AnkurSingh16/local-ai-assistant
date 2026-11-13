@@ -2,7 +2,13 @@ import { createMockEmbeddingProvider } from '@local-ai/providers/mock';
 import { describe, expect, it } from 'vitest';
 
 import { runTurn } from './pipeline.js';
-import { atThreshold, bestThreshold, loadRecallSet, scorePairs } from './memory-recall.js';
+import {
+  alwaysItemCoverage,
+  atThreshold,
+  bestThreshold,
+  loadRecallSet,
+  scorePairs,
+} from './memory-recall.js';
 import { replayProviders } from './replay.js';
 import { loadCases, loadFixtures, runReplay } from './run.js';
 import type { RedTeamCase } from './schema.js';
@@ -168,8 +174,8 @@ describe('memory recall eval', () => {
   it('scores pairs, and measures recall and precision at a threshold', async () => {
     const set = {
       items: [
-        { id: 'a', text: 'alpha' },
-        { id: 'b', text: 'beta' },
+        { id: 'a', text: 'alpha', always: false },
+        { id: 'b', text: 'beta', always: false },
       ],
       messages: [{ id: 'm', message: 'alpha', relevant: ['a'], split: 'dev' as const }],
     };
@@ -194,6 +200,7 @@ describe('memory recall eval', () => {
       split: 'dev' as const,
       messageId,
       itemId,
+      always: false,
       score,
       relevant,
     });
@@ -212,6 +219,7 @@ describe('memory recall eval', () => {
       split: 'dev' as const,
       messageId,
       itemId,
+      always: false,
       score,
       relevant,
     });
@@ -224,5 +232,43 @@ describe('memory recall eval', () => {
     ];
     expect(bestThreshold(pairs).threshold).toBeCloseTo(0.3);
     expect(bestThreshold(pairs, 1).recall).toBeLessThan(1);
+  });
+});
+
+describe('always-on memory in the recall eval', () => {
+  const pair = (
+    messageId: string,
+    itemId: string,
+    score: number,
+    relevant: boolean,
+    always = false,
+  ) => ({
+    split: 'dev' as const,
+    messageId,
+    itemId,
+    always,
+    score,
+    relevant,
+  });
+
+  it('keeps always-on items for every message and reports what similarity alone missed', () => {
+    const pairs = [
+      pair('m1', 'allergy', 0.2, true, true),
+      pair('m1', 'other', 0.9, false),
+      pair('m2', 'allergy', 0.9, true, true),
+    ];
+    expect(atThreshold(pairs, 0.5, 3).recall).toBe(0.5);
+    expect(atThreshold(pairs, 0.5, 3, true).recall).toBe(1);
+    expect(alwaysItemCoverage(pairs, 0.5, 3)).toEqual([
+      { itemId: 'allergy', needed: 2, bySimilarity: 1 },
+    ]);
+  });
+
+  it('marks the allergy item always-on in the case set', () => {
+    expect(
+      loadRecallSet()
+        .items.filter((i) => i.always)
+        .map((i) => i.id),
+    ).toEqual(['m07']);
   });
 });

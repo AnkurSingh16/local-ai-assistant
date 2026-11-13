@@ -17,6 +17,7 @@ import { createReviewer, paraphraseProblem } from './learning.js';
  *
  *   npm run review                       list pending items
  *   npm run review -- approve <id>       approve (preferences and corrections become memory)
+ *   npm run review -- approve <id> --always   approve as memory used in every prompt (allergies, health)
  *   npm run review -- reject <id>
  *   npm run review -- promote <id> <category> <expect> "<paraphrase>"
  */
@@ -61,7 +62,8 @@ async function main(): Promise<void> {
         );
       }
     } else if (command === 'approve' && args[0] !== undefined) {
-      process.stdout.write(`${await reviewer.approve(args[0], signal)}\n`);
+      const always = args.slice(1).includes('--always');
+      process.stdout.write(`${await reviewer.approve(args[0], signal, { always })}\n`);
     } else if (command === 'reject' && args[0] !== undefined) {
       process.stdout.write((await reviewer.reject(args[0])) ? 'rejected\n' : 'not_found\n');
     } else if (command === 'promote' && args.length === 4) {
@@ -86,7 +88,7 @@ async function main(): Promise<void> {
       );
     } else {
       process.stdout.write(
-        'Usage: npm run review -- [list | approve <id> | reject <id> | promote <id> <category> <expect> "<paraphrase>"]\n',
+        'Usage: npm run review -- [list | approve <id> [--always] | reject <id> | promote <id> <category> <expect> "<paraphrase>"]\n',
       );
       process.exitCode = 1;
     }

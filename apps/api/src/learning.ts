@@ -36,29 +36,43 @@ export function createMemoryRecall(deps: {
       return (await deps.memory.list(sessionId)).map((m) => m.content);
     },
     async recall(sessionId, message, signal) {
-      const items = await deps.memory.withEmbeddings(sessionId);
-      if (items.length === 0) return [];
-      try {
-        const [query] = await deps.embeddings.embed(
-          [message],
-          AbortSignal.any([signal, AbortSignal.timeout(deps.timeoutMs)]),
-        );
-        if (query === undefined) return [];
-        return items
-          .map((item) => ({
-            content: item.content,
-            score: cosineSimilarity(query, item.embedding),
-          }))
-          .filter((s) => s.score >= minSimilarity)
-          .sort((x, y) => y.score - x.score)
-          .slice(0, maxRecalled)
-          .map((s) => s.content);
-      } catch (err) {
-        if (signal.aborted) throw err;
-        return [];
-      }
+      // Always-on items come first and never depend on the embedding model:
+      // similarity cannot be trusted for things like allergies (ADR-0001).
+      const always = (await deps.memory.list(sessionId))
+        .filter((m) => m.always)
+        .map((m) => m.content);
+      const similar = await recallSimilar(sessionId, message, signal);
+      return [...always, ...similar];
     },
   };
+
+  async function recallSimilar(
+    sessionId: string,
+    message: string,
+    signal: AbortSignal,
+  ): Promise<string[]> {
+    const items = await deps.memory.withEmbeddings(sessionId);
+    if (items.length === 0) return [];
+    try {
+      const [query] = await deps.embeddings.embed(
+        [message],
+        AbortSignal.any([signal, AbortSignal.timeout(deps.timeoutMs)]),
+      );
+      if (query === undefined) return [];
+      return items
+        .map((item) => ({
+          content: item.content,
+          score: cosineSimilarity(query, item.embedding),
+        }))
+        .filter((s) => s.score >= minSimilarity)
+        .sort((x, y) => y.score - x.score)
+        .slice(0, maxRecalled)
+        .map((s) => s.content);
+    } catch (err) {
+      if (signal.aborted) throw err;
+      return [];
+    }
+  }
 }
 
 /** 'support': the text sounded like self-harm, so the reply carries crisis resources. */
@@ -110,7 +124,14 @@ export interface Reviewer {
    * session; feedback is only marked approved. The text is checked by the
    * guard again, which is also the only way to turn it back into storable text.
    */
-  approve(id: string, signal: AbortSignal): Promise<'approved' | 'not_found' | 'refused'>;
+  approve(
+    id: string,
+    signal: AbortSignal,
+    options?: {
+      /** Include the memory in every prompt for its session, for things like allergies. */
+      readonly always?: boolean;
+    },
+  ): Promise<'approved' | 'not_found' | 'refused'>;
   reject(id: string): Promise<boolean>;
 }
 
@@ -122,7 +143,7 @@ export function createReviewer(deps: {
 }): Reviewer {
   return {
     pending: () => deps.review.pending(),
-    async approve(id, signal) {
+    async approve(id, signal, options = {}) {
       const item = await deps.review.get(id);
       if (item === undefined) return 'not_found';
       const verdict = await deps.inputGuard.check(item.content, signal);
@@ -130,8 +151,11 @@ export function createReviewer(deps: {
       if (item.kind === 'feedback') {
         return (await deps.review.decide(id, 'approved')) ? 'approved' : 'not_found';
       }
-      const [embedding] = await deps.embeddings.embed([verdict.text], signal);
-      const memoryId = await deps.memory.add(item.sessionId, verdict.text, embedding);
+      // An always-on item is never matched by similarity, so it needs no embedding
+      // and does not depend on the embedding model being up.
+      const always = options.always === true;
+      const [embedding] = always ? [] : await deps.embeddings.embed([verdict.text], signal);
+      const memoryId = await deps.memory.add(item.sessionId, verdict.text, embedding, always);
       // The text moves to memory, where the user can see and delete it, so the
       // review row keeps none. If someone decided the item meanwhile, undo.
       if (!(await deps.review.decide(id, 'approved', true))) {

@@ -213,6 +213,50 @@ describe('memory recall', () => {
   });
 });
 
+describe('always-on memory', () => {
+  it('approves an item as always-on without an embedding, and recalls it for every message', async () => {
+    const s = setup();
+    const a = await s.sessions.create('a');
+    const id = await s.review.add(a, 'preference', await mint(s, "I'm allergic to peanuts."));
+    let embedCalls = 0;
+    const counting = {
+      ...s.embeddings,
+      embed: (texts: readonly string[], sig: AbortSignal) => {
+        embedCalls += 1;
+        return s.embeddings.embed(texts, sig);
+      },
+    };
+    const reviewer = createReviewer({
+      review: s.review,
+      memory: s.memory,
+      embeddings: counting,
+      inputGuard: s.inputGuard,
+    });
+    expect(await reviewer.approve(id, signal, { always: true })).toBe('approved');
+    expect(embedCalls).toBe(0);
+    expect((await s.memory.list(a)).map((m) => m.always)).toEqual([true]);
+    const recall = createMemoryRecall({ memory: s.memory, embeddings: counting, timeoutMs: 1000 });
+    expect(await recall.recall(a, 'What should I make for dinner?', signal)).toEqual([
+      "I'm allergic to peanuts.",
+    ]);
+  });
+
+  it('still recalls always-on items when the embedding model is down, ahead of similar ones', async () => {
+    const s = setup();
+    const a = await s.sessions.create('a');
+    await s.memory.add(a, await mint(s, 'I am vegetarian.'), undefined, true);
+    await s.memory.add(a, await mint(s, 'x y z'), new Float32Array([1, 0]));
+    const down = createMemoryRecall({
+      memory: s.memory,
+      embeddings: { model: 'm', dimensions: 2, embed: () => Promise.reject(new Error('down')) },
+      timeoutMs: 1000,
+    });
+    expect(await down.recall(a, 'x y z', signal)).toEqual(['I am vegetarian.']);
+    // Always-on items are not scored by similarity, so they are never listed twice.
+    expect(await s.memory.withEmbeddings(a)).toHaveLength(1);
+  });
+});
+
 describe('promoting an eval case', () => {
   it('refuses a paraphrase that copies the user or carries personal data', () => {
     const source = 'my landlord at 12 Rose Street keeps the deposit and will not answer';
