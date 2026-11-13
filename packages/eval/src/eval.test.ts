@@ -1,7 +1,15 @@
+import { createMockChatProvider, mockReply } from '@local-ai/providers/mock';
 import { describe, expect, it } from 'vitest';
 
 import { runTurn } from './pipeline.js';
 import { replayProviders } from './replay.js';
+import {
+  formatRouting,
+  loadRoutingCases,
+  routeWithModel,
+  routeWithRules,
+  summariseRouting,
+} from './routing.js';
 import { loadCases, loadFixtures, runReplay } from './run.js';
 import type { RedTeamCase } from './schema.js';
 import { caseCategories } from './schema.js';
@@ -151,5 +159,69 @@ describe('stale fixtures', () => {
     });
     await runTurn(noVerdict, 'hello', timeouts);
     expect(noVerdict.stale()).toBe(true);
+  });
+});
+
+describe('routing eval (rules pre-router)', () => {
+  const cases = loadRoutingCases();
+  const summary = (split: 'dev' | 'heldout') =>
+    summariseRouting(routeWithRules(cases.filter((c) => c.split === split)));
+
+  it('has a labelled set with both kinds of question in each split', () => {
+    for (const split of ['dev', 'heldout'] as const) {
+      const s = summary(split);
+      expect(s.positives).toBeGreaterThanOrEqual(30);
+      expect(s.negatives).toBeGreaterThanOrEqual(30);
+    }
+  });
+
+  // Floors at the levels measured on 2026-11-14, so a rule change that loses
+  // recall or starts sending ordinary questions to search fails CI.
+  it('keeps recall at or above what was measured, with almost no unneeded searches', () => {
+    expect(summary('dev').recall).toBeGreaterThanOrEqual(0.95);
+    expect(summary('heldout').recall).toBeGreaterThanOrEqual(0.66);
+    expect(summary('dev').falsePositiveRate).toBeLessThanOrEqual(0.02);
+    expect(summary('heldout').falsePositiveRate).toBeLessThanOrEqual(0.02);
+  });
+});
+
+describe('routing eval with a model', () => {
+  it('counts a forced search, a search the model chooses, and an answer without one', async () => {
+    const forced = await routeWithModel(
+      createMockChatProvider({ reply: (req) => mockReply('bitcoin price', req) }),
+      'What is the bitcoin price today?',
+      5000,
+    );
+    const chosen = await routeWithModel(
+      createMockChatProvider({
+        reply: () => [
+          { type: 'tool_call', call: { name: 'web_search', arguments: { query: 'x' } } },
+          { type: 'done', finishReason: 'tool_calls', usage: { promptTokens: 1, outputTokens: 1 } },
+        ],
+      }),
+      'Tell me about a topic.',
+      5000,
+    );
+    const answered = await routeWithModel(
+      createMockChatProvider({ reply: (req) => mockReply('Paris.', req) }),
+      'What is the capital of France?',
+      5000,
+    );
+    expect([forced, chosen, answered]).toEqual([true, true, false]);
+  });
+
+  it('formats a summary with misses and unneeded searches', () => {
+    const [first, second] = loadRoutingCases().filter((c) => c.split === 'heldout');
+    if (first === undefined || second === undefined) throw new Error('no cases');
+    const text = formatRouting(
+      'Title',
+      summariseRouting([
+        { case: { ...first, needsSearch: true }, searched: false },
+        { case: { ...second, needsSearch: false }, searched: true },
+      ]),
+    );
+    expect(text).toContain('Recall: 0.0% (0 of 1)');
+    expect(text).toContain('missed');
+    expect(text).toContain('unneeded');
   });
 });

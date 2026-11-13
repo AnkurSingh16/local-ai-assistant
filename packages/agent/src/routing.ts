@@ -33,6 +33,31 @@ const aboutAText =
 const creativeRequest =
   /\b(?:write|compose|imagine|invent|draft|make up)\b.{0,60}\b(?:story|poem|song|lyrics|essay|script|scene|fiction|tale|letter|dialogue)\b/;
 
+/**
+ * A question asking for facts, as opposed to a request to explain, write or
+ * change something. A time word only forces search inside a question.
+ */
+const factualQuestion =
+  /^(?:\W*)(?:what(?:'s| is| are| was| were| did| does| do| time| films?| movies?)?|who(?:'s| is| are| won| runs| leads)?|when|where|which|is|are|was|were|did|does|do|will|has|have|had|any|how (?:much|many|is|are|did|does|do|\w+ (?:is|are|was|were|will))|can i (?:still )?(?:buy|get|watch|see))\b/;
+/** Requests to explain or produce something, which a time word does not make news. */
+const request =
+  /^(?:\W*)(?:(?:can|could|would) you (?:please )?)?(?:explain|write|help|tell me (?:a|about how)|show|teach|describe|define|summarise|summarize|translate|fix|review|rewrite)\b/;
+/** Questions about the clock or calendar, which get_current_datetime answers without search. */
+const clockQuestion =
+  /\b(?:what(?:'s| is) (?:the )?(?:time|date|day)(?: it)?(?: is it)?|what(?:'s| is) today's (?:date|day)|what day is it|what date is it|what time is it|how many (?:days|weeks|months) (?:until|till|to|since))\b/;
+/** Time words that make a factual question about now or the near future. */
+const nearTime =
+  /\b(?:today|tonight|tomorrow|yesterday|last night|this (?:morning|afternoon|evening|week|weekend|month|year|season)|right now|at the moment|these days|nowadays|so far|as of now|now(?=\s*(?:[?.!,;]|$))|currently|latest|newest|most recent|upcoming|next (?:week|month|year|weekend)|recently)\b/;
+/** Things still pending or scheduled: "is it out yet", "when is the next launch". */
+const pendingOrNext =
+  /\b(?:yet|when (?:is|are|does|do|will) (?:the )?next|what(?:'s| is) next for|next (?:launch|race|match|game|episode|season|election|eclipse|release|event|movie|film))\b/;
+/** Who holds a role, however it is asked. */
+const whoLeads =
+  /\bwho (?:runs|leads|heads|owns|is in charge of|chairs|coaches|manages)\b|\b(?:secretary[- ]general|chief executive|head coach|frontrunner|leader of the opposition)\b/;
+/** Live state: prices, rates and availability that change by the hour. */
+const liveState =
+  /\b(?:costs?|prices?|pricing|expensive|cheapest|cheaper|(?:interest|mortgage|inflation) rates?|snowing|raining|sunny|temperature|how (?:hot|cold|warm)|who (?:scored|won)|still|has (?:[\w' ]{1,40} )?(?:come out|been released|launched|held|ended|started|finished|changed)|exchange rate|convert \d[\d,.]* ?(?:[a-z]{3}|dollars?|euros?|pounds?|yen|rupees?) (?:to|into)|how many (?:dollars|euros|pounds|yen|rupees) is|on sale|in stock|sold out|delays?|cancell?ed|closed|outage|is (?:\w+ )?down|storm warning|weather|forecast|flights? (?:from|to)|tickets? (?:for|to)|election results?|updates? (?:on|about)|news (?:on|about))\b/;
+
 /** Years from the training cutoff on, written as four digits. */
 function mentionsRecentYear(text: string, currentYear: number): boolean {
   for (const match of text.matchAll(/\b(20\d\d)\b/g)) {
@@ -45,7 +70,8 @@ function mentionsRecentYear(text: string, currentYear: number): boolean {
 /**
  * True when the turn must search first: a question about who holds a role,
  * something that always changes (a price, the weather, who won), a time word
- * with something that changes, or a recent year. "What is a stock", "explain
+ * with something that changes, a factual question about now or what comes
+ * next, live state such as delays or exchange rates, or a recent year. "What is a stock", "explain
  * how elections work" and fiction set in a recent year are not forced.
  */
 export function isTimeSensitive(message: string, now: Date): boolean {
@@ -55,6 +81,18 @@ export function isTimeSensitive(message: string, now: Date): boolean {
   if (alwaysChanging.test(text)) return true;
   if (!creativeRequest.test(text) && mentionsRecentYear(text, now.getUTCFullYear())) return true;
   if (timeWords.test(text) && changingThings.test(text)) return true;
+  // Broader rules, measured on the routing eval (ADR-0003): any factual
+  // question about now or what comes next, who leads something, or live state.
+  const question = factualQuestion.test(text) && !request.test(text) && !clockQuestion.test(text);
+  if (question && (nearTime.test(text) || pendingOrNext.test(text))) return true;
+  if (question && (whoLeads.test(text) || liveState.test(text))) return true;
+  // Price words ask about now even outside a question ("cheapest price for…").
+  if (
+    !request.test(text) &&
+    /\b(?:cheapest|best price|price of|prices? for|cost of)\b/.test(text)
+  ) {
+    return true;
+  }
   return /\b(?:latest|today's|current) (?:news|price|score|version|release|results?|weather)\b/.test(
     text,
   );

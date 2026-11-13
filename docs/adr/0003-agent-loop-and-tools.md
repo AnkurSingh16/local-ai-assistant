@@ -40,3 +40,12 @@ Option 4.
 - Spike on 2026-11-12 with `qwen2.5:7b` (Q4_K_M) at temperature 0: native tool routing was right on 11 of 12 hand-picked prompts; the miss was an unnecessary search. Twelve prompts prove little, which is why the routing eval exists.
 - A tool decision took about 1 s once the model was loaded; generation ran at about 26 tokens/s.
 - OWASP LLM01 Prompt Injection and LLM06 Excessive Agency (2025): https://genai.owasp.org/llmrisk/llm01-prompt-injection/ and https://genai.owasp.org/llmrisk/llm062025-excessive-agency/ (accessed 2026-11-12).
+
+**Amended 2026-11-14 (routing eval).** The routing eval is in `packages/eval/cases/routing.json`: 224 questions labelled by whether a good answer needs information that changes or is newer than the model's training. It has two parts. The `dev` set (164 questions) is the one I shaped the rules against. The `heldout` set (60 questions) was written afterwards and never used to change anything, so its numbers are the honest ones. `npm run eval:routing` measures the rules pre-router (CI checks floors at these levels), and `npm run eval:routing:live` measures whole turns against the chat model, counting a search forced by the router or chosen by the model.
+
+| Measured 2026-11-14                  | Rules alone, dev | Rules alone, held-out | Whole turns with `qwen2.5:7b`, held-out |
+| ------------------------------------ | ---------------- | --------------------- | --------------------------------------- |
+| Recall on questions that need search | 97.6% (82 of 84) | 66.7% (20 of 30)      | 70.0% (21 of 30)                        |
+| Unneeded searches                    | 0% (0 of 80)     | 0% (0 of 30)          | 0% (0 of 30)                            |
+
+Before the broader rules, the rules alone reached 46% and whole turns 56% on the first 104 questions. The 95% target is **not met** on unseen questions: each round of rules reached about 97% on the questions it was shaped against and about two-thirds on new ones, so more keyword rules would chase the test set rather than generalise. I also tried one yes/no call to `qwen2.5:7b` asking whether a question needs current information. On the held-out set it added nothing: asked "Is there a new MacBook Air out?", the model answers "No", because it believes its training covers it. I did not ship it. The gap is a limit of a small local model; the production guide's hosted models are the way to close it, measured with this same eval.
