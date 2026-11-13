@@ -19,8 +19,9 @@ export interface AccountClient {
   /** Deletes the session and everything stored under it. */
   deleteEverything(signal: AbortSignal): Promise<void>;
   /**
-   * Sends feedback, a correction or a preference for review. Resolves to a message to show when the server
-   * answered with one (crisis resources, when the text read as self-harm).
+   * Sends feedback, a correction or a preference for review. Resolves to a
+   * message to show when the server answered with one (crisis resources, when
+   * the text read as self-harm).
    */
   sendFeedback(kind: FeedbackKind, text: string, signal: AbortSignal): Promise<string | undefined>;
 }

@@ -71,9 +71,10 @@ describe('per-session window limiter', () => {
     const clock = createManualClock(new Date(0));
     const limiter = createWindowLimiter(clock, 1, 1000);
     for (let i = 0; i <= 10_001; i++) limiter.hit(`k${String(i)}`);
+    expect(limiter.size()).toBe(10_002);
     clock.advance(1000);
-    // After the sweep an old key starts a fresh window.
-    expect(limiter.hit('k1')).toBeUndefined();
-    expect(limiter.hit('k1')).toBe(1000);
+    limiter.hit('fresh');
+    // Every expired window was dropped; only the new key remains.
+    expect(limiter.size()).toBe(1);
   });
 });

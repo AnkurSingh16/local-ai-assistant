@@ -24,6 +24,8 @@ config.resolver.nodeModulesPaths = [
 config.resolver.unstable_enablePackageExports = true;
 // The local database and build output change often and are never bundled.
 config.resolver.blockList = [
+  // Expo's own exclusions (tests, generated types, native build folders) stay.
+  ...[].concat(config.resolver.blockList ?? []),
   new RegExp(`^${escape(path.join(workspaceRoot, 'data'))}(/.*)?$`),
   new RegExp(`^${escape(path.join(workspaceRoot, 'packages'))}/[^/]+/dist/.*$`),
 ];

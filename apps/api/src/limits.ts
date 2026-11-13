@@ -102,6 +102,8 @@ export function createTurnSlots(maxActive: number, maxQueued: number): TurnSlots
 export interface WindowLimiter {
   /** Counts one request; returns the wait in ms when over the limit, or undefined. */
   hit(key: string): number | undefined;
+  /** How many keys are held, so tests can see expired windows are swept. */
+  size(): number;
 }
 
 export function createWindowLimiter(clock: Clock, max: number, windowMs: number): WindowLimiter {
@@ -120,5 +122,6 @@ export function createWindowLimiter(clock: Clock, max: number, windowMs: number)
       w.count++;
       return w.count > max ? w.resetAt - now : undefined;
     },
+    size: () => windows.size,
   };
 }
