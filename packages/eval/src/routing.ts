@@ -101,11 +101,13 @@ const allowAll: ModerationProvider = {
  * stops as soon as the answer is decided: at the first search, or when the
  * model starts writing without one.
  */
+export type ModelRoute = 'searched' | 'answered' | 'failed';
+
 export async function routeWithModel(
   chat: ChatProvider,
   message: string,
   timeoutMs: number,
-): Promise<boolean> {
+): Promise<ModelRoute> {
   let searched = false;
   const web: WebTools = {
     search: {
@@ -134,10 +136,12 @@ export async function routeWithModel(
   const stop = new AbortController();
   for await (const event of assistant.handleTurn({ message, requestId: 'routing' }, stop.signal)) {
     if (event.type === 'status' && event.phase === 'searching') searched = true;
-    if (searched || (event.type === 'status' && event.phase === 'answering')) {
-      stop.abort();
-      break;
-    }
+    if (searched) break;
+    if (event.type === 'status' && event.phase === 'answering') return 'answered';
+    // An outage or timeout says nothing about routing, so it is reported, not
+    // counted as an answer without search.
+    if (event.type === 'error') return 'failed';
   }
-  return searched;
+  stop.abort();
+  return searched ? 'searched' : 'failed';
 }

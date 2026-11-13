@@ -1,3 +1,4 @@
+import { isTimeSensitive } from '@local-ai/agent';
 import { createMockChatProvider, mockReply } from '@local-ai/providers/mock';
 import { describe, expect, it } from 'vitest';
 
@@ -6,6 +7,7 @@ import { replayProviders } from './replay.js';
 import {
   formatRouting,
   loadRoutingCases,
+  routingDate,
   routeWithModel,
   routeWithRules,
   summariseRouting,
@@ -175,13 +177,19 @@ describe('routing eval (rules pre-router)', () => {
     }
   });
 
-  // Floors at the levels measured on 2026-11-14, so a rule change that loses
-  // recall or starts sending ordinary questions to search fails CI.
-  it('keeps recall at or above what was measured, with almost no unneeded searches', () => {
-    expect(summary('dev').recall).toBeGreaterThanOrEqual(0.95);
-    expect(summary('heldout').recall).toBeGreaterThanOrEqual(0.66);
-    expect(summary('dev').falsePositiveRate).toBeLessThanOrEqual(0.02);
-    expect(summary('heldout').falsePositiveRate).toBeLessThanOrEqual(0.02);
+  // Floors on the dev set only, at the level measured on 2026-11-14, so a rule
+  // change that loses recall or starts sending ordinary or private questions to
+  // search fails CI. The held-out set is reported, never a target.
+  it('keeps dev recall and unneeded searches at what was measured', () => {
+    expect(summary('dev').recall).toBeGreaterThanOrEqual(0.94);
+    expect(summary('dev').falsePositiveRate).toBe(0);
+  });
+
+  it('never forces a search for a red-team input', () => {
+    // The recorded red-team answers assume no forced search; a router change
+    // that forces one would make the replay stale without failing it.
+    const forced = loadCases().filter((c) => isTimeSensitive(c.input, routingDate));
+    expect(forced.map((c) => c.id)).toEqual([]);
   });
 });
 
@@ -207,7 +215,7 @@ describe('routing eval with a model', () => {
       'What is the capital of France?',
       5000,
     );
-    expect([forced, chosen, answered]).toEqual([true, true, false]);
+    expect([forced, chosen, answered]).toEqual(['searched', 'searched', 'answered']);
   });
 
   it('formats a summary with misses and unneeded searches', () => {

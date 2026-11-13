@@ -54,9 +54,30 @@ const pendingOrNext =
 /** Who holds a role, however it is asked. */
 const whoLeads =
   /\bwho (?:runs|leads|heads|owns|is in charge of|chairs|coaches|manages)\b|\b(?:secretary[- ]general|chief executive|head coach|frontrunner|leader of the opposition)\b/;
-/** Live state: prices, rates and availability that change by the hour. */
-const liveState =
-  /\b(?:costs?|prices?|pricing|expensive|cheapest|cheaper|(?:interest|mortgage|inflation) rates?|snowing|raining|sunny|temperature|how (?:hot|cold|warm)|who (?:scored|won)|still|has (?:[\w' ]{1,40} )?(?:come out|been released|launched|held|ended|started|finished|changed)|exchange rate|convert \d[\d,.]* ?(?:[a-z]{3}|dollars?|euros?|pounds?|yen|rupees?) (?:to|into)|how many (?:dollars|euros|pounds|yen|rupees) is|on sale|in stock|sold out|delays?|cancell?ed|closed|outage|is (?:\w+ )?down|storm warning|weather|forecast|flights? (?:from|to)|tickets? (?:for|to)|election results?|updates? (?:on|about)|news (?:on|about))\b/;
+/** Live state that is public by nature: weather, rates, results, outages, availability. */
+const publicLiveState =
+  /\b(?:exchange rate|convert \d[\d,.]* ?(?:[a-z]{3}|dollars?|euros?|pounds?|yen|rupees?) (?:to|into)|how many (?:dollars|euros|pounds|yen|rupees) is|storm warning|weather|forecast|snowing|raining|sunny|how (?:hot|cold|warm) will|who (?:scored|won)|election results?|outage|is (?:\w+ )?down (?:right now|today)|on sale|in stock|sold out|flights? (?:from|to)|tickets? (?:for|to)|updates? (?:on|about)|news (?:on|about))\b/;
+/**
+ * Words that ask about now only when they are about something public: "how
+ * expensive is Netflix" yes, "how expensive is it to learn piano" no. They force
+ * search only next to a time word or a named thing.
+ */
+const weakLiveState =
+  /\b(?:costs?|prices?|pricing|expensive|cheapest|cheaper|(?:interest|mortgage|inflation) rates?|temperature|still|has (?:[\w' ]{1,40} )?(?:come out|been released|launched|held|ended|started|finished|changed)|delays?|cancell?ed|closed)\b/;
+/**
+ * The user, the assistant or people around them. Questions about them stay
+ * local: the broad rules would send a paraphrase of private context ("is my
+ * lump still worth checking", "do I still love him") or small talk with the
+ * assistant to a search engine.
+ */
+const personal =
+  /\b(?:i|i'm|i've|i'd|i'll|me|my|mine|myself|you|your|you're|yourself|we|we're|our|us|he|she|him|her|his|hers|they're|their)\b/;
+
+/** A capitalised word after the first, other than "I": a named product, place, team or person. */
+function namesSomething(message: string): boolean {
+  const words = message.replace(/[‘’ʼ]/g, "'").split(/\s+/).slice(1);
+  return words.some((w) => /^[A-Z][\w'.-]*[a-zA-Z]/.test(w) && !/^I(?:'\w+)?$/.test(w));
+}
 
 /** Years from the training cutoff on, written as four digits. */
 function mentionsRecentYear(text: string, currentYear: number): boolean {
@@ -70,9 +91,10 @@ function mentionsRecentYear(text: string, currentYear: number): boolean {
 /**
  * True when the turn must search first: a question about who holds a role,
  * something that always changes (a price, the weather, who won), a time word
- * with something that changes, a factual question about now or what comes
- * next, live state such as delays or exchange rates, or a recent year. "What is a stock", "explain
- * how elections work" and fiction set in a recent year are not forced.
+ * with something that changes, a recent year, or a factual question about the
+ * world that asks about now, what comes next, or the live state of something
+ * named. Questions about the user or the assistant, "what is a stock",
+ * "explain how elections work" and fiction set in a recent year are not forced.
  */
 export function isTimeSensitive(message: string, now: Date): boolean {
   const text = message.toLowerCase().replace(/[‘’ʼ]/g, "'");
@@ -81,15 +103,26 @@ export function isTimeSensitive(message: string, now: Date): boolean {
   if (alwaysChanging.test(text)) return true;
   if (!creativeRequest.test(text) && mentionsRecentYear(text, now.getUTCFullYear())) return true;
   if (timeWords.test(text) && changingThings.test(text)) return true;
-  // Broader rules, measured on the routing eval (ADR-0003): any factual
-  // question about now or what comes next, who leads something, or live state.
-  const question = factualQuestion.test(text) && !request.test(text) && !clockQuestion.test(text);
-  if (question && (nearTime.test(text) || pendingOrNext.test(text))) return true;
-  if (question && (whoLeads.test(text) || liveState.test(text))) return true;
-  // Price words ask about now even outside a question ("cheapest price for…").
-  if (
+  // Broader rules, measured on the routing eval (ADR-0003). They apply only to
+  // factual questions about the world, never to ones about the user, the
+  // assistant or people they know.
+  const question =
+    factualQuestion.test(text) &&
     !request.test(text) &&
-    /\b(?:cheapest|best price|price of|prices? for|cost of)\b/.test(text)
+    !clockQuestion.test(text) &&
+    !personal.test(text);
+  if (question) {
+    const timeOrName = nearTime.test(text) || namesSomething(message);
+    if (publicLiveState.test(text)) return true;
+    if (nearTime.test(text)) return true;
+    if (timeOrName && (pendingOrNext.test(text) || whoLeads.test(text))) return true;
+    if (timeOrName && weakLiveState.test(text)) return true;
+  }
+  // Price words about a named product ask about now even outside a question.
+  if (
+    !personal.test(text) &&
+    namesSomething(message) &&
+    /\b(?:cheapest|best price|price of|prices? for)\b/.test(text)
   ) {
     return true;
   }

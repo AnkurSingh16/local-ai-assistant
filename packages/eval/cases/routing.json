@@ -1566,5 +1566,467 @@
     "message": "Is this sentence grammatically correct?",
     "needsSearch": false,
     "split": "heldout"
+  },
+  {
+    "id": "routing-225",
+    "category": "hard_negative",
+    "message": "Is my lump still worth checking if it doesn't hurt?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-226",
+    "category": "hard_negative",
+    "message": "Is the pain in my chest still a concern if it comes and goes?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-227",
+    "category": "hard_negative",
+    "message": "Is it still okay to take my antidepressants with alcohol?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-228",
+    "category": "hard_negative",
+    "message": "Has my period ended if it's just spotting?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-229",
+    "category": "hard_negative",
+    "message": "Are my symptoms still covid?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-230",
+    "category": "hard_negative",
+    "message": "Do I still love him?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-231",
+    "category": "hard_negative",
+    "message": "Is my relationship still salvageable?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-232",
+    "category": "hard_negative",
+    "message": "Does my ex still have rights to the house?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-233",
+    "category": "hard_negative",
+    "message": "What is the cost of a divorce for my situation, I earn 40k and my wife earns 20k?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-234",
+    "category": "hard_negative",
+    "message": "Is my visa still valid if I change jobs?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-235",
+    "category": "hard_negative",
+    "message": "My therapist says the cost of my anxiety is my relationships. Is she right?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-236",
+    "category": "hard_negative",
+    "message": "Is it still safe to eat rice left out overnight?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-237",
+    "category": "hard_negative",
+    "message": "Who runs the fastest, a cheetah or a horse?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-238",
+    "category": "hard_negative",
+    "message": "How expensive is it to learn the piano?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-239",
+    "category": "hard_negative",
+    "message": "What's the latest I can drink coffee and still sleep?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-240",
+    "category": "hard_negative",
+    "message": "Has the meeting started?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-241",
+    "category": "hard_negative",
+    "message": "How does the cost of living affect savings?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-242",
+    "category": "hard_negative",
+    "message": "Is my code still correct after this change?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-243",
+    "category": "hard_negative",
+    "message": "What is the price elasticity of demand?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-244",
+    "category": "hard_negative",
+    "message": "How do I calculate the cost of goods sold?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-245",
+    "category": "hard_negative",
+    "message": "When is the next prime after 97?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-246",
+    "category": "hard_negative",
+    "message": "Who leads in a tango?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-247",
+    "category": "hard_negative",
+    "message": "What temperature should I cook chicken to?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-248",
+    "category": "hard_negative",
+    "message": "Are delays in speech normal for a two-year-old?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-249",
+    "category": "hard_negative",
+    "message": "How are you feeling today?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-250",
+    "category": "hard_negative",
+    "message": "Are you happy or sad right now?",
+    "needsSearch": false,
+    "split": "dev"
+  },
+  {
+    "id": "routing-251",
+    "category": "hard_negative",
+    "message": "Is it still worth repairing a ten-year-old washing machine?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-252",
+    "category": "hard_negative",
+    "message": "How expensive is it to keep chickens in the garden?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-253",
+    "category": "hard_negative",
+    "message": "What's the cheapest way to heat a small flat?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-254",
+    "category": "hard_negative",
+    "message": "Is honey still safe to eat after it crystallises?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-255",
+    "category": "hard_negative",
+    "message": "When is the next step after kneading bread dough?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-256",
+    "category": "hard_negative",
+    "message": "Who leads the conversation in a job interview?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-257",
+    "category": "hard_negative",
+    "message": "Has the dough risen enough if it doubled in size?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-258",
+    "category": "hard_negative",
+    "message": "Are delays normal when learning to read?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-259",
+    "category": "hard_negative",
+    "message": "What temperature does water freeze at?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-260",
+    "category": "hard_negative",
+    "message": "Is the shop closed on bank holidays usually?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-261",
+    "category": "hard_negative",
+    "message": "Who owns the copyright to a photo taken by a monkey?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-262",
+    "category": "hard_negative",
+    "message": "What does a typical wedding cost in general?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-263",
+    "category": "hard_negative",
+    "message": "Is it cheaper to buy or rent a car in principle?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-264",
+    "category": "hard_negative",
+    "message": "How cold does it get on Mars?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-265",
+    "category": "hard_negative",
+    "message": "Has the price of a stamp gone up much historically?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-266",
+    "category": "hard_negative",
+    "message": "Who manages a hedge fund on a day-to-day basis?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-267",
+    "category": "hard_negative",
+    "message": "Is my dog still a puppy at ten months?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-268",
+    "category": "hard_negative",
+    "message": "Do you still remember what I said earlier?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-269",
+    "category": "hard_negative",
+    "message": "Are you still there?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-270",
+    "category": "hard_negative",
+    "message": "Is it still raining in the poem's last stanza?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-271",
+    "category": "hard_negative",
+    "message": "What is the cheapest flight booking strategy in general?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-272",
+    "category": "hard_negative",
+    "message": "How does inflation affect interest rates?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-273",
+    "category": "hard_negative",
+    "message": "Is coffee still good after a week in the fridge?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-274",
+    "category": "hard_negative",
+    "message": "What happens when a library book is cancelled from a hold?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-275",
+    "category": "hard_negative",
+    "message": "Is the first-class ticket still worth it on long flights?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-276",
+    "category": "hard_negative",
+    "message": "How expensive is a PhD compared with a master's?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-277",
+    "category": "hard_negative",
+    "message": "When does a cancelled cheque count as void?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-278",
+    "category": "hard_negative",
+    "message": "Who runs a household budget in most families?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-279",
+    "category": "hard_negative",
+    "message": "Is a closed-loop system more efficient?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-280",
+    "category": "hard_negative",
+    "message": "What is the temperature of the Sun's surface?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-281",
+    "category": "hard_negative",
+    "message": "Has the universe always been expanding?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-282",
+    "category": "hard_negative",
+    "message": "Is it still legal to drive with a cracked windscreen?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-283",
+    "category": "hard_negative",
+    "message": "How much does a blue whale weigh?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-284",
+    "category": "hard_negative",
+    "message": "Are open-source licences still valid if the author dies?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-285",
+    "category": "hard_negative",
+    "message": "What is the next number in 2, 4, 8, 16?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-286",
+    "category": "hard_negative",
+    "message": "Who leads a symphony orchestra?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-287",
+    "category": "hard_negative",
+    "message": "Is my phone still under warranty after two years?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-288",
+    "category": "hard_negative",
+    "message": "What's the cheapest protein source per gram?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-289",
+    "category": "hard_negative",
+    "message": "Is the moon still moving away from Earth?",
+    "needsSearch": false,
+    "split": "heldout"
+  },
+  {
+    "id": "routing-290",
+    "category": "hard_negative",
+    "message": "How do I tell if milk is still good?",
+    "needsSearch": false,
+    "split": "heldout"
   }
 ]

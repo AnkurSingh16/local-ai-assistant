@@ -21,7 +21,7 @@ const tagsSchema = z.object({
   models: z.array(z.object({ name: z.string(), digest: z.string() })),
 });
 
-async function digestOf(config: LiveConfig, model: string): Promise<string> {
+export async function digestOf(config: LiveConfig, model: string): Promise<string> {
   const res = await config.fetch(new URL('/api/tags', config.baseUrl).toString(), {
     method: 'GET',
     signal: AbortSignal.timeout(5_000),
