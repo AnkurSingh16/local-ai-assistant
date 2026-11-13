@@ -4,6 +4,7 @@ import { createManualClock } from '@local-ai/core';
 import { describe, expect, it } from 'vitest';
 
 import { createTtlCache } from './cache.js';
+import { createUndiciHop } from './hop.js';
 import { createPageParser } from './parse.js';
 import { createReadPage } from './read-page.js';
 import type { HopFetch, HopResponse, Resolve } from './safe-fetch.js';
@@ -302,5 +303,98 @@ describe('read_page tool', () => {
       ok: false,
       error: 'blocked_address',
     });
+  });
+});
+
+describe('ADR-0008 limits, enforced', () => {
+  it('wires the guarded lookup into undici, so a private answer fails the connection', async () => {
+    const asked: string[] = [];
+    const hop = createUndiciHop((host) => {
+      asked.push(host);
+      return Promise.resolve([{ address: '127.0.0.1', family: 4 }]);
+    });
+    const err = await hop('https://host.example/', signal).catch((e: unknown) => e);
+    expect(asked).toContain('host.example');
+    let cause: unknown = err;
+    let code: unknown;
+    for (let i = 0; i < 5 && cause instanceof Error; i++) {
+      if ('code' in cause) code = cause.code;
+      cause = cause.cause;
+    }
+    expect(code).toBe('EBLOCKED');
+  });
+
+  it('reports a connect-time refusal as blocked_address', async () => {
+    const connectAnswers: string[] = ['93.184.215.14', '127.0.0.1'];
+    const resolve: Resolve = () => {
+      const address = connectAnswers.shift() ?? '127.0.0.1';
+      return Promise.resolve([{ address, family: 4 }]);
+    };
+    const safeFetch = createSafeFetch({ resolve, hop: createUndiciHop(resolve) });
+    await expect(safeFetch('https://rebind.example/', signal)).rejects.toMatchObject({
+      reason: 'blocked_address',
+    });
+  });
+
+  it('kills a parse that runs past its limit', async () => {
+    const parse = createPageParser({ timeoutMs: 100 });
+    const deep = `<html><body>${'<div>'.repeat(150_000)}x${'</div>'.repeat(150_000)}</body></html>`;
+    await expect(
+      parse({ url: 'https://example.com/', contentType: 'text/html', body: deep }, signal),
+    ).rejects.toMatchObject({ reason: 'parse_timeout' });
+  });
+
+  it('stops a parse when the caller aborts', async () => {
+    const parse = createPageParser({ timeoutMs: 5_000 });
+    const controller = new AbortController();
+    const deep = `<html><body>${'<div>'.repeat(150_000)}x</body></html>`;
+    const pending = parse(
+      { url: 'https://example.com/', contentType: 'text/html', body: deep },
+      controller.signal,
+    ).catch((e: unknown) => e);
+    setTimeout(() => {
+      controller.abort();
+    }, 50);
+    const started = performance.now();
+    expect(await pending).toBeInstanceOf(Error);
+    expect(performance.now() - started).toBeLessThan(3_000);
+  });
+
+  it('runs at most two parses at once and lets an aborted waiter leave the queue', async () => {
+    const parse = createPageParser({ timeoutMs: 2_000, maxConcurrent: 2 });
+    const page = {
+      url: 'https://example.com/',
+      contentType: 'text/html',
+      body: '<p>ok text here</p>',
+    };
+    const controller = new AbortController();
+    const first = parse(page, signal);
+    const second = parse(page, signal);
+    const third = parse(page, controller.signal).catch((e: unknown) => e);
+    controller.abort();
+    expect(await third).toBeInstanceOf(Error);
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+  });
+
+  it('bounds the whole read, fetch and parse together', async () => {
+    const tool = createReadPage({
+      fetch: (_url, s) =>
+        new Promise((_, reject) => {
+          s.addEventListener('abort', () => {
+            reject(new DOMException('timed out', 'TimeoutError'));
+          });
+        }),
+      parse: createPageParser(),
+      cache: createTtlCache({
+        clock: createManualClock(new Date('2026-11-13T00:00:00Z')),
+        ttlMs: 1000,
+        maxEntries: 5,
+        hmacKey: new Uint8Array(32),
+      }),
+      timeoutMs: 50,
+    });
+    expect(
+      await tool.run({ url: 'https://example.com/' }, new Set(['https://example.com/']), signal),
+    ).toEqual({ ok: false, error: 'timeout' });
   });
 });
