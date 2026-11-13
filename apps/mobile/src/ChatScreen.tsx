@@ -130,7 +130,10 @@ export function spokenSummary(view: TurnView): string {
   if (view.phase === 'cancelled') return 'Stopped.';
   const first = toBlocks(view.text).find((b) => b.kind === 'text')?.content ?? '';
   const sources = view.citations.length > 0 ? ' Sources are listed below.' : '';
-  return first === '' ? 'Answer ready.' : `${first.slice(0, 300)}${sources}`;
+  if (first === '') return `Answer ready.${sources}`;
+  // Cut at a word boundary, so the screen reader never says half a word.
+  const short = first.length <= 300 ? first : `${first.slice(0, first.lastIndexOf(' ', 300))}…`;
+  return `${short}${sources}`;
 }
 
 function defaultAnnounce(message: string): void {
@@ -176,6 +179,8 @@ export function ChatScreen({
     if (chat.busy || draft.trim() === '') return;
     const question = draft;
     setDraft('');
+    // Asking something new means wanting to see its answer.
+    atEnd.current = true;
     void chat.send(question);
   };
 

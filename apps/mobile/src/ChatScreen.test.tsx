@@ -1,13 +1,18 @@
-import type { AccountClient, ChatClient } from '@local-ai/client';
+import type { AccountClient, ChatClient, TurnView } from '@local-ai/client';
+import { initialTurn } from '@local-ai/client';
 import { createChatClient, toBlocks } from '@local-ai/client';
 import type { ChatRequestBody, SseEvent } from '@local-ai/contract';
 import { chatRequestSchema, encodeSseEvent, sseEventId } from '@local-ai/contract';
 import { fixtureMessageId, fixtureTurns } from '@local-ai/contract/fixtures';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native/dist/pure';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
-import { ChatScreen } from './ChatScreen';
+import { ChatScreen, spokenSummary } from './ChatScreen';
 import { scrollToEndCalls } from './test/react-native';
+
+beforeEach(() => {
+  scrollToEndCalls.length = 0;
+});
 
 const encoder = new TextEncoder();
 
@@ -201,7 +206,15 @@ describe('mobile feedback', () => {
   it('sends feedback of the chosen kind on an answered turn', async () => {
     const { client } = chatWith(fixtureTurns.answered ?? []);
     const { account, sent } = feedbackAccount();
-    await render(<ChatScreen client={client} account={account} openUrl={() => undefined} />);
+    const spoken: string[] = [];
+    await render(
+      <ChatScreen
+        client={client}
+        account={account}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
     await ask('Hello');
     await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
     await fireEvent.press(screen.getByRole('radio', { name: 'Correction' }));
@@ -209,6 +222,7 @@ describe('mobile feedback', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Submit' }));
     expect(await screen.findByText(/I review feedback before anything changes/)).toBeTruthy();
     expect(sent).toEqual(['correction: The year is wrong.']);
+    expect(spoken.at(-1)).toBe('Thanks. I review feedback before anything changes.');
   });
 
   it('shows crisis resources when the server answers with them', async () => {
@@ -225,13 +239,22 @@ describe('mobile feedback', () => {
   it('keeps the text and says so when feedback cannot be sent', async () => {
     const { client } = chatWith(fixtureTurns.answered ?? []);
     const { account } = feedbackAccount(undefined, true);
-    await render(<ChatScreen client={client} account={account} openUrl={() => undefined} />);
+    const spoken: string[] = [];
+    await render(
+      <ChatScreen
+        client={client}
+        account={account}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
     await ask('Hello');
     await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
     await fireEvent.changeText(screen.getByLabelText('Details'), 'Great answer');
     await fireEvent.press(screen.getByRole('button', { name: 'Submit' }));
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.getByLabelText('Details').props.value).toBe('Great answer');
+    expect(spoken.at(-1)).toBe('Feedback could not be sent. Please try again.');
   });
 
   it('offers no feedback on a refused turn', async () => {
@@ -390,8 +413,41 @@ describe('mobile announcements and scrolling', () => {
     expect(scrollToEndCalls).toHaveLength(1);
     turn.release();
     await screen.findByRole('button', { name: 'Send' });
-    // After the turn, opening feedback on it does not move the view either.
+    // Back at the end, but the turn is over: content added now (opening
+    // feedback, the source list) does not move the view.
+    await fireEvent.scroll(list, {
+      nativeEvent: {
+        contentOffset: { y: 900 },
+        layoutMeasurement: { height: 400 },
+        contentSize: { height: 1300 },
+      },
+    });
     await fireEvent(list, 'contentSizeChange', 100, 1400);
     expect(scrollToEndCalls).toHaveLength(1);
+  });
+});
+
+describe('spoken summaries', () => {
+  const base: TurnView = { ...initialTurn, phase: 'done' };
+
+  it('reads a refusal before an error, an error as shown, and Stopped after Stop', () => {
+    const refusal = { kind: 'policy' as const, message: 'Refused.' };
+    const error = { message: 'Broken.', retryable: true };
+    expect(spokenSummary({ ...base, refusal, error })).toBe('Refused.');
+    expect(spokenSummary({ ...base, error })).toBe('Broken.');
+    expect(spokenSummary({ ...base, phase: 'cancelled', text: 'Half an answer' })).toBe('Stopped.');
+  });
+
+  it('reads the first paragraph, cut at a word, and mentions sources', () => {
+    const long = `${'word '.repeat(80)}end`;
+    const spoken = spokenSummary({
+      ...base,
+      text: `${long}\n\nSecond.`,
+      citations: [{ n: 1, url: 'https://example.com/', title: 'Example' }],
+    });
+    expect(spoken.endsWith('… Sources are listed below.')).toBe(true);
+    expect(spoken).not.toContain('Second.');
+    expect(spoken.length).toBeLessThan(340);
+    expect(spokenSummary({ ...base, text: '```\ncode\n```' })).toBe('Answer ready.');
   });
 });
