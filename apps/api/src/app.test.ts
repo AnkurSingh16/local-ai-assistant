@@ -486,6 +486,9 @@ describe('sessions and conversation memory', () => {
     expect(queued.statusCode).toBe(202);
     expect(dropped.statusCode).toBe(202);
     expect(dropped.body).toBe(queued.body);
+    const crisis = await send({ kind: 'feedback', text: 'MOCK_FLAG_SELF_HARM' }, { cookie });
+    expect(crisis.statusCode).toBe(202);
+    expect(crisis.json<{ message?: string }>().message).toContain('988');
   });
 
   it('shows remembered items and deletes one, or everything, for real', async () => {

@@ -65,7 +65,8 @@ export function createMemoryRecall(deps: {
   };
 }
 
-export type FeedbackOutcome = 'queued' | 'dropped';
+/** 'support': the text sounded like self-harm, so the reply carries crisis resources. */
+export type FeedbackOutcome = 'queued' | 'dropped' | 'support';
 
 /** Items one session may have waiting for review. */
 export const maxPendingPerSession = 20;
@@ -96,7 +97,9 @@ export function createFeedbackService(deps: {
       const verdict = await deps.inputGuard.check(text, signal);
       if (!verdict.ok) {
         await deps.flags.record(sessionId, 'refusal' in verdict ? verdict.refusal : 'too_long');
-        return 'dropped';
+        // Someone in crisis gets the same help as in chat, even though that
+        // reveals the outcome; every other drop looks like a queued item.
+        return 'refusal' in verdict && verdict.refusal === 'self_harm' ? 'support' : 'dropped';
       }
       await deps.review.add(sessionId, kind, verdict.text);
       return 'queued';

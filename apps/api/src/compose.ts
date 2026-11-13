@@ -189,13 +189,18 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
         });
   // Idle sessions and everything under them go at start-up and every hour
   // after, so a long-running API keeps nothing past the 30-day idle limit (ADR-0009).
-  void sessionRepo.purgeIdle();
-  setInterval(
-    () => {
+  const purge = (): void => {
+    // The repository is synchronous underneath, so an error can be thrown
+    // before any promise exists; it must never escape a timer callback.
+    try {
       void sessionRepo.purgeIdle().catch(() => undefined);
-    },
-    60 * 60 * 1000,
-  ).unref();
+    } catch {
+      // The next hour tries again.
+    }
+  };
+  purge();
+  const purgeTimer = setInterval(purge, 60 * 60 * 1000);
+  purgeTimer.unref();
   const assistant = createAssistant({
     chat,
     inputGuard: createInputGuard(guard),
@@ -225,6 +230,7 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
       flags: createFlagLog(storageDeps),
     }),
     close: () => {
+      clearInterval(purgeTimer);
       db.close();
     },
   };

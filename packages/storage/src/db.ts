@@ -61,7 +61,9 @@ const migrations: readonly string[] = [
 
 export function openDatabase(path: string): Database {
   const db = new DatabaseSync(path);
-  db.exec('PRAGMA foreign_keys = ON; PRAGMA secure_delete = ON;');
+  // busy_timeout: the review command writes to the same file as the API, so a
+  // write waits up to 5 s for the other's lock instead of failing at once.
+  db.exec('PRAGMA foreign_keys = ON; PRAGMA secure_delete = ON; PRAGMA busy_timeout = 5000;');
   if (path !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
   migrate(db);
   return db;

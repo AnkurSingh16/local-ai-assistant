@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
+import { refusalMessages } from '@local-ai/guardrails';
 import { z } from 'zod';
 
 import type { AppDeps } from '../deps.js';
+import type { FeedbackOutcome } from '../learning.js';
 import { apiError } from '../http.js';
 import { tokenFrom } from '../sessions.js';
 
@@ -32,8 +34,9 @@ export function registerFeedbackRoute(app: FastifyInstance, deps: AppDeps): void
       if (sessionId === undefined) {
         return apiError(reply, request, 401, 'no_session', 'There is no active session.');
       }
+      let outcome: FeedbackOutcome;
       try {
-        await feedback.submit(
+        outcome = await feedback.submit(
           sessionId,
           parsed.data.kind,
           parsed.data.text,
@@ -48,7 +51,13 @@ export function registerFeedbackRoute(app: FastifyInstance, deps: AppDeps): void
           'Feedback could not be checked right now.',
         );
       }
-      return reply.code(202).send({ received: true });
+      return reply
+        .code(202)
+        .send(
+          outcome === 'support'
+            ? { received: true, message: refusalMessages.self_harm }
+            : { received: true },
+        );
     },
   );
 }
