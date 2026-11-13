@@ -456,15 +456,15 @@ describe('sessions and conversation memory', () => {
 
   it('tells a client whether its session is active', async () => {
     const { app } = await harness({ storage: true });
-    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: { host } })).statusCode).toBe(
-      401,
-    );
+    const none = await app.inject({ method: 'GET', url: '/v1/me', headers: { host } });
+    expect(none.statusCode).toBe(200);
+    expect(none.json()).toEqual({ active: false });
     const cookie = cookieFrom(
       await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } }),
     );
     expect(
-      (await app.inject({ method: 'GET', url: '/v1/me', headers: { host, cookie } })).statusCode,
-    ).toBe(200);
+      (await app.inject({ method: 'GET', url: '/v1/me', headers: { host, cookie } })).json(),
+    ).toEqual({ active: true });
   });
 
   it('takes feedback only with a session and answers the same whether it is queued or dropped', async () => {
@@ -542,8 +542,8 @@ describe('sessions and conversation memory', () => {
     expect(gone.statusCode).toBe(204);
     expect(String(gone.headers['set-cookie'])).toContain('lai_session=;');
     expect(
-      (await app.inject({ method: 'GET', url: '/v1/me', headers: { host, cookie } })).statusCode,
-    ).toBe(401);
+      (await app.inject({ method: 'GET', url: '/v1/me', headers: { host, cookie } })).json(),
+    ).toEqual({ active: false });
     for (const table of ['sessions', 'conversations', 'messages', 'memory', 'review_items']) {
       expect(db.prepare(`SELECT count(*) AS n FROM ${table}`).get(), table).toEqual({ n: 0 });
     }

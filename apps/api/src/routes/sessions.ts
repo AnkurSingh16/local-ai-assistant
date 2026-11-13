@@ -37,14 +37,13 @@ export function registerSessionRoutes(app: FastifyInstance, deps: AppDeps): void
     },
   );
 
-  // Lets a client that cannot read its HttpOnly cookie learn whether it still has a session.
+  // Lets a client that cannot read its HttpOnly cookie learn whether it still
+  // has a session. Having none is the normal first visit, not an error, so it
+  // answers 200 rather than 401, which browsers would log as a failed request.
   app.get('/v1/me', async (request, reply) => {
     const token = tokenFrom(request.cookies, request.headers.authorization);
     const sessionId = token === undefined ? undefined : await sessions.resolve(token);
-    if (sessionId === undefined) {
-      return apiError(reply, request, 401, 'no_session', 'There is no active session.');
-    }
-    return reply.send({ active: true });
+    return reply.send({ active: sessionId !== undefined });
   });
 
   const sessionOf = async (

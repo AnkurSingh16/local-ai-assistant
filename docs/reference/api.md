@@ -6,7 +6,7 @@ The API listens on `127.0.0.1:8787` by default. Every request must carry an allo
 
 There are no accounts. `POST /v1/sessions` creates an anonymous session and answers `201` with `{ "token": "..." }`; it also sets the `lai_session` cookie (HttpOnly, SameSite=Strict, Secure off loopback, 30 days). The web app relies on the cookie; the mobile app keeps the token and sends `Authorization: Bearer <token>`. Only the token's SHA-256 hash is stored, and a session expires after 30 days without use. Creating sessions is limited to 10 per hour per IP.
 
-`GET /v1/me` answers `200` with `{ "active": true }` while the session is in use, and `401` (`no_session`) otherwise.
+`GET /v1/me` answers `200` with `{ "active": true }` while the session is in use, and `{ "active": false }` otherwise. A first visit has no session, so I do not treat it as an error.
 
 With a session, `POST /v1/chat` remembers the conversation: the most recent turns that fit the history budget are sent with the next message, and the moderated message and the released answer are stored. A `conversationId` that belongs to another session is answered with `404`. Without a session every turn is stateless.
 

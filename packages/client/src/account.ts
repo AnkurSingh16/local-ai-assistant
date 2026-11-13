@@ -42,6 +42,7 @@ export interface AccountClientOptions {
 }
 
 const sessionSchema = z.object({ token: z.string().min(20).max(100) });
+const meSchema = z.object({ active: z.boolean() });
 
 export class AccountError extends Error {
   constructor(readonly status: number | undefined) {
@@ -117,10 +118,13 @@ export function createAccountClient(options: AccountClientOptions): AccountClien
         if (signal.aborted) throw err;
         throw new AccountError(undefined);
       }
-      await res.body?.cancel().catch(() => undefined);
-      if (res.status === 401) return false;
-      if (!res.ok) throw new AccountError(res.status);
-      return true;
+      if (!res.ok) {
+        await res.body?.cancel().catch(() => undefined);
+        throw new AccountError(res.status);
+      }
+      const parsed = meSchema.safeParse(await res.json().catch(() => undefined));
+      if (!parsed.success) throw new AccountError(res.status);
+      return parsed.data.active;
     },
     async startSession(signal) {
       let res: Response;

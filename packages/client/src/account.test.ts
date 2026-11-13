@@ -28,12 +28,25 @@ describe('account client', () => {
       fetch: (_url, init) => {
         const headers = new Headers(init.headers);
         seen.push(headers.get('authorization') ?? undefined);
-        return Promise.resolve(new Response(null, { status: seen.length === 1 ? 200 : 401 }));
+        return Promise.resolve(Response.json({ active: seen.length === 1 }));
       },
     });
     expect(await account.hasSession(signal)).toBe(true);
     expect(await account.hasSession(signal)).toBe(false);
     expect(seen[0]).toBe(`Bearer ${'b'.repeat(43)}`);
+  });
+
+  it('treats an unexpected answer about the session as an error', async () => {
+    const odd = createAccountClient({
+      baseUrl: '',
+      fetch: () => Promise.resolve(Response.json({ active: 'yes' })),
+    });
+    await expect(odd.hasSession(signal)).rejects.toBeInstanceOf(AccountError);
+    const down = createAccountClient({
+      baseUrl: '',
+      fetch: () => Promise.resolve(new Response(null, { status: 503 })),
+    });
+    await expect(down.hasSession(signal)).rejects.toBeInstanceOf(AccountError);
   });
 
   it('throws AccountError on network failure or a bad body', async () => {
