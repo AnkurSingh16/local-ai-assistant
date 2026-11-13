@@ -2,7 +2,11 @@ import type { ChatMessage, ChatProvider, Clock, ModeratedText, ToolCall } from '
 import { isAbortError, ProviderError } from '@local-ai/core';
 import type { FinishReason, SseEvent, StatusPhase } from '@local-ai/contract';
 import type { InputGuard, OutputGuard } from '@local-ai/guardrails';
-import { createParagraphSplitter, refusalMessages } from '@local-ai/guardrails';
+import {
+  createParagraphSplitter,
+  neutraliseTemplateTokens,
+  refusalMessages,
+} from '@local-ai/guardrails';
 
 import { persona, webGuide } from '../persona/persona.js';
 import { contextBudget, estimateTokens, maxPromptTokens, promptTokens } from './budget.js';
@@ -25,7 +29,41 @@ export interface AssistantDeps {
   readonly clock: Clock;
   /** Web search and page reading; without them the assistant answers from the model alone. */
   readonly web?: WebTools;
+  /** Conversation history for turns that are remembered (a session is present). */
+  readonly conversations?: ConversationStore;
+  /** Approved memory for the session; only items the owner approved are ever returned. */
+  readonly memory?: MemoryRecall;
 }
+
+/** Items the owner approved for this session that relate to the message (ADR-0009). */
+export interface MemoryRecall {
+  recall(sessionId: string, message: string, signal: AbortSignal): Promise<string[]>;
+  /**
+   * Every approved item for the session. Search queries are checked against all
+   * of them, since an earlier answer in the history may repeat one that was not
+   * recalled this turn (ADR-0003).
+   */
+  all(sessionId: string): Promise<string[]>;
+}
+
+/**
+ * Where remembered turns are kept. It takes only moderated text, so nothing a
+ * guard refused can be stored (ADR-0002, ADR-0005 step 9).
+ */
+export interface ConversationStore {
+  recent(
+    conversationId: string,
+    limit: number,
+  ): Promise<{ role: 'user' | 'assistant'; content: string }[]>;
+  append(
+    conversationId: string,
+    role: 'user' | 'assistant',
+    parts: readonly ModeratedText[],
+  ): Promise<void>;
+}
+
+/** How many stored messages are considered before fitting them to the history budget. */
+const historyLookback = 40;
 
 /** ADR-0003: four model steps per turn, the forced-query step included. */
 export const maxModelSteps = 4;
@@ -35,6 +73,10 @@ export interface TurnInput {
   readonly conversationId?: string | undefined;
   /** Correlates the error event with the API's request log. */
   readonly requestId: string;
+  /** Load and store history for this conversation; the route sets it only for a claimed conversation. */
+  readonly remember?: boolean;
+  /** The session the turn belongs to, for approved memory. */
+  readonly sessionId?: string;
 }
 
 export interface Assistant {
@@ -53,12 +95,50 @@ const genericErrors = {
 } as const;
 
 /** Builds the prompt. The user slot accepts only text that passed the input guard. */
-export function buildMessages(user: ModeratedText, withWeb = false): ChatMessage[] | undefined {
+export function buildMessages(
+  user: ModeratedText,
+  withWeb = false,
+  history: readonly { role: 'user' | 'assistant'; content: string }[] = [],
+  memory: readonly string[] = [],
+): ChatMessage[] | undefined {
   const system = withWeb ? `${persona}\n\n${webGuide}` : persona;
   if (estimateTokens(system) > contextBudget.system) return undefined;
   if (estimateTokens(user) > contextBudget.user) return undefined;
+  // The newest turns that fit the history slot; the oldest are dropped first (ADR-0004).
+  const kept: ChatMessage[] = [];
+  let used = 0;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m = history[i];
+    if (m === undefined) continue;
+    const cost = estimateTokens(m.content) + 4;
+    if (used + cost > contextBudget.history) break;
+    used += cost;
+    // Stored text was moderated, but an answer can spell out chat-template
+    // tokens; replayed raw, they would forge a system turn (ADR-0004).
+    kept.unshift({ role: m.role, content: neutraliseTemplateTokens(m.content) });
+  }
+  // Approved memory fills its own slot, most relevant first, and never displaces history.
+  const remembered: string[] = [];
+  let memoryUsed = 0;
+  for (const item of memory) {
+    const cost = estimateTokens(item) + 2;
+    if (memoryUsed + cost > contextBudget.memory) break;
+    memoryUsed += cost;
+    remembered.push(`- ${neutraliseTemplateTokens(item)}`);
+  }
+  const memoryMessage: ChatMessage[] =
+    remembered.length === 0
+      ? []
+      : [
+          {
+            role: 'system',
+            content: `Things this user asked you to remember, reviewed and approved:\n${remembered.join('\n')}`,
+          },
+        ];
   return [
     { role: 'system', content: system },
+    ...memoryMessage,
+    ...kept,
     { role: 'user', content: user },
   ];
 }
@@ -106,12 +186,27 @@ export function createAssistant(deps: AssistantDeps): Assistant {
         }
 
         const web = deps.web;
-        const messages = buildMessages(verdict.text, web !== undefined);
+        const store = input.remember === true ? deps.conversations : undefined;
+        const history =
+          store === undefined ? [] : await store.recent(conversationId, historyLookback);
+        // Only approved items come back, and only for this session (ADR-0009).
+        const recalled =
+          deps.memory === undefined || input.sessionId === undefined
+            ? []
+            : await deps.memory.recall(input.sessionId, verdict.text, signal);
+        const approved =
+          deps.memory === undefined || input.sessionId === undefined
+            ? []
+            : await deps.memory.all(input.sessionId);
+        const messages = buildMessages(verdict.text, web !== undefined, history, recalled);
         if (messages === undefined) {
           yield error('bad_request', false);
           yield done('error');
           return;
         }
+        await store?.append(conversationId, 'user', [verdict.text]);
+        // Released paragraphs only: text a guard withheld is never stored.
+        const released: ModeratedText[] = [];
 
         // Generation and moderation run side by side (ADR-0005): a pump reads the
         // model stream into the hold-back buffer while this loop checks and
@@ -197,9 +292,10 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               steps += 1;
               const query = await writeQuery(deps.chat, verdict.text, signal);
               const call = { name: 'web_search', arguments: { query: query ?? '' } };
-              await runToolCalls({ web, clock: deps.clock, taint, messages, status, signal }, [
-                call,
-              ]);
+              await runToolCalls(
+                { web, clock: deps.clock, taint, messages, status, signal, privateText: approved },
+                [call],
+              );
             }
             for (;;) {
               steps += 1;
@@ -209,7 +305,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               // step budget is a hard stop even if the model keeps asking.
               if (calls.length === 0 || web === undefined || !offerTools) break;
               await runToolCalls(
-                { web, clock: deps.clock, taint, messages, status, signal },
+                { web, clock: deps.clock, taint, messages, status, signal, privateText: approved },
                 calls,
               );
             }
@@ -225,7 +321,6 @@ export function createAssistant(deps: AssistantDeps): Assistant {
 
         try {
           const cited = new Set<number>();
-          let released = false;
           for (;;) {
             const item = pending.shift();
             if (item === undefined) {
@@ -252,8 +347,8 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               yield done('refused');
               return;
             }
+            released.push(checked.text);
             yield { type: 'delta', text: checked.text };
-            released = true;
             // A citation is sent only after the paragraph that cites it is released (ADR-0005).
             // [n] markers, and links straight to a listed source, both count as citing it.
             const linked = sources.filter((s) => checked.text.includes(s.url)).map((s) => s.id);
@@ -269,7 +364,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               ? pumpState.error
               : new Error('chat stream failed');
           }
-          if (!released) {
+          if (released.length === 0) {
             // The model spent every step on tool calls, or wrote nothing: an
             // empty answer would look like success, so it is reported instead.
             yield error('internal', true);
@@ -282,6 +377,9 @@ export function createAssistant(deps: AssistantDeps): Assistant {
           // for the pump so nothing keeps running after the turn.
           stop.abort();
           await pump;
+          if (store !== undefined && released.length > 0) {
+            await store.append(conversationId, 'assistant', released);
+          }
         }
       } catch (err) {
         if (clientSignal.aborted) return;

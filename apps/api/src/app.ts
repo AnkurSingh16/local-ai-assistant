@@ -1,5 +1,6 @@
 export type { AppDeps } from './deps.js';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import Fastify, { LogController } from 'fastify';
@@ -8,7 +9,9 @@ import type { AppDeps } from './deps.js';
 import { apiError } from './http.js';
 import { createClockStore, createTurnSlots } from './limits.js';
 import { registerChatRoute } from './routes/chat.js';
+import { registerFeedbackRoute } from './routes/feedback.js';
 import { registerHealthRoutes } from './routes/health.js';
+import { registerSessionRoutes } from './routes/sessions.js';
 
 /** Fastify's own limit, before any parsing (ADR-0005). */
 export const bodyLimitBytes = 16 * 1024;
@@ -70,11 +73,12 @@ export async function createApp(deps: AppDeps): Promise<FastifyInstance> {
 
   await app.register(cors, {
     origin: [...allowedOrigins],
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'DELETE'],
     allowedHeaders: ['content-type'],
     maxAge: 600,
   });
 
+  await app.register(cookie);
   await app.register(rateLimit, {
     global: false,
     store: createClockStore(deps.clock),
@@ -125,6 +129,8 @@ export async function createApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   registerHealthRoutes(app, deps);
+  registerSessionRoutes(app, deps);
+  registerFeedbackRoute(app, deps);
   registerChatRoute(app, deps, createTurnSlots(config.maxConcurrentTurns, config.maxQueuedTurns));
   return app;
 }

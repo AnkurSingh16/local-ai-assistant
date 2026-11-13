@@ -179,3 +179,53 @@ describe('answer blocks', () => {
     ]);
   });
 });
+
+describe('memory view', () => {
+  function fakeAccount(items: { id: string; content: string; createdAt: string }[]) {
+    const calls: string[] = [];
+    let current = [...items];
+    const account = {
+      startSession: () => Promise.resolve('t'.repeat(43)),
+      hasSession: () => Promise.resolve(true),
+      memory: () => Promise.resolve(current),
+      forget: (id: string) => {
+        calls.push(`forget ${id}`);
+        current = current.filter((i) => i.id !== id);
+        return Promise.resolve();
+      },
+      deleteEverything: () => {
+        calls.push('delete everything');
+        current = [];
+        return Promise.resolve();
+      },
+      sendFeedback: () => Promise.resolve(),
+    };
+    return { account, calls };
+  }
+
+  it('lists what is remembered, with the disclosure, and forgets one item', async () => {
+    const { account, calls } = fakeAccount([
+      { id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00Z' },
+    ]);
+    render(<App client={fakeClient(() => events([]))} account={account} />);
+    await userEvent.click(screen.getByRole('button', { name: 'What I remember' }));
+    expect(await screen.findByText('Call me Sam.')).toBeInTheDocument();
+    expect(screen.getByText(/deleted for real/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Forget: Call me Sam.' }));
+    await waitFor(() => {
+      expect(screen.queryByText('Call me Sam.')).not.toBeInTheDocument();
+    });
+    expect(calls).toEqual(['forget m1']);
+  });
+
+  it('asks before deleting everything', async () => {
+    const { account, calls } = fakeAccount([]);
+    render(<App client={fakeClient(() => events([]))} account={account} />);
+    await userEvent.click(screen.getByRole('button', { name: 'What I remember' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete everything' }));
+    expect(calls).toEqual([]);
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, delete everything' }));
+    expect(await screen.findByText(/is deleted\./)).toBeInTheDocument();
+    expect(calls).toEqual(['delete everything']);
+  });
+});

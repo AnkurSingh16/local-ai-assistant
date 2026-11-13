@@ -2,6 +2,28 @@
 
 The API listens on `127.0.0.1:8787` by default. Every request must carry an allowed `Host` header, and browser requests an allowed `Origin` ([configuration](configuration.md)). Request bodies are JSON only and at most 16 KB.
 
+## Sessions
+
+There are no accounts. `POST /v1/sessions` creates an anonymous session and answers `201` with `{ "token": "..." }`; it also sets the `lai_session` cookie (HttpOnly, SameSite=Strict, Secure off loopback, 30 days). The web app relies on the cookie; the mobile app keeps the token and sends `Authorization: Bearer <token>`. Only the token's SHA-256 hash is stored, and a session expires after 30 days without use. Creating sessions is limited to 10 per hour per IP.
+
+`GET /v1/me` answers `200` with `{ "active": true }` while the session is in use, and `{ "active": false }` otherwise. A first visit has no session, so I do not treat it as an error.
+
+With a session, `POST /v1/chat` remembers the conversation: the most recent turns that fit the history budget are sent with the next message, and the moderated message and the released answer are stored. A `conversationId` that belongs to another session is answered with `404`. Without a session every turn is stateless.
+
+## Memory and deletion
+
+All need a session ([ADR-0009](../adr/0009-sessions-and-memory-deletion.md)).
+
+- `GET /v1/me/memory` lists everything remembered: `{ "items": [{ "id", "content", "createdAt" }] }`. Items appear only after I approve them.
+- `DELETE /v1/me/memory/:id` forgets one item: `204`, or `404` if it is not this session's.
+- `DELETE /v1/me` deletes the session and everything under it (conversations, memory, feedback, items waiting for review) and clears the cookie: `204`. Deletion cascades in the database, and a WAL checkpoint follows, so the text is gone from the files as well as the tables.
+
+The web app shows the same list under "What I remember", with the wording promised in ADR-0009.
+
+## `POST /v1/feedback`
+
+Needs a session. Body: `{ "kind": "feedback" | "correction" | "preference", "text": "1 to 1,000 characters" }`. The text passes the same input guard as a chat message; a flagged item is dropped and only its category and time are recorded. An accepted item gets `202` with `{ "received": true }`, whether it was queued or dropped, so the answer does not say what moderation decided (a rules hit is answered faster than a classifier call, so timing is not hidden). A bad body gets `400`, no session `401`, too many requests `429`, and a guard outage `503`. A session can have at most 20 items waiting for review; more are dropped the same way. One exception: text that reads as self-harm is answered with `{ "received": true, "message": "…" }` carrying the same crisis resources as chat, because helping someone matters more than hiding the outcome. Queued items wait for my review; only items I approve become memory.
+
 ## `POST /v1/chat`
 
 Runs one turn and streams it as Server-Sent Events ([ADR-0007](../adr/0007-streaming-contract.md)). The schemas live in `packages/contract`.

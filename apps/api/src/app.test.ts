@@ -3,6 +3,14 @@ import type { ManualClock } from '@local-ai/core';
 import { createManualClock } from '@local-ai/core';
 import type { SseEvent } from '@local-ai/contract';
 import { sseEventSchema } from '@local-ai/contract';
+import {
+  createConversationRepo,
+  createFlagLog,
+  createMemoryRepo,
+  createReviewRepo,
+  createSessionRepo,
+  openDatabase,
+} from '@local-ai/storage';
 import { createInputGuard, createOutputGuard, createOutputRules } from '@local-ai/guardrails';
 import type { MockChatProvider, MockModerationOptions } from '@local-ai/providers/mock';
 import {
@@ -18,6 +26,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { AppDeps } from './app.js';
 import { bodyLimitBytes, createApp } from './app.js';
 import { trackReadiness } from './compose.js';
+import { createFeedbackService } from './learning.js';
+import { createSessionService } from './sessions.js';
 import { parseConfig } from './config.js';
 import { createLogEvent } from './logging.js';
 
@@ -30,6 +40,7 @@ interface Harness {
   clock: ManualClock;
   logs: string[];
   routes: { method: string; url: string }[];
+  db?: ReturnType<typeof openDatabase>;
 }
 
 let open: FastifyInstance[] = [];
@@ -44,6 +55,7 @@ async function harness(
     chat?: MockChatProvider;
     moderation?: MockModerationOptions;
     deps?: Partial<AppDeps>;
+    storage?: boolean;
   } = {},
 ): Promise<Harness> {
   const config = parseConfig({ NODE_ENV: 'test', ...options.env });
@@ -64,6 +76,24 @@ async function harness(
     }),
   );
   const routes: { method: string; url: string }[] = [];
+  const db = options.storage === true ? openDatabase(':memory:') : undefined;
+  const conversations = db === undefined ? undefined : createConversationRepo({ db, clock, newId });
+  const sessions =
+    db === undefined || conversations === undefined
+      ? undefined
+      : createSessionService({
+          sessions: createSessionRepo({ db, clock, newId }),
+          conversations,
+          memory: createMemoryRepo({ db, clock, newId }),
+        });
+  const feedback =
+    db === undefined
+      ? undefined
+      : createFeedbackService({
+          inputGuard: createInputGuard({ moderation, timeoutMs: 1000 }),
+          review: createReviewRepo({ db, clock, newId }),
+          flags: createFlagLog({ db, clock, newId }),
+        });
   const app = await createApp({
     config,
     clock,
@@ -83,11 +113,14 @@ async function harness(
       newId,
       turnTimeoutMs: 5000,
       clock,
+      ...(conversations === undefined ? {} : { conversations }),
     }),
+    ...(sessions === undefined ? {} : { sessions }),
+    ...(feedback === undefined ? {} : { feedback }),
     ...options.deps,
   });
   open.push(app);
-  return { app, chat, clock, logs, routes };
+  return { app, chat, clock, logs, routes, ...(db === undefined ? {} : { db }) };
 }
 
 function post(app: FastifyInstance, body: unknown, headers: Record<string, string> = {}) {
@@ -365,5 +398,174 @@ describe('readiness tracking', () => {
   it('keeps the residency check, so the warm timeout still applies', async () => {
     const tracked = trackReadiness(createMockModerationProvider({ resident: false }));
     expect(await tracked.moderation.isResident?.(new AbortController().signal)).toBe(false);
+  });
+});
+
+describe('sessions and conversation memory', () => {
+  function cookieFrom(res: { headers: Record<string, unknown> }): string {
+    const raw = res.headers['set-cookie'];
+    const header = Array.isArray(raw) ? String(raw[0]) : String(raw);
+    return header.split(';')[0] ?? '';
+  }
+
+  it('creates a session with an HttpOnly, SameSite=Strict cookie and returns the token', async () => {
+    const { app } = await harness({ storage: true });
+    const res = await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } });
+    expect(res.statusCode).toBe(201);
+    const setCookie = String(res.headers['set-cookie']);
+    expect(setCookie).toContain('HttpOnly');
+    expect(setCookie).toContain('SameSite=Strict');
+    expect(JSON.parse(res.body)).toHaveProperty('token');
+  });
+
+  it('remembers a conversation for its session, so the next turn sees the history', async () => {
+    const { app, chat } = await harness({ storage: true });
+    const cookie = cookieFrom(
+      await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } }),
+    );
+    const first = await post(app, { message: 'My name is Sam.' }, { cookie });
+    const conversationId = /"conversationId":"([^"]+)"/.exec(first.body)?.[1] ?? '';
+    await post(app, { message: 'What is my name?', conversationId }, { cookie });
+    const second = chat.calls[1]?.messages.map((m) => `${m.role}:${m.content}`) ?? [];
+    expect(second).toContain('user:My name is Sam.');
+    expect(second).toContain('assistant:One.\n\nTwo.');
+    expect(second.at(-1)).toBe('user:What is my name?');
+  });
+
+  it('accepts a bearer token and refuses another session’s conversation', async () => {
+    const { app } = await harness({ storage: true });
+    const tokenA = (
+      JSON.parse(
+        (await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } })).body,
+      ) as { token: string }
+    ).token;
+    const tokenB = (
+      JSON.parse(
+        (await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } })).body,
+      ) as { token: string }
+    ).token;
+    const first = await post(app, { message: 'Hello.' }, { authorization: `Bearer ${tokenA}` });
+    const conversationId = /"conversationId":"([^"]+)"/.exec(first.body)?.[1] ?? '';
+    const stolen = await post(
+      app,
+      { message: 'Hi.', conversationId },
+      { authorization: `Bearer ${tokenB}` },
+    );
+    expect(stolen.statusCode).toBe(404);
+  });
+
+  it('tells a client whether its session is active', async () => {
+    const { app } = await harness({ storage: true });
+    const none = await app.inject({ method: 'GET', url: '/v1/me', headers: { host } });
+    expect(none.statusCode).toBe(200);
+    expect(none.json()).toEqual({ active: false });
+    const cookie = cookieFrom(
+      await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } }),
+    );
+    expect(
+      (await app.inject({ method: 'GET', url: '/v1/me', headers: { host, cookie } })).json(),
+    ).toEqual({ active: true });
+  });
+
+  it('takes feedback only with a session and answers the same whether it is queued or dropped', async () => {
+    const { app } = await harness({ storage: true });
+    const send = (payload: unknown, headers: Record<string, string> = {}) =>
+      app.inject({
+        method: 'POST',
+        url: '/v1/feedback',
+        headers: { host, 'content-type': 'application/json', ...headers },
+        payload: JSON.stringify(payload),
+      });
+    expect((await send({ kind: 'feedback', text: 'Nice.' })).statusCode).toBe(401);
+    const cookie = cookieFrom(
+      await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } }),
+    );
+    expect((await send({ kind: 'nope', text: 'x' }, { cookie })).statusCode).toBe(400);
+    const queued = await send({ kind: 'preference', text: 'Use metric units.' }, { cookie });
+    const dropped = await send({ kind: 'feedback', text: 'MOCK_FLAG awful' }, { cookie });
+    expect(queued.statusCode).toBe(202);
+    expect(dropped.statusCode).toBe(202);
+    expect(dropped.body).toBe(queued.body);
+    const crisis = await send({ kind: 'feedback', text: 'MOCK_FLAG_SELF_HARM' }, { cookie });
+    expect(crisis.statusCode).toBe(202);
+    expect(crisis.json<{ message?: string }>().message).toContain('988');
+  });
+
+  it('shows remembered items and deletes one, or everything, for real', async () => {
+    const { app, db, clock } = await harness({ storage: true });
+    if (db === undefined) throw new Error('no db');
+    const login = await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } });
+    const cookie = cookieFrom(login);
+    const token = (JSON.parse(login.body) as { token: string }).token;
+    const sessionId =
+      (await createSessionService({
+        sessions: createSessionRepo({ db, clock, newId: () => 'x' }),
+        conversations: createConversationRepo({ db, clock, newId: () => 'x' }),
+        memory: createMemoryRepo({ db, clock, newId: () => 'x' }),
+      }).resolve(token)) ?? '';
+    const guard = createInputGuard({ moderation: createMockModerationProvider(), timeoutMs: 1000 });
+    let memoryIds = 0;
+    const memory = createMemoryRepo({ db, clock, newId: () => `m-${String(++memoryIds)}` });
+    for (const text of ['Call me Sam.', 'Prefers metric units.']) {
+      const verdict = await guard.check(text, new AbortController().signal);
+      if (!verdict.ok) throw new Error('refused');
+      await memory.add(sessionId, verdict.text, undefined);
+    }
+    await post(app, { message: 'Hello there.' }, { cookie });
+
+    const list = await app.inject({
+      method: 'GET',
+      url: '/v1/me/memory',
+      headers: { host, cookie },
+    });
+    const items = (JSON.parse(list.body) as { items: { id: string; content: string }[] }).items;
+    expect(items.map((i) => i.content)).toEqual(['Call me Sam.', 'Prefers metric units.']);
+
+    const first = items[0]?.id ?? '';
+    expect(
+      (
+        await app.inject({
+          method: 'DELETE',
+          url: `/v1/me/memory/${first}`,
+          headers: { host, cookie },
+        })
+      ).statusCode,
+    ).toBe(204);
+    expect(
+      (
+        await app.inject({
+          method: 'DELETE',
+          url: `/v1/me/memory/${first}`,
+          headers: { host, cookie },
+        })
+      ).statusCode,
+    ).toBe(404);
+
+    const gone = await app.inject({ method: 'DELETE', url: '/v1/me', headers: { host, cookie } });
+    expect(gone.statusCode).toBe(204);
+    expect(String(gone.headers['set-cookie'])).toContain('lai_session=;');
+    expect(
+      (await app.inject({ method: 'GET', url: '/v1/me', headers: { host, cookie } })).json(),
+    ).toEqual({ active: false });
+    for (const table of ['sessions', 'conversations', 'messages', 'memory', 'review_items']) {
+      expect(db.prepare(`SELECT count(*) AS n FROM ${table}`).get(), table).toEqual({ n: 0 });
+    }
+  });
+
+  it('refuses memory calls without a session', async () => {
+    const { app } = await harness({ storage: true });
+    expect(
+      (await app.inject({ method: 'GET', url: '/v1/me/memory', headers: { host } })).statusCode,
+    ).toBe(401);
+    expect(
+      (await app.inject({ method: 'DELETE', url: '/v1/me', headers: { host } })).statusCode,
+    ).toBe(401);
+  });
+
+  it('stays stateless without a session', async () => {
+    const { app, chat } = await harness({ storage: true });
+    await post(app, { message: 'First.' });
+    await post(app, { message: 'Second.' });
+    expect(chat.calls[1]?.messages.filter((m) => m.role === 'user')).toHaveLength(1);
   });
 });

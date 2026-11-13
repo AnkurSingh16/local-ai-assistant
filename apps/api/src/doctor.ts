@@ -17,6 +17,7 @@ export const pinnedDigests: Readonly<Record<string, string>> = {
   'qwen2.5:7b': '845dbda0ea48',
   'llama-guard3:1b': '494147e06bf9',
   'llama-guard3:8b': '46f211c3d866',
+  'nomic-embed-text': '0a109f422b47',
 };
 
 export interface CheckResult {
@@ -100,8 +101,9 @@ export async function checkOllama(config: Config, fetchFn: DoctorFetch): Promise
   const models = new Map(
     (tagsSchema.safeParse(tags).data?.models ?? []).map((m) => [m.name, m.digest] as const),
   );
-  for (const model of [config.chatModel, config.guardModel]) {
-    const digest = models.get(model);
+  for (const model of [config.chatModel, config.guardModel, config.embedModel]) {
+    // An untagged name is listed by Ollama as name:latest.
+    const digest = models.get(model) ?? models.get(`${model}:latest`);
     const pinned = pinnedDigests[model];
     if (digest === undefined) {
       results.push({ ok: false, name: model, detail: 'not pulled', fix: `ollama pull ${model}` });

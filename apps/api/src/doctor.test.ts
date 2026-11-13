@@ -25,6 +25,10 @@ const goodTags = {
       name: 'llama-guard3:1b',
       digest: '494147e06bf99e10dbe67b63a07ac81c162f18ef3341aa3390007ac828571b3b',
     },
+    {
+      name: 'nomic-embed-text:latest',
+      digest: '0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f',
+    },
   ],
 };
 
@@ -66,6 +70,7 @@ describe('doctor', () => {
       'Update Ollama from https://ollama.com/download',
       expect.stringContaining('ollama pull qwen2.5:7b') as string,
       'ollama pull llama-guard3:1b',
+      'ollama pull nomic-embed-text',
     ]);
     expect(format(results)).toContain('FAIL');
   });

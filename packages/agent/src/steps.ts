@@ -16,7 +16,35 @@ export interface StepContext {
   /** Reports what the turn is doing, as status events for the client. */
   readonly status: (phase: StatusPhase) => void;
   readonly signal: AbortSignal;
+  /** All approved memory for the session; a query must not carry it to a search engine. */
+  readonly privateText?: readonly string[];
 }
+
+const words = (text: string): string[] =>
+  text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w !== '');
+
+/**
+ * ADR-0003: a query that shares a run of four or more words with an approved
+ * memory item is not sent, so what the user asked me to remember does not
+ * reach search engines. Every approved item is checked, not only those recalled
+ * this turn, because earlier answers in the history may repeat others.
+ */
+export function sharesPrivateRun(query: string, privateText: readonly string[]): boolean {
+  const q = words(query);
+  const runs = new Set<string>();
+  for (let i = 0; i + 4 <= q.length; i++) runs.add(q.slice(i, i + 4).join(' '));
+  if (runs.size === 0) return false;
+  return privateText.some((item) => {
+    const w = words(item);
+    for (let i = 0; i + 4 <= w.length; i++) if (runs.has(w.slice(i, i + 4).join(' '))) return true;
+    return false;
+  });
+}
+
+const searchArgs = z.object({ query: z.string() });
 
 function appendToolResult(ctx: StepContext, call: ToolCall, content: ToolResultContent): void {
   ctx.messages.push(
@@ -38,6 +66,11 @@ const searchNotes = {
 async function runSearch(ctx: StepContext, call: ToolCall): Promise<void> {
   ctx.status('searching');
   ctx.taint.searched = true;
+  const requested = searchArgs.safeParse(call.arguments);
+  if (requested.success && sharesPrivateRun(requested.data.query, ctx.privateText ?? [])) {
+    appendToolResult(ctx, call, searchNotes.blocked_query);
+    return;
+  }
   const outcome = await ctx.web.search.run(call.arguments, ctx.signal);
   if (!outcome.ok) {
     appendToolResult(ctx, call, searchNotes[outcome.error]);

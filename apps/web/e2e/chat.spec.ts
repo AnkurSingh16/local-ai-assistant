@@ -24,7 +24,7 @@ const test = base.extend<{ consoleErrors: string[] }>({
 
 async function ask(page: Page, text: string): Promise<void> {
   await page.getByLabel('Message').fill(text);
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
 }
 
 test('streams an answer through the real API', async ({ page }) => {
@@ -32,7 +32,7 @@ test('streams an answer through the real API', async ({ page }) => {
   await ask(page, 'Hello there');
   await expect(page.getByLabel('You')).toHaveText('Hello there');
   await expect(page.getByLabel('Assistant')).toContainText(mockAnswer);
-  await expect(page.getByRole('button', { name: 'Send' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
 });
 
 test('refuses flagged input with the fixed message', async ({ page }) => {
@@ -55,4 +55,22 @@ test('keeps a conversation of several turns', async ({ page }) => {
   await ask(page, 'Second');
   await expect(page.getByLabel('You')).toHaveText(['First', 'Second']);
   await expect(page.getByLabel('Assistant').nth(1)).toContainText(mockAnswer);
+});
+
+test('starts a session, shows the memory view and deletes everything', async ({ page }) => {
+  await ask(page, 'Hello there');
+  await expect(page.getByLabel('Assistant')).toContainText(mockAnswer);
+  const cookies = await page.context().cookies();
+  const session = cookies.find((c) => c.name === 'lai_session');
+  expect(session?.httpOnly).toBe(true);
+  expect(session?.sameSite).toBe('Strict');
+  await page.getByRole('button', { name: 'What I remember' }).click();
+  await expect(page.getByText(/deleted for real/)).toBeVisible();
+  await expect(page.getByText(/Nothing is remembered yet/)).toBeVisible();
+  await page.getByRole('button', { name: 'Delete everything' }).click();
+  await page.getByRole('button', { name: 'Yes, delete everything' }).click();
+  await expect(page.getByRole('status')).toHaveText(
+    'Everything stored under your session is deleted.',
+  );
+  await expect(page.getByLabel('You')).toHaveCount(0);
 });

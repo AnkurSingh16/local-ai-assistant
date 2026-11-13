@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 import type { Assistant, WebTools } from '@local-ai/agent';
 import { createAssistant, leakCheckPrompt, personaCanary } from '@local-ai/agent';
@@ -11,14 +13,24 @@ import {
 } from '@local-ai/guardrails';
 import {
   createOllamaChatProvider,
+  createOllamaEmbeddingProvider,
   createOllamaModerationProvider,
   createSearxngSearchProvider,
 } from '@local-ai/providers';
 import {
   createMockChatProvider,
+  createMockEmbeddingProvider,
   createMockModerationProvider,
   createMockSearchProvider,
 } from '@local-ai/providers/mock';
+import {
+  createConversationRepo,
+  createFlagLog,
+  createMemoryRepo,
+  createReviewRepo,
+  createSessionRepo,
+  openDatabase,
+} from '@local-ai/storage';
 import type { HopFetch } from '@local-ai/tools';
 import {
   createPageParser,
@@ -36,6 +48,10 @@ import {
 import type { FetchFn } from '@local-ai/providers';
 
 import type { Config } from './config.js';
+import type { FeedbackService } from './learning.js';
+import { createFeedbackService, createMemoryRecall } from './learning.js';
+import type { SessionService } from './sessions.js';
+import { createSessionService } from './sessions.js';
 
 /**
  * The composition root (ADR-0002): the only module in the API that imports
@@ -46,6 +62,10 @@ export interface Composition {
   readonly moderation: ModerationProvider;
   /** True once any guard classification has succeeded (ADR-0005). */
   readonly isReady: () => boolean;
+  readonly sessions: SessionService;
+  readonly feedback: FeedbackService;
+  /** Closes the database on shutdown. */
+  readonly close: () => void;
 }
 
 /** Marks the API ready on the first successful classification, whether warm-up or a real turn. */
@@ -151,6 +171,36 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
     // The lease outlasts the longest check (residency read plus the cold timeout).
     breaker: createCircuitBreaker({ clock, probeLeaseMs: config.guardTimeoutMs + 1_000 }),
   };
+  if (config.databasePath !== ':memory:')
+    mkdirSync(dirname(config.databasePath), { recursive: true });
+  const db = openDatabase(config.databasePath);
+  const storageDeps = { db, clock, newId };
+  const sessionRepo = createSessionRepo(storageDeps);
+  const conversationRepo = createConversationRepo(storageDeps);
+  const memoryRepo = createMemoryRepo(storageDeps);
+  const embeddings =
+    config.providers === 'mock'
+      ? createMockEmbeddingProvider()
+      : createOllamaEmbeddingProvider({
+          baseUrl: config.ollamaBaseUrl,
+          model: config.embedModel,
+          keepAlive: config.ollamaKeepAlive,
+          fetch: fetchFn,
+        });
+  // Idle sessions and everything under them go at start-up and every hour
+  // after, so a long-running API keeps nothing past the 30-day idle limit (ADR-0009).
+  const purge = (): void => {
+    // The repository is synchronous underneath, so an error can be thrown
+    // before any promise exists; it must never escape a timer callback.
+    try {
+      void sessionRepo.purgeIdle().catch(() => undefined);
+    } catch {
+      // The next hour tries again.
+    }
+  };
+  purge();
+  const purgeTimer = setInterval(purge, 60 * 60 * 1000);
+  purgeTimer.unref();
   const assistant = createAssistant({
     chat,
     inputGuard: createInputGuard(guard),
@@ -162,6 +212,26 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
     turnTimeoutMs: config.turnTimeoutMs,
     clock,
     web: webTools(config, clock, fetchFn),
+    conversations: conversationRepo,
+    memory: createMemoryRecall({ memory: memoryRepo, embeddings, timeoutMs: 5_000 }),
   });
-  return { assistant, moderation: tracked.moderation, isReady: tracked.isReady };
+  return {
+    assistant,
+    moderation: tracked.moderation,
+    isReady: tracked.isReady,
+    sessions: createSessionService({
+      sessions: sessionRepo,
+      conversations: conversationRepo,
+      memory: memoryRepo,
+    }),
+    feedback: createFeedbackService({
+      inputGuard: createInputGuard(guard),
+      review: createReviewRepo(storageDeps),
+      flags: createFlagLog(storageDeps),
+    }),
+    close: () => {
+      clearInterval(purgeTimer);
+      db.close();
+    },
+  };
 }

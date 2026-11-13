@@ -1,9 +1,10 @@
-import type { ChatClient, TurnView } from '@local-ai/client';
+import type { AccountClient, ChatClient, TurnView } from '@local-ai/client';
 import { maxMessageChars } from '@local-ai/contract';
 import type { KeyboardEvent, ReactElement, SyntheticEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
 import { Answer } from './Answer.js';
+import { MemoryPanel } from './MemoryPanel.js';
 import type { Turn } from './useChat.js';
 import { useChat } from './useChat.js';
 
@@ -97,9 +98,17 @@ function TurnItem({
   );
 }
 
-export function App({ client }: { readonly client: ChatClient }): ReactElement {
+export function App({
+  client,
+  account,
+}: {
+  readonly client: ChatClient;
+  /** Session and memory calls; without it the memory view is hidden. */
+  readonly account?: AccountClient;
+}): ReactElement {
   const chat = useChat(client);
   const [draft, setDraft] = useState('');
+  const [showMemory, setShowMemory] = useState(false);
   const end = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -128,7 +137,32 @@ export function App({ client }: { readonly client: ChatClient }): ReactElement {
         <p className="subtitle">
           Runs on this computer. Answers can be wrong; check anything important.
         </p>
+        {account !== undefined && (
+          <button
+            type="button"
+            className="link"
+            aria-expanded={showMemory}
+            onClick={() => {
+              setShowMemory((v) => !v);
+            }}
+          >
+            What I remember
+          </button>
+        )}
       </header>
+      {account !== undefined && showMemory && (
+        <MemoryPanel
+          account={account}
+          onClose={() => {
+            setShowMemory(false);
+          }}
+          onDeletedEverything={() => {
+            chat.reset();
+            // A fresh session, so the next conversation is remembered again.
+            void account.startSession(AbortSignal.timeout(10_000)).catch(() => undefined);
+          }}
+        />
+      )}
       <ol className="turns" aria-label="Conversation">
         {chat.turns.map((turn) => (
           <TurnItem key={turn.id} turn={turn} busy={chat.busy} onRetry={(q) => void chat.send(q)} />

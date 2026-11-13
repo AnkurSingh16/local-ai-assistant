@@ -7,6 +7,8 @@
   --you: #eef3fd;
   --warn: #fdf2e9;
   --err: #fce8e6;
+  --link: #1a5fb4;
+  --danger: #b3261e;
   font-family:
     system-ui,
     -apple-system,
@@ -23,6 +25,8 @@
     --you: #22304a;
     --warn: #3d2e1f;
     --err: #4a2522;
+    --link: #8ab4f8;
+    --danger: #f2b8b5;
   }
 }
 * {
@@ -139,4 +143,45 @@ button:disabled {
 .sources a {
   color: inherit;
   word-break: break-word;
+}
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--link);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.memory {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.memory-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.memory-items {
+  list-style: none;
+  padding: 0;
+}
+
+.memory-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+button.danger {
+  color: var(--danger);
 }

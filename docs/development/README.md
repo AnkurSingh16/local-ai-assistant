@@ -74,6 +74,28 @@ npm run eval:redteam:live   # run against Ollama without touching the fixtures
 
 Re-recording keeps my harmful labels by paragraph text and lists new paragraphs to label. `npm run eval:record -- --only=id1,id2` re-records just those cases and keeps the rest; the recorder retries a turn that ended in a guard outage or an error, logs each retry, exits non-zero if one still fails, and refuses `--only` when the persona or a model changed since the last recording. Check that no other Ollama client is running first; a second client at a different context size makes models reload mid-run.
 
+## Reviewing feedback
+
+Users' feedback, corrections and preferences wait in a review queue. Nothing is used until I approve it ([ADR-0009](../adr/0009-sessions-and-memory-deletion.md)).
+
+```bash
+npm run review
+```
+
+```bash
+npm run review -- approve <id>
+```
+
+```bash
+npm run review -- reject <id>
+```
+
+```bash
+npm run review -- promote <id> <category> <expect> "<a paraphrase in my own words>"
+```
+
+Approving a preference or correction turns it into memory for that session, with an embedding from `nomic-embed-text`. `promote` refuses a paraphrase that copies five or more of the user's words in a row or contains personal data, and writes only the paraphrase, the category and the expected behaviour to the red-team cases; record it with `npm run eval:record -- --only=<new id>`.
+
 ## Workflows
 
 | Workflow      | Runs on          | What it checks                                                        |
