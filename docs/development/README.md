@@ -74,6 +74,14 @@ npm run eval:redteam:live   # run against Ollama without touching the fixtures
 
 Re-recording keeps my harmful labels by paragraph text and lists new paragraphs to label. `npm run eval:record -- --only=id1,id2` re-records just those cases and keeps the rest; the recorder retries a turn that ended in a guard outage or an error, logs each retry, exits non-zero if one still fails, and refuses `--only` when the persona or a model changed since the last recording. Check that no other Ollama client is running first; a second client at a different context size makes models reload mid-run.
 
+## Memory recall eval
+
+The labelled memory items and messages live in `packages/eval/cases/memory-recall.json` ([ADR-0001](../adr/0001-storage-sqlite.md)). The threshold is chosen on the dev messages and reported on the held-out ones.
+
+```bash
+npm run eval:memory         # against Ollama's nomic-embed-text; prints recall and precision
+```
+
 ## Reviewing feedback
 
 Users' feedback, corrections and preferences wait in a review queue. Nothing is used until I approve it ([ADR-0009](../adr/0009-sessions-and-memory-deletion.md)).

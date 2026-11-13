@@ -1,6 +1,8 @@
+import { createMockEmbeddingProvider } from '@local-ai/providers/mock';
 import { describe, expect, it } from 'vitest';
 
 import { runTurn } from './pipeline.js';
+import { atThreshold, bestThreshold, loadRecallSet, scorePairs } from './memory-recall.js';
 import { replayProviders } from './replay.js';
 import { loadCases, loadFixtures, runReplay } from './run.js';
 import type { RedTeamCase } from './schema.js';
@@ -151,5 +153,76 @@ describe('stale fixtures', () => {
     });
     await runTurn(noVerdict, 'hello', timeouts);
     expect(noVerdict.stale()).toBe(true);
+  });
+});
+
+describe('memory recall eval', () => {
+  it('loads a labelled set whose labels name real items, in both splits', () => {
+    const set = loadRecallSet();
+    expect(set.items.length).toBeGreaterThanOrEqual(10);
+    for (const split of ['dev', 'heldout'] as const) {
+      expect(set.messages.filter((m) => m.split === split).length).toBeGreaterThanOrEqual(20);
+    }
+  });
+
+  it('scores pairs, and measures recall and precision at a threshold', async () => {
+    const set = {
+      items: [
+        { id: 'a', text: 'alpha' },
+        { id: 'b', text: 'beta' },
+      ],
+      messages: [{ id: 'm', message: 'alpha', relevant: ['a'], split: 'dev' as const }],
+    };
+    // Same text, same vector: "alpha" scores 1 against itself and less against "beta".
+    const pairs = await scorePairs(
+      set,
+      createMockEmbeddingProvider(),
+      { query: '', document: '' },
+      new AbortController().signal,
+    );
+    expect(pairs).toHaveLength(2);
+    const self = pairs.find((p) => p.relevant);
+    expect(self?.score).toBeCloseTo(1, 5);
+    const r = atThreshold(pairs, 0.999);
+    expect(r.recall).toBe(1);
+    expect(r.precision).toBe(1);
+    expect(bestThreshold(pairs).f1).toBe(1);
+  });
+
+  it('keeps only the best items per message in top-k mode, as the API does', () => {
+    const pair = (messageId: string, itemId: string, score: number, relevant: boolean) => ({
+      split: 'dev' as const,
+      messageId,
+      itemId,
+      score,
+      relevant,
+    });
+    const pairs = [
+      pair('m1', 'a', 0.9, false),
+      pair('m1', 'b', 0.8, false),
+      pair('m1', 'c', 0.7, true),
+    ];
+    expect(atThreshold(pairs, 0.5).recall).toBe(1);
+    expect(atThreshold(pairs, 0.5, 2).recall).toBe(0);
+    expect(atThreshold(pairs, 0.75, 3).precision).toBe(0);
+  });
+
+  it('chooses the threshold with the cap applied when the cap changes the answer', () => {
+    const pair = (messageId: string, itemId: string, score: number, relevant: boolean) => ({
+      split: 'dev' as const,
+      messageId,
+      itemId,
+      score,
+      relevant,
+    });
+    // Without a cap, 0.30 keeps the relevant item; with a cap of one, the
+    // irrelevant higher-scoring item takes the slot unless the threshold rises.
+    const pairs = [
+      pair('m1', 'x', 0.6, false),
+      pair('m1', 'y', 0.5, true),
+      pair('m2', 'z', 0.65, true),
+    ];
+    expect(bestThreshold(pairs).threshold).toBeCloseTo(0.3);
+    expect(bestThreshold(pairs, 1).recall).toBeLessThan(1);
   });
 });

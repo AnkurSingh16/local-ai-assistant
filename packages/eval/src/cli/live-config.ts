@@ -10,3 +10,8 @@ export function liveConfigFromEnv(): LiveConfig {
     now: () => new Date(),
   };
 }
+
+/** The embedding model for the memory recall eval. */
+export function embedModelFromEnv(): string {
+  return process.env.EMBED_MODEL ?? 'nomic-embed-text';
+}
