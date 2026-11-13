@@ -48,6 +48,7 @@ const envSchema = z.object({
   /** Browser origins allowed to call the API. Defaults to the Vite dev server. */
   ALLOWED_ORIGINS: csv.default(['http://localhost:5173', 'http://127.0.0.1:5173']),
   RATE_LIMIT_PER_IP: positiveInt.default(60),
+  RATE_LIMIT_PER_SESSION: positiveInt.default(20),
   RATE_LIMIT_WINDOW_MS: positiveInt.default(600_000),
   MAX_CONCURRENT_TURNS: positiveInt.default(2),
   MAX_QUEUED_TURNS: z.coerce.number().int().min(0).default(4),
@@ -73,6 +74,7 @@ export interface Config {
   readonly allowedHosts: readonly string[];
   readonly allowedOrigins: readonly string[];
   readonly rateLimitPerIp: number;
+  readonly rateLimitPerSession: number;
   readonly rateLimitWindowMs: number;
   readonly maxConcurrentTurns: number;
   readonly maxQueuedTurns: number;
@@ -115,6 +117,7 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>): 
     allowedHosts: e.ALLOWED_HOSTS ?? [`localhost:${String(e.PORT)}`, `127.0.0.1:${String(e.PORT)}`],
     allowedOrigins: e.ALLOWED_ORIGINS,
     rateLimitPerIp: e.RATE_LIMIT_PER_IP,
+    rateLimitPerSession: e.RATE_LIMIT_PER_SESSION,
     rateLimitWindowMs: e.RATE_LIMIT_WINDOW_MS,
     maxConcurrentTurns: e.MAX_CONCURRENT_TURNS,
     maxQueuedTurns: e.MAX_QUEUED_TURNS,

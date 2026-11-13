@@ -408,6 +408,21 @@ describe('sessions and conversation memory', () => {
     return header.split(';')[0] ?? '';
   }
 
+  it('rate-limits each session on its own, as well as each address', async () => {
+    const { app } = await harness({
+      storage: true,
+      env: { RATE_LIMIT_PER_SESSION: '2', RATE_LIMIT_PER_IP: '10', RATE_LIMIT_WINDOW_MS: '60000' },
+    });
+    const start = () => app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } });
+    const a = cookieFrom(await start());
+    const b = cookieFrom(await start());
+    expect((await post(app, { message: '1' }, { cookie: a })).statusCode).toBe(200);
+    expect((await post(app, { message: '2' }, { cookie: a })).statusCode).toBe(200);
+    expect((await post(app, { message: '3' }, { cookie: a })).statusCode).toBe(429);
+    // The same address with another session still has its own budget.
+    expect((await post(app, { message: '1' }, { cookie: b })).statusCode).toBe(200);
+  });
+
   it('creates a session with an HttpOnly, SameSite=Strict cookie and returns the token', async () => {
     const { app } = await harness({ storage: true });
     const res = await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } });

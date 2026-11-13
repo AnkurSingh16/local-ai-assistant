@@ -97,3 +97,28 @@ export function createTurnSlots(maxActive: number, maxQueued: number): TurnSlots
     },
   };
 }
+
+/** A fixed-window counter per key on the injected clock: true while the key is within its limit. */
+export interface WindowLimiter {
+  /** Counts one request; returns the wait in ms when over the limit, or undefined. */
+  hit(key: string): number | undefined;
+}
+
+export function createWindowLimiter(clock: Clock, max: number, windowMs: number): WindowLimiter {
+  const windows = new Map<string, { count: number; resetAt: number }>();
+  return {
+    hit(key) {
+      const now = clock.monotonicMs();
+      if (windows.size > 10_000) {
+        for (const [k, w] of windows) if (w.resetAt <= now) windows.delete(k);
+      }
+      let w = windows.get(key);
+      if (w === undefined || w.resetAt <= now) {
+        w = { count: 0, resetAt: now + windowMs };
+        windows.set(key, w);
+      }
+      w.count++;
+      return w.count > max ? w.resetAt - now : undefined;
+    },
+  };
+}

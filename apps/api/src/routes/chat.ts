@@ -7,6 +7,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import type { AppDeps } from '../deps.js';
 import { apiError } from '../http.js';
 import type { TurnSlots } from '../limits.js';
+import { createWindowLimiter } from '../limits.js';
 import { tokenFrom } from '../sessions.js';
 
 const defaultPingIntervalMs = 15_000;
@@ -16,6 +17,14 @@ const defaultPingIntervalMs = 15_000;
  * the assistant's handleTurn, never a provider or a store (ADR-0002).
  */
 export function registerChatRoute(app: FastifyInstance, deps: AppDeps, slots: TurnSlots): void {
+  // ADR-0011: a limit per session on top of the per-address one, so users behind
+  // one address (a proxy, a household) do not share a budget and one session
+  // cannot use all of it. Keyed by session id, never by the token.
+  const perSession = createWindowLimiter(
+    deps.clock,
+    deps.config.rateLimitPerSession,
+    deps.config.rateLimitWindowMs,
+  );
   app.post(
     '/v1/chat',
     {
@@ -45,6 +54,29 @@ export function registerChatRoute(app: FastifyInstance, deps: AppDeps, slots: Tu
         token === undefined || deps.sessions === undefined
           ? undefined
           : await deps.sessions.resolve(token);
+      if (sessionId !== undefined) {
+        const waitMs = perSession.hit(sessionId);
+        if (waitMs !== undefined) {
+          deps.logEvent({
+            event: 'request_rejected',
+            requestId: request.id,
+            route: '/v1/chat',
+            status: 429,
+            reason: 'rate_limited',
+          });
+          return reply
+            .code(429)
+            .header('retry-after', String(Math.ceil(waitMs / 1000)))
+            .send({
+              error: {
+                code: 'rate_limited',
+                message: 'Too many requests. Please wait a moment and try again.',
+                requestId: request.id,
+                retryAfterMs: waitMs,
+              },
+            });
+        }
+      }
       if (sessionId !== undefined && deps.sessions !== undefined) {
         conversationId ??= deps.newId();
         if (!(await deps.sessions.claimConversation(conversationId, sessionId))) {
