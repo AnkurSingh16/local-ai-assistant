@@ -7,6 +7,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import { describe, expect, it } from 'vitest';
 
 import { ChatScreen } from './ChatScreen';
+import { scrollToEndCalls } from './test/react-native';
 
 const encoder = new TextEncoder();
 
@@ -180,26 +181,26 @@ describe('mobile chat screen', () => {
   });
 });
 
-describe('mobile feedback and announcements', () => {
-  function fakeAccount(reply?: string, failing = false) {
-    const sent: string[] = [];
-    const account: AccountClient = {
-      startSession: () => Promise.resolve('t'.repeat(43)),
-      hasSession: () => Promise.resolve(true),
-      memory: () => Promise.resolve([]),
-      forget: () => Promise.resolve(),
-      deleteEverything: () => Promise.resolve(),
-      sendFeedback: (kind, text) => {
-        sent.push(`${kind}: ${text}`);
-        return failing ? Promise.reject(new Error('down')) : Promise.resolve(reply);
-      },
-    };
-    return { account, sent };
-  }
+function feedbackAccount(reply?: string, failing = false) {
+  const sent: string[] = [];
+  const account: AccountClient = {
+    startSession: () => Promise.resolve('t'.repeat(43)),
+    hasSession: () => Promise.resolve(true),
+    memory: () => Promise.resolve([]),
+    forget: () => Promise.resolve(),
+    deleteEverything: () => Promise.resolve(),
+    sendFeedback: (kind, text) => {
+      sent.push(`${kind}: ${text}`);
+      return failing ? Promise.reject(new Error('down')) : Promise.resolve(reply);
+    },
+  };
+  return { account, sent };
+}
 
+describe('mobile feedback', () => {
   it('sends feedback of the chosen kind on an answered turn', async () => {
     const { client } = chatWith(fixtureTurns.answered ?? []);
-    const { account, sent } = fakeAccount();
+    const { account, sent } = feedbackAccount();
     await render(<ChatScreen client={client} account={account} openUrl={() => undefined} />);
     await ask('Hello');
     await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
@@ -212,7 +213,7 @@ describe('mobile feedback and announcements', () => {
 
   it('shows crisis resources when the server answers with them', async () => {
     const { client } = chatWith(fixtureTurns.answered ?? []);
-    const crisis = fakeAccount('Call or text 988.');
+    const crisis = feedbackAccount('Call or text 988.');
     await render(<ChatScreen client={client} account={crisis.account} openUrl={() => undefined} />);
     await ask('Hello');
     await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
@@ -223,7 +224,7 @@ describe('mobile feedback and announcements', () => {
 
   it('keeps the text and says so when feedback cannot be sent', async () => {
     const { client } = chatWith(fixtureTurns.answered ?? []);
-    const { account } = fakeAccount(undefined, true);
+    const { account } = feedbackAccount(undefined, true);
     await render(<ChatScreen client={client} account={account} openUrl={() => undefined} />);
     await ask('Hello');
     await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
@@ -235,7 +236,7 @@ describe('mobile feedback and announcements', () => {
 
   it('offers no feedback on a refused turn', async () => {
     const { client } = chatWith(fixtureTurns.refusedMidAnswer ?? []);
-    const { account } = fakeAccount();
+    const { account } = feedbackAccount();
     await render(<ChatScreen client={client} account={account} openUrl={() => undefined} />);
     await ask('Hello');
     await screen.findByText("I can't help with that.");
@@ -253,5 +254,144 @@ describe('mobile feedback and announcements', () => {
     await waitFor(() => {
       expect(spoken).toEqual(["I can't help with that."]);
     });
+  });
+});
+
+describe('mobile announcements and scrolling', () => {
+  /** A client whose turn streams the given deltas, then waits until released. */
+  function controlledClient(deltas: readonly string[]) {
+    let release: () => void = () => undefined;
+    const done = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const client: ChatClient = {
+      async *send(_body, signal) {
+        yield { type: 'status', phase: 'answering' };
+        for (const text of deltas) {
+          await Promise.resolve();
+          yield { type: 'delta', text };
+        }
+        // Like the real client, an abort ends the turn with an error.
+        await Promise.race([
+          done,
+          new Promise<never>((_, reject) => {
+            signal.addEventListener('abort', () => {
+              reject(new Error('aborted'));
+            });
+          }),
+        ]);
+        yield { type: 'done', finishReason: 'stop' };
+      },
+    };
+    return {
+      client,
+      release: () => {
+        release();
+      },
+    };
+  }
+
+  it('says nothing while an answer streams, then its first paragraph once', async () => {
+    const turn = controlledClient(['First paragraph.\n\n', 'Second paragraph.']);
+    const spoken: string[] = [];
+    await render(
+      <ChatScreen
+        client={turn.client}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
+    await ask('Hello');
+    await screen.findByText('Second paragraph.');
+    expect(spoken).toEqual([]);
+    turn.release();
+    await waitFor(() => {
+      expect(spoken).toEqual(['First paragraph.']);
+    });
+    await fireEvent.changeText(screen.getByLabelText('Message'), 'typing more');
+    expect(spoken).toEqual(['First paragraph.']);
+  });
+
+  it('says Stopped after Stop, not the partial answer', async () => {
+    const turn = controlledClient(['Partial text.']);
+    const spoken: string[] = [];
+    await render(
+      <ChatScreen
+        client={turn.client}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
+    await ask('Hello');
+    await screen.findByText('Partial text.');
+    await fireEvent.press(screen.getByRole('button', { name: 'Stop' }));
+    await waitFor(() => {
+      expect(spoken).toEqual(['Stopped.']);
+    });
+  });
+
+  it('reads out an error as shown, and offers no feedback on failed or stopped turns', async () => {
+    const { client } = chatWith(fixtureTurns.failed ?? []);
+    const spoken: string[] = [];
+    const { account } = feedbackAccount();
+    await render(
+      <ChatScreen
+        client={client}
+        account={account}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
+    await ask('Hello');
+    await screen.findByText('The assistant is not available right now.');
+    await waitFor(() => {
+      expect(spoken).toEqual(['The assistant is not available right now.']);
+    });
+    expect(screen.queryByRole('button', { name: 'Send feedback' })).toBeNull();
+  });
+
+  it('reads out the feedback outcome, crisis resources included', async () => {
+    const { client } = chatWith(fixtureTurns.answered ?? []);
+    const spoken: string[] = [];
+    const { account } = feedbackAccount('Call or text 988.');
+    await render(
+      <ChatScreen
+        client={client}
+        account={account}
+        openUrl={() => undefined}
+        announce={(m) => spoken.push(m)}
+      />,
+    );
+    await ask('Hello');
+    await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
+    await fireEvent.changeText(screen.getByLabelText('Details'), 'I feel hopeless');
+    await fireEvent.press(screen.getByRole('button', { name: 'Submit' }));
+    await screen.findByText('Call or text 988.');
+    expect(spoken.at(-1)).toBe('Call or text 988.');
+  });
+
+  it('follows new text only during a turn and only while the reader is at the end', async () => {
+    const turn = controlledClient(['One.\n\n', 'Two.']);
+    await render(<ChatScreen client={turn.client} openUrl={() => undefined} />);
+    const list = screen.getByLabelText('Conversation');
+    scrollToEndCalls.length = 0;
+    await ask('Hello');
+    await fireEvent(list, 'contentSizeChange', 100, 500);
+    expect(scrollToEndCalls).toHaveLength(1);
+    // The reader scrolls up to read; new text no longer moves the view.
+    await fireEvent.scroll(list, {
+      nativeEvent: {
+        contentOffset: { y: 0 },
+        layoutMeasurement: { height: 400 },
+        contentSize: { height: 1200 },
+      },
+    });
+    await fireEvent(list, 'contentSizeChange', 100, 1300);
+    expect(scrollToEndCalls).toHaveLength(1);
+    turn.release();
+    await screen.findByRole('button', { name: 'Send' });
+    // After the turn, opening feedback on it does not move the view either.
+    await fireEvent(list, 'contentSizeChange', 100, 1400);
+    expect(scrollToEndCalls).toHaveLength(1);
   });
 });

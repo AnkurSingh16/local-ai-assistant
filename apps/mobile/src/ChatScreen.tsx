@@ -42,12 +42,14 @@ function TurnItem({
   onRetry,
   openUrl,
   account,
+  announce,
 }: {
   readonly turn: Turn;
   readonly busy: boolean;
   readonly onRetry: (question: string) => void;
   readonly openUrl: (url: string) => void;
   readonly account: AccountClient | undefined;
+  readonly announce: (message: string) => void;
 }): ReactElement {
   const { view } = turn;
   const label = phaseLabels[view.phase];
@@ -110,11 +112,25 @@ function TurnItem({
         )}
         {view.phase === 'cancelled' && <Text style={styles.note}>Stopped.</Text>}
         {account !== undefined && view.phase === 'done' && view.text !== '' && (
-          <Feedback account={account} />
+          <Feedback account={account} announce={announce} />
         )}
       </View>
     </View>
   );
+}
+
+/**
+ * What a screen reader hears when a turn ends: the refusal or error as shown,
+ * "Stopped." after Stop (not the partial answer the user just cut off), and for
+ * an answer its first paragraph, so a long reply is not read out in one go.
+ */
+export function spokenSummary(view: TurnView): string {
+  if (view.refusal !== undefined) return view.refusal.message;
+  if (view.error !== undefined) return view.error.message;
+  if (view.phase === 'cancelled') return 'Stopped.';
+  const first = toBlocks(view.text).find((b) => b.kind === 'text')?.content ?? '';
+  const sources = view.citations.length > 0 ? ' Sources are listed below.' : '';
+  return first === '' ? 'Answer ready.' : `${first.slice(0, 300)}${sources}`;
 }
 
 function defaultAnnounce(message: string): void {
@@ -141,6 +157,9 @@ export function ChatScreen({
   const chat = useChat(client);
   const [draft, setDraft] = useState('');
   const scroll = useRef<ScrollViewInstance>(null);
+  // Follow new text only while the reader is at the end. Someone who scrolled
+  // up to read, or opened feedback on an earlier answer, is left where they are.
+  const atEnd = useRef(true);
 
   // VoiceOver ignores accessibilityLiveRegion (Android only), so a finished
   // answer, refusal or error is announced once when the turn ends.
@@ -150,8 +169,7 @@ export function ChatScreen({
     if (last === undefined || chat.busy || announced.current === last.id) return;
     announced.current = last.id;
     const v = last.view;
-    const message = v.refusal?.message ?? v.error?.message ?? v.text;
-    if (message.trim() !== '') announce(message);
+    announce(spokenSummary(v));
   }, [last, chat.busy, announce]);
 
   const send = (): void => {
@@ -194,9 +212,13 @@ export function ChatScreen({
         ref={scroll}
         style={styles.turns}
         accessibilityLabel="Conversation"
-        // Keep the newest text in view as it streams in.
+        scrollEventThrottle={100}
+        onScroll={(e) => {
+          const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+          atEnd.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 48;
+        }}
         onContentSizeChange={() => {
-          scroll.current?.scrollToEnd({ animated: true });
+          if (chat.busy && atEnd.current) scroll.current?.scrollToEnd({ animated: true });
         }}
       >
         {chat.turns.map((turn) => (
@@ -205,6 +227,7 @@ export function ChatScreen({
             turn={turn}
             busy={chat.busy}
             account={account}
+            announce={announce}
             openUrl={openUrl}
             onRetry={(q) => void chat.send(q)}
           />

@@ -19,12 +19,19 @@ function host(name: string): (props: Props) => ReactElement {
 export const View = host('View');
 export const Text = host('Text');
 export const TextInput = host('TextInput');
+/** Every scrollToEnd call, so tests can check when the list follows new text. */
+export const scrollToEndCalls: number[] = [];
+
 export function ScrollView({
   ref,
   ...props
 }: Props & { readonly ref?: Ref<unknown> }): ReactElement {
-  // Components call scrollToEnd on the ref; the stand-in accepts and ignores it.
-  useImperativeHandle(ref, () => ({ scrollToEnd: () => undefined }));
+  // Components call scrollToEnd on the ref; the stand-in records each call.
+  useImperativeHandle(ref, () => ({
+    scrollToEnd: () => {
+      scrollToEndCalls.push(1);
+    },
+  }));
   return createElement('RCTScrollView', props);
 }
 export const SafeAreaView = host('View');

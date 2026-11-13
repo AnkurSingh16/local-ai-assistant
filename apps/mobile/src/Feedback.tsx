@@ -1,11 +1,10 @@
 import type { AccountClient, FeedbackKind } from '@local-ai/client';
+import { maxFeedbackChars } from '@local-ai/contract';
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { colors } from './theme';
-
-const maxFeedbackChars = 1000;
 
 const kinds: readonly { readonly kind: FeedbackKind; readonly label: string }[] = [
   { kind: 'feedback', label: 'Feedback' },
@@ -15,12 +14,26 @@ const kinds: readonly { readonly kind: FeedbackKind; readonly label: string }[] 
 
 type State = 'closed' | 'open' | 'sending' | 'sent' | 'failed';
 
+const sentMessage = 'Thanks. I review feedback before anything changes.';
+const failedMessage = 'Feedback could not be sent. Please try again.';
+
 /**
  * Sends feedback, a correction or a preference for my review (ADR-0009), as
  * the web app does. Nothing changes the assistant until I approve it; text
  * that reads as self-harm is answered with crisis resources.
  */
-export function Feedback({ account }: { readonly account: AccountClient }): ReactElement {
+export function Feedback({
+  account,
+  announce,
+}: {
+  readonly account: AccountClient;
+  /**
+   * Reads the outcome aloud. The form disappears when it is sent, and VoiceOver
+   * does not read live regions, so without this a screen-reader user would
+   * never hear the confirmation or the crisis resources.
+   */
+  readonly announce: (message: string) => void;
+}): ReactElement {
   const [state, setState] = useState<State>('closed');
   const [kind, setKind] = useState<FeedbackKind>('feedback');
   const [text, setText] = useState('');
@@ -44,7 +57,7 @@ export function Feedback({ account }: { readonly account: AccountClient }): Reac
         style={support === undefined ? styles.note : styles.support}
         accessibilityLiveRegion="polite"
       >
-        {support ?? 'Thanks. I review feedback before anything changes.'}
+        {support ?? sentMessage}
       </Text>
     );
   }
@@ -53,11 +66,14 @@ export function Feedback({ account }: { readonly account: AccountClient }): Reac
     if (text.trim() === '') return;
     setState('sending');
     try {
-      setSupport(await account.sendFeedback(kind, text.trim(), AbortSignal.timeout(15_000)));
+      const reply = await account.sendFeedback(kind, text.trim(), AbortSignal.timeout(15_000));
+      setSupport(reply);
       setText('');
       setState('sent');
+      announce(reply ?? sentMessage);
     } catch {
       setState('failed');
+      announce(failedMessage);
     }
   };
 
@@ -88,7 +104,7 @@ export function Feedback({ account }: { readonly account: AccountClient }): Reac
       />
       {state === 'failed' && (
         <Text style={styles.error} accessibilityRole="alert">
-          Feedback could not be sent. Please try again.
+          {failedMessage}
         </Text>
       )}
       <View style={styles.actions}>
