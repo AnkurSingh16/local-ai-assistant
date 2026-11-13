@@ -29,18 +29,29 @@ export interface WrappedWeb {
 const injectionRules = createRules({ categories: ['injection'] });
 
 /**
- * Anything that looks like our delimiter, opening or closing: a page must not
- * be able to close its own block and start talking. Matched on the normalised
- * text with look-alike hyphens, a Cyrillic о, escaped brackets and no bracket
- * at all. Every repeat is bounded and the match must reach "web" within a few
- * characters, so a long run of blanks cannot make it quadratic.
+ * Delimiter look-alikes. The nonce is what stops a page forging the end of its
+ * block, since a page cannot know it; removing look-alikes is a second, best
+ * effort layer. Only tag-shaped text is removed (after an opening bracket, or
+ * a slash as in a closing tag), so ordinary prose about "web content", WCAG or
+ * Electron's webContents is left alone. Separators and a few Cyrillic
+ * look-alike letters are allowed between the parts; every repeat is bounded,
+ * so the patterns stay linear.
  */
-const delimiterLike =
-  /(?:(?:<|\u2039|&lt;)[\s/]{0,8}|\/)?web[\s_.\-\u2010-\u2015]{0,3}c[o\u043E0]ntents?(?:_[a-z]+)?\b[^>\u203A\n]{0,200}(?:>|\u203A|&gt;)?/gi;
+const word = '[wW][eEеЕ][bB][^a-zA-Z0-9>›\n]{0,6}[cCсС][oOоО0][nN][tT][eEеЕ][nN][tT]';
+const delimiterTag = new RegExp(
+  `(?:<|‹|&lt;)[\\s/]{0,8}${word}[\\w-]{0,12}[^>›\\n]{0,200}(?:>|›|&gt;)?`,
+  'g',
+);
+// A closing tag missing its bracket, but not a URL path such as /webcontent/guide.
+const closingWithoutBracket = new RegExp(`\\/${word}[\\w-]{0,12}(?=[\\s>\u203A]|$)`, 'gm');
+
+function removeLookalikes(text: string, replacement: string): string {
+  return text.replace(delimiterTag, replacement).replace(closingWithoutBracket, replacement);
+}
 
 /** Text with look-alike delimiters replaced, for the prompt. */
 function clean(text: string): string {
-  return normalise(text).replace(delimiterLike, '[removed]');
+  return removeLookalikes(normalise(text), '[removed]');
 }
 
 /**
@@ -48,7 +59,7 @@ function clean(text: string): string {
  * could otherwise split "ign<web_content>ore" so the check sees two halves.
  */
 function joined(text: string): string {
-  return normalise(text).replace(delimiterLike, '');
+  return removeLookalikes(normalise(text), '');
 }
 
 /** Attribute values hold no quotes, angle brackets or line or paragraph breaks of any kind. */
