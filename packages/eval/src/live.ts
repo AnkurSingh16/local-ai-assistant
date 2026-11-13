@@ -64,8 +64,14 @@ function recording(chat: ChatProvider, moderation: ModerationProvider) {
   };
 }
 
-/** Real-model timeouts: the guard may need a load, and answers can run long. */
-const liveTimeouts = { guardMs: 20_000, turnMs: 180_000 };
+/**
+ * Recording timeouts are longer than the API's: another Ollama client on the
+ * same machine makes models reload, and a timeout would record a guard outage
+ * or a cut-off answer instead of what the models actually say.
+ */
+const liveTimeouts = { guardMs: 90_000, turnMs: 600_000 };
+/** A turn that hit a timeout or a guard outage is run again, up to this many times. */
+const maxAttempts = 3;
 
 /**
  * Runs every case against Ollama (ADR-0012) and returns the scores and new
@@ -78,7 +84,15 @@ export async function runLive(
   config: LiveConfig,
   previous: Fixtures | undefined,
   onCase: (c: RedTeamCase, index: number) => void = () => undefined,
-): Promise<{ scores: CaseScore[]; fixtures: Fixtures; newParagraphs: string[] }> {
+  onRetry: (c: RedTeamCase, attempt: number) => void = () => undefined,
+): Promise<{
+  scores: CaseScore[];
+  fixtures: Fixtures;
+  newParagraphs: string[];
+  /** Cases that still ended in a guard outage or an error after every retry. */
+  outages: string[];
+  retried: string[];
+}> {
   const fetchFn = config.fetch;
   const chat = createOllamaChatProvider({
     baseUrl: config.baseUrl,
@@ -103,6 +117,8 @@ export async function runLive(
   const scores: CaseScore[] = [];
   const recordedCases: Record<string, RecordedCase> = {};
   const newParagraphs: string[] = [];
+  const outages: string[] = [];
+  const retried: string[] = [];
   for (const [index, c] of cases.entries()) {
     onCase(c, index);
     const kept = previous?.cases[c.id];
@@ -110,8 +126,19 @@ export async function runLive(
       recordedCases[c.id] = kept;
       continue;
     }
-    const rec = recording(chat, moderation);
-    const outcome = await runTurn(rec, c.input, liveTimeouts);
+    let rec = recording(chat, moderation);
+    let outcome = await runTurn(rec, c.input, liveTimeouts);
+    for (
+      let attempt = 1;
+      attempt < maxAttempts && (outcome.error !== undefined || outcome.refusal === 'unavailable');
+      attempt++
+    ) {
+      // Logged, so a flaky guard or an intermittent bug stays visible.
+      onRetry(c, attempt + 1);
+      retried.push(c.id);
+      rec = recording(chat, moderation);
+      outcome = await runTurn(rec, c.input, liveTimeouts);
+    }
     const units = [...rec.captured.units].map(([text, verdict]) => {
       const harmful = labels.get(text);
       if (harmful === undefined || harmful === null) {
@@ -127,6 +154,7 @@ export async function runLive(
     };
     recordedCases[c.id] = recorded;
     scores.push(scoreCase(c, outcome, recorded));
+    if (outcome.error !== undefined || outcome.refusal === 'unavailable') outages.push(c.id);
   }
 
   const fixtures: Fixtures = {
@@ -138,5 +166,5 @@ export async function runLive(
     personaVersion,
     cases: recordedCases,
   };
-  return { scores, fixtures, newParagraphs };
+  return { scores, fixtures, newParagraphs, outages, retried };
 }

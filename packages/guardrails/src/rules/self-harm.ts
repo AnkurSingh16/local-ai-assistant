@@ -13,7 +13,7 @@ import { fold } from './fold.js';
  * games still reach the classifier and the model.
  */
 const act =
-  '(?:kill myself|kms|end my life|end it all|take my own life|commit suicide|hang myself|slit my wrists|overdose on purpose|hurt myself|harm myself|cut myself(?! (?:a|some|free|loose)\\b)|jump off (?:a|the) (?:bridge|building|roof|cliff)|jump in front of (?:a|the) (?:train|bus|truck|car)|not be alive anymore|not exist anymore)';
+  '(?:kill myself|kms|end my life|drive (?:my car )?(?:off (?:a|the) (?:road|bridge|cliff)|into (?:a|the) (?:wall|tree|river|traffic))|end it all|take my own life|commit suicide|hang myself|slit my wrists|overdose on purpose|hurt myself|harm myself|cut myself(?! (?:a|some|free|loose)\\b)|jump off (?:a|the) (?:bridge|building|roof|cliff)|jump in front of (?:a|the) (?:train|bus|truck|car)|not be alive anymore|not exist anymore)';
 /** "Kill myself in Minecraft" or "kill myself laughing" are games and idioms. */
 const notGameOrIdiom =
   '(?! (?:in|on) (?:minecraft|skyrim|roblox|fortnite|the game|this game|game|hardcore|creative|survival)\\b| laughing\\b| with laughter\\b)';
@@ -48,7 +48,78 @@ const intent = [
   /\bi want to starve myself\b/,
 ];
 
+/** Warning signs that are rarely meant casually: never excused by context. */
+const warningSigns = [
+  /\b(?:nobody|no one|no body) (?:would|will|d) (?:even )?(?:miss|notice) me (?:if|when) i (?:was|were|m|am) (?:gone|dead|not here|not around)\b/,
+  /\b(?:nobody|no one) (?:would|will|d) (?:even )?(?:miss me|notice|care) if i (?:was|were|m|am) (?:gone|dead|not here|not around|to disappear)\b/,
+  /\b(?:nobody|no one) (?:would|will|d) (?:even )?miss me\b(?! (?:at|in|on|if i (?:left|went|skipped|took|moved))\b)/,
+  /\b(?:everyone|everybody|my family|my kids|my friends|the world|they) (?:would|will|d) (?:all )?be better off (?:without me|if i (?:was|were) (?:dead|gone|not here)|if i wasn t here)\b(?! (?:on|in|at) (?:the|this|my) (?:team|project|class|band|group)\b)/,
+  /\b(?:i am|i m|im|i feel like|i feel like i m|tired of being) (?:just |such )?a burden\b(?! (?:when|at work|in (?:class|meetings)|to my (?:manager|boss|team))\b)/,
+  /\b(?:i have|i ve got|i ve) nothing (?:left )?to live for\b/,
+  /\b(?:life|my life) (?:isn t|is not|isnt) worth living\b/,
+  /\b(?:i have|i ve got|i ve|there is|there s)? ?no reason (?:left )?(?:for me )?to (?:live|stay alive|keep living)\b(?! in\b)/,
+  /\bi (?:want to|wanna) (?:go to sleep|sleep) and never wake up\b/,
+  /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:my )?(?:goodbye|farewell) (?:letters?|notes?) to (?:my family|everyone|my (?:kids|children|parents|wife|husband|partner|friends))\b/,
+  /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:a |my )?suicide notes?\b/,
+];
+
+/**
+ * Phrases that are also everyday complaints. These count unless the same
+ * message asks a practical question or names an everyday thing (a slow laptop,
+ * a sore knee, a long meeting). Job loss, money and housing are not excused:
+ * they are common reasons people reach this point.
+ */
+const ambiguousSigns = [
+  /\bi can t (?:go on|keep living|keep going) (?:like this )?(?:anymore|any more)\b/,
+  /\bi (?:don t|do not) want to be here (?:anymore|any more)\b/,
+  /\b(?:nobody|no one) (?:would|will|d) (?:even )?care if i (?:disappeared|died|vanished)\b/,
+  /\b(?:there s|there is) no point (?:in )?(?:living|being alive|going on)\b(?! in\b)/,
+  /\bi (?:don t|do not|can t) see (?:any |the )?point (?:in|of) (?:living|life|going on|being alive|staying alive)\b(?! in\b)/,
+  /\bi (?:just )?want the pain to (?:end|stop)\b/,
+  /\bi (?:just )?want (?:it all|everything|my life) to (?:end|stop) (?:forever|for good|permanently)\b/,
+];
+// Concrete practical questions only: "how can I make it stop" or "how do I tell my family" are not.
+const practicalQuestion =
+  /\b(?:how (?:do|can|should) i (?:quit|leave my job|move|fix|speed|budget|ask|ramp up|cancel|find a|get a|switch|soundproof)|where should i (?:move|go|live)|what should i (?:take|buy|use|try) for|any [a-z ]{0,20}tips|what are my rights|should i (?:resign|quit|move|cancel|respawn))\b/;
+const everydayThing =
+  /\b(?:laptop|computer|phone|wifi|internet|printer|commute|traffic|meeting|lecture|knee|legs|tooth|headache|game|marathon|workout|queue|weather|diet|meditation|vacation|holiday|city|london|decluttering|tax season|homework|party)\b/;
+
+const givingAway =
+  /\bi (?:ve|have|m|am) (?:started |been )?giving away (?:all )?(?:of )?my (?:things|stuff|belongings|possessions)\b/;
+const givenAway =
+  /\bi (?:ve|have) given away (?:all |everything )?(?:of )?my (?:things|stuff|belongings|possessions)\b/;
+/** Hopelessness, not tidying: "it feels empty but good to declutter" is not a warning sign. */
+const hopeless =
+  /\b(?:pointless|hopeless|nothing matters|won t need (?:them|it|any of it)(?: anymore)?|tired of (?:living|life|everything)|done with (?:life|everything)|don t want to be here)\b/;
+
+/**
+ * Someone else's words, quoted to ask about them: "my friend texted me '…'" or
+ * "what does it mean when someone says '…'". Only quotes introduced by another
+ * person are set aside; "I keep telling myself '…'" or a message that is only a
+ * quote is still the person's own.
+ */
+const reportedQuote =
+  /\b(?:my (?:friend|son|daughter|kid|child|partner|wife|husband|mum|mom|dad|brother|sister|colleague|student|patient|client)|someone|somebody|a friend|he|she|they|people)(?: \w+){0,2} (?:said|says|saying|texted|wrote|writes|told me|posted|messaged|sent)(?: me| to me)?[^"'“\n]{0,20}(?:"[^"\n]{0,300}"|“[^”\n]{0,300}”|'[^\n]{0,300}?'(?=[\s.,!?]|$))/gi;
+
+/** "I can't go on." as a sentence of its own; folding drops the full stop, so it is read on the raw text. */
+const cantGoOnSentence = /\bi can['\u2019]?t go on\s*(?:[.!]|$)/im;
+
 export function isSelfHarmIntent(text: string): boolean {
-  const { unjoined } = fold(text, { leet: true, stretch: 1 });
-  return intent.some((p) => p.test(unjoined));
+  // Direct intent is read on the text as written, quotes included.
+  if (cantGoOnSentence.test(text)) return true;
+  if (intent.some((p) => p.test(fold(text, { leet: true, stretch: 1 }).unjoined))) return true;
+  const { unjoined } = fold(text.replace(reportedQuote, ' '), { leet: true, stretch: 1 });
+  if (warningSigns.some((p) => p.test(unjoined))) return true;
+  if (
+    ambiguousSigns.some((p) => p.test(unjoined)) &&
+    !practicalQuestion.test(unjoined) &&
+    !everydayThing.test(unjoined)
+  ) {
+    return true;
+  }
+  return (
+    (givingAway.test(unjoined) || givenAway.test(unjoined)) &&
+    hopeless.test(unjoined) &&
+    !/\bdeclutter/.test(unjoined)
+  );
 }

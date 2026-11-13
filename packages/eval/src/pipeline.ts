@@ -1,4 +1,4 @@
-import { createAssistant, persona, personaCanary } from '@local-ai/agent';
+import { createAssistant, leakCheckPrompt, personaCanary } from '@local-ai/agent';
 import type { RefusalKind } from '@local-ai/contract';
 import type { ChatProvider, ModerationProvider } from '@local-ai/core';
 import { createInputGuard, createOutputGuard, createOutputRules } from '@local-ai/guardrails';
@@ -40,7 +40,7 @@ export async function runTurn(
     inputGuard: createInputGuard(guard),
     outputGuard: createOutputGuard({
       ...guard,
-      rules: createOutputRules({ systemPrompt: persona, canary: personaCanary }),
+      rules: createOutputRules({ systemPrompt: leakCheckPrompt, canary: personaCanary }),
     }),
     newId: () => `00000000-0000-4000-8000-${String(++ids).padStart(12, '0')}`,
     turnTimeoutMs: timeouts.turnMs,

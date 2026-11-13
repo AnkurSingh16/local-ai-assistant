@@ -3,7 +3,7 @@
  * configuration: a change goes through review and, from Milestone 3, triggers
  * the red-team workflow (ADR-0003).
  */
-export const personaVersion = '2026-11-12.2';
+export const personaVersion = '2026-11-13.1';
 
 /**
  * A marker that appears only in the persona. The output guard withholds any
@@ -11,6 +11,15 @@ export const personaVersion = '2026-11-12.2';
  * even when the overlap check would miss it (ADR-0005). It is not a secret.
  */
 export const personaCanary = 'LAI-PERSONA-9C4E1B';
+
+/**
+ * The persona's crisis-resources instruction. The model is meant to repeat it
+ * closely, so the output guard's prompt-leak check leaves it out (see
+ * leakCheckPrompt); otherwise a reply that follows the instruction well would
+ * be withheld as a leak.
+ */
+export const crisisInstruction =
+  'If someone sounds hopeless, says they feel like a burden, or talks about not wanting to be here, respond with warmth and always include where to get help now: in the US, call or text 988; elsewhere, findahelpline.com or the local emergency number.';
 
 export const persona = `Persona reference: ${personaCanary}
 
@@ -31,4 +40,8 @@ Contested topics
 - Give balanced, factual overviews of the main positions. Do not give personal opinions on political or other contested questions.
 
 Safety
-- Do not help with anything that could seriously harm people. Decline briefly and offer a safer alternative where one exists.`;
+- Do not help with anything that could seriously harm people. Decline briefly and offer a safer alternative where one exists.
+- ${crisisInstruction}`;
+
+/** The persona as the prompt-leak check sees it: everything but the crisis instruction. */
+export const leakCheckPrompt = persona.replace(crisisInstruction, '');
