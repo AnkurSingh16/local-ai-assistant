@@ -185,3 +185,36 @@ button.link {
 button.danger {
   color: var(--danger);
 }
+
+header button.link + button.link {
+  margin-left: 1rem;
+}
+
+button.link:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.feedback {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+  max-width: 32rem;
+}
+
+.feedback select,
+.feedback textarea {
+  font: inherit;
+  padding: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: inherit;
+}
+
+.feedback .actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 0.25rem;
+}

@@ -4,6 +4,7 @@ import type { KeyboardEvent, ReactElement, SyntheticEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
 import { Answer } from './Answer.js';
+import { Feedback } from './Feedback.js';
 import { MemoryPanel } from './MemoryPanel.js';
 import type { Turn } from './useChat.js';
 import { useChat } from './useChat.js';
@@ -37,10 +38,12 @@ function TurnItem({
   turn,
   onRetry,
   busy,
+  account,
 }: {
   turn: Turn;
   onRetry: (q: string) => void;
   busy: boolean;
+  account: AccountClient | undefined;
 }): ReactElement {
   const { view } = turn;
   const label = phaseLabels[view.phase];
@@ -93,6 +96,9 @@ function TurnItem({
           </div>
         )}
         {view.phase === 'cancelled' && <p className="note">Stopped.</p>}
+        {account !== undefined && view.phase === 'done' && view.text !== '' && (
+          <Feedback account={account} />
+        )}
       </div>
     </li>
   );
@@ -137,6 +143,18 @@ export function App({
         <p className="subtitle">
           Runs on this computer. Answers can be wrong; check anything important.
         </p>
+        {chat.turns.length > 0 && (
+          <button
+            type="button"
+            className="link"
+            disabled={chat.busy}
+            onClick={() => {
+              chat.reset();
+            }}
+          >
+            New conversation
+          </button>
+        )}
         {account !== undefined && (
           <button
             type="button"
@@ -165,7 +183,13 @@ export function App({
       )}
       <ol className="turns" aria-label="Conversation">
         {chat.turns.map((turn) => (
-          <TurnItem key={turn.id} turn={turn} busy={chat.busy} onRetry={(q) => void chat.send(q)} />
+          <TurnItem
+            key={turn.id}
+            turn={turn}
+            busy={chat.busy}
+            account={account}
+            onRetry={(q) => void chat.send(q)}
+          />
         ))}
       </ol>
       <div ref={end} />

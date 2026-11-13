@@ -38,6 +38,34 @@ async function ask(text: string): Promise<void> {
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
 }
 
+function fakeAccount(
+  items: { id: string; content: string; createdAt: string }[],
+  feedbackFails = false,
+) {
+  const calls: string[] = [];
+  let current = [...items];
+  const account = {
+    startSession: () => Promise.resolve('t'.repeat(43)),
+    hasSession: () => Promise.resolve(true),
+    memory: () => Promise.resolve(current),
+    forget: (id: string) => {
+      calls.push(`forget ${id}`);
+      current = current.filter((i) => i.id !== id);
+      return Promise.resolve();
+    },
+    deleteEverything: () => {
+      calls.push('delete everything');
+      current = [];
+      return Promise.resolve();
+    },
+    sendFeedback: (kind: string, text: string) => {
+      calls.push(`feedback ${kind}: ${text}`);
+      return feedbackFails ? Promise.reject(new Error('down')) : Promise.resolve();
+    },
+  };
+  return { account, calls };
+}
+
 describe('web app', () => {
   it('shows the question and the streamed answer, with code as a code block', async () => {
     render(<App client={fakeClient(() => events(fixtureTurns.answered ?? []))} />);
@@ -181,28 +209,6 @@ describe('answer blocks', () => {
 });
 
 describe('memory view', () => {
-  function fakeAccount(items: { id: string; content: string; createdAt: string }[]) {
-    const calls: string[] = [];
-    let current = [...items];
-    const account = {
-      startSession: () => Promise.resolve('t'.repeat(43)),
-      hasSession: () => Promise.resolve(true),
-      memory: () => Promise.resolve(current),
-      forget: (id: string) => {
-        calls.push(`forget ${id}`);
-        current = current.filter((i) => i.id !== id);
-        return Promise.resolve();
-      },
-      deleteEverything: () => {
-        calls.push('delete everything');
-        current = [];
-        return Promise.resolve();
-      },
-      sendFeedback: () => Promise.resolve(),
-    };
-    return { account, calls };
-  }
-
   it('lists what is remembered, with the disclosure, and forgets one item', async () => {
     const { account, calls } = fakeAccount([
       { id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00Z' },
@@ -227,5 +233,66 @@ describe('memory view', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Yes, delete everything' }));
     expect(await screen.findByText(/is deleted\./)).toBeInTheDocument();
     expect(calls).toEqual(['delete everything']);
+  });
+});
+
+describe('feedback and new conversation', () => {
+  const refusal: SseEvent[] = [
+    { type: 'refusal', kind: 'policy', message: 'I cannot help with that.' },
+  ];
+
+  it('sends feedback of the chosen kind for an answered turn', async () => {
+    const { account, calls } = fakeAccount([]);
+    render(
+      <App client={fakeClient(() => events(fixtureTurns.answered ?? []))} account={account} />,
+    );
+    await ask('Hello');
+    await userEvent.click(await screen.findByRole('button', { name: 'Send feedback' }));
+    const form = screen.getByRole('form', { name: 'Feedback' });
+    await userEvent.selectOptions(within(form).getByLabelText('Type'), 'correction');
+    await userEvent.type(within(form).getByLabelText('Details'), 'The year is wrong.');
+    await userEvent.click(within(form).getByRole('button', { name: 'Send' }));
+    expect(
+      await screen.findByText(/I review feedback before anything changes/),
+    ).toBeInTheDocument();
+    expect(calls).toEqual(['feedback correction: The year is wrong.']);
+  });
+
+  it('says so when feedback cannot be sent, and keeps the text', async () => {
+    const { account } = fakeAccount([], true);
+    render(
+      <App client={fakeClient(() => events(fixtureTurns.answered ?? []))} account={account} />,
+    );
+    await ask('Hello');
+    await userEvent.click(await screen.findByRole('button', { name: 'Send feedback' }));
+    const form = screen.getByRole('form', { name: 'Feedback' });
+    await userEvent.type(within(form).getByLabelText('Details'), 'Great answer');
+    await userEvent.click(within(form).getByRole('button', { name: 'Send' }));
+    expect(await within(form).findByRole('alert')).toHaveTextContent(/could not be sent/);
+    expect(within(form).getByLabelText('Details')).toHaveValue('Great answer');
+  });
+
+  it('offers no feedback on a refused turn', async () => {
+    const { account } = fakeAccount([]);
+    render(<App client={fakeClient(() => events(refusal))} account={account} />);
+    await ask('Hello');
+    await screen.findByText('I cannot help with that.');
+    expect(screen.queryByRole('button', { name: 'Send feedback' })).not.toBeInTheDocument();
+  });
+
+  it('starts a new conversation without the old conversation id', async () => {
+    const client = fakeClient(() => events(fixtureTurns.answered ?? []));
+    render(<App client={client} />);
+    await ask('First');
+    await screen.findByRole('list', { name: 'Sources' });
+    await ask('Follow-up');
+    await waitFor(() => {
+      expect(screen.getAllByRole('list', { name: 'Sources' })).toHaveLength(2);
+    });
+    expect(client.bodies[1]?.conversationId).toBeDefined();
+    await userEvent.click(screen.getByRole('button', { name: 'New conversation' }));
+    expect(screen.queryByLabelText('You')).not.toBeInTheDocument();
+    await ask('Fresh start');
+    expect(client.bodies[2]?.conversationId).toBeUndefined();
   });
 });
