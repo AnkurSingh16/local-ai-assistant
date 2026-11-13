@@ -1,12 +1,23 @@
-import type { ChatClient, TurnView } from '@local-ai/client';
+import type { AccountClient, ChatClient, TurnView } from '@local-ai/client';
 import { toBlocks } from '@local-ai/client';
 import type { Turn } from '@local-ai/client/react';
 import { useChat } from '@local-ai/client/react';
 import { maxMessageChars } from '@local-ai/contract';
 import type { ReactElement } from 'react';
-import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  AccessibilityInfo,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
+import { Feedback } from './Feedback';
 import { colors } from './theme';
 
 const phaseLabels: Partial<Record<TurnView['phase'], string>> = {
@@ -30,11 +41,13 @@ function TurnItem({
   busy,
   onRetry,
   openUrl,
+  account,
 }: {
   readonly turn: Turn;
   readonly busy: boolean;
   readonly onRetry: (question: string) => void;
   readonly openUrl: (url: string) => void;
+  readonly account: AccountClient | undefined;
 }): ReactElement {
   const { view } = turn;
   const label = phaseLabels[view.phase];
@@ -96,24 +109,50 @@ function TurnItem({
           </View>
         )}
         {view.phase === 'cancelled' && <Text style={styles.note}>Stopped.</Text>}
+        {account !== undefined && view.phase === 'done' && view.text !== '' && (
+          <Feedback account={account} />
+        )}
       </View>
     </View>
   );
 }
 
+function defaultAnnounce(message: string): void {
+  if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(message);
+}
+
 /** The conversation: streamed answers with sources, a composer, and Stop while answering. */
 export function ChatScreen({
   client,
+  account,
   openUrl,
   onShowMemory,
+  announce = defaultAnnounce,
 }: {
   readonly client: ChatClient;
+  /** Session calls for feedback; without it no feedback form is shown. */
+  readonly account?: AccountClient;
+  /** Reads a finished answer aloud on iOS, where live regions are not announced. */
+  readonly announce?: (message: string) => void;
   /** Opens a cited source in the system browser; injected so tests need no native module. */
   readonly openUrl: (url: string) => void;
   readonly onShowMemory?: () => void;
 }): ReactElement {
   const chat = useChat(client);
   const [draft, setDraft] = useState('');
+  const scroll = useRef<ScrollViewInstance>(null);
+
+  // VoiceOver ignores accessibilityLiveRegion (Android only), so a finished
+  // answer, refusal or error is announced once when the turn ends.
+  const last = chat.turns.at(-1);
+  const announced = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (last === undefined || chat.busy || announced.current === last.id) return;
+    announced.current = last.id;
+    const v = last.view;
+    const message = v.refusal?.message ?? v.error?.message ?? v.text;
+    if (message.trim() !== '') announce(message);
+  }, [last, chat.busy, announce]);
 
   const send = (): void => {
     if (chat.busy || draft.trim() === '') return;
@@ -151,12 +190,21 @@ export function ChatScreen({
       <Text style={styles.note}>
         Runs on your computer. Answers can be wrong; check anything important.
       </Text>
-      <ScrollView style={styles.turns} accessibilityLabel="Conversation">
+      <ScrollView
+        ref={scroll}
+        style={styles.turns}
+        accessibilityLabel="Conversation"
+        // Keep the newest text in view as it streams in.
+        onContentSizeChange={() => {
+          scroll.current?.scrollToEnd({ animated: true });
+        }}
+      >
         {chat.turns.map((turn) => (
           <TurnItem
             key={turn.id}
             turn={turn}
             busy={chat.busy}
+            account={account}
             openUrl={openUrl}
             onRetry={(q) => void chat.send(q)}
           />

@@ -1,4 +1,4 @@
-import type { ChatClient } from '@local-ai/client';
+import type { AccountClient, ChatClient } from '@local-ai/client';
 import { createChatClient, toBlocks } from '@local-ai/client';
 import type { ChatRequestBody, SseEvent } from '@local-ai/contract';
 import { chatRequestSchema, encodeSseEvent, sseEventId } from '@local-ai/contract';
@@ -177,5 +177,81 @@ describe('mobile chat screen', () => {
     );
     await fireEvent.press(screen.getByRole('button', { name: 'What I remember' }));
     expect(opened).toBe(true);
+  });
+});
+
+describe('mobile feedback and announcements', () => {
+  function fakeAccount(reply?: string, failing = false) {
+    const sent: string[] = [];
+    const account: AccountClient = {
+      startSession: () => Promise.resolve('t'.repeat(43)),
+      hasSession: () => Promise.resolve(true),
+      memory: () => Promise.resolve([]),
+      forget: () => Promise.resolve(),
+      deleteEverything: () => Promise.resolve(),
+      sendFeedback: (kind, text) => {
+        sent.push(`${kind}: ${text}`);
+        return failing ? Promise.reject(new Error('down')) : Promise.resolve(reply);
+      },
+    };
+    return { account, sent };
+  }
+
+  it('sends feedback of the chosen kind on an answered turn', async () => {
+    const { client } = chatWith(fixtureTurns.answered ?? []);
+    const { account, sent } = fakeAccount();
+    await render(<ChatScreen client={client} account={account} openUrl={() => undefined} />);
+    await ask('Hello');
+    await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
+    await fireEvent.press(screen.getByRole('radio', { name: 'Correction' }));
+    await fireEvent.changeText(screen.getByLabelText('Details'), 'The year is wrong.');
+    await fireEvent.press(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByText(/I review feedback before anything changes/)).toBeTruthy();
+    expect(sent).toEqual(['correction: The year is wrong.']);
+  });
+
+  it('shows crisis resources when the server answers with them', async () => {
+    const { client } = chatWith(fixtureTurns.answered ?? []);
+    const crisis = fakeAccount('Call or text 988.');
+    await render(<ChatScreen client={client} account={crisis.account} openUrl={() => undefined} />);
+    await ask('Hello');
+    await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
+    await fireEvent.changeText(screen.getByLabelText('Details'), 'I feel hopeless');
+    await fireEvent.press(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByText('Call or text 988.')).toBeTruthy();
+  });
+
+  it('keeps the text and says so when feedback cannot be sent', async () => {
+    const { client } = chatWith(fixtureTurns.answered ?? []);
+    const { account } = fakeAccount(undefined, true);
+    await render(<ChatScreen client={client} account={account} openUrl={() => undefined} />);
+    await ask('Hello');
+    await fireEvent.press(await screen.findByRole('button', { name: 'Send feedback' }));
+    await fireEvent.changeText(screen.getByLabelText('Details'), 'Great answer');
+    await fireEvent.press(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.getByLabelText('Details').props.value).toBe('Great answer');
+  });
+
+  it('offers no feedback on a refused turn', async () => {
+    const { client } = chatWith(fixtureTurns.refusedMidAnswer ?? []);
+    const { account } = fakeAccount();
+    await render(<ChatScreen client={client} account={account} openUrl={() => undefined} />);
+    await ask('Hello');
+    await screen.findByText("I can't help with that.");
+    expect(screen.queryByRole('button', { name: 'Send feedback' })).toBeNull();
+  });
+
+  it('announces a finished answer once, for screen readers that ignore live regions', async () => {
+    const { client } = chatWith(fixtureTurns.refused ?? []);
+    const spoken: string[] = [];
+    await render(
+      <ChatScreen client={client} openUrl={() => undefined} announce={(m) => spoken.push(m)} />,
+    );
+    await ask('Hello');
+    await screen.findByText("I can't help with that.");
+    await waitFor(() => {
+      expect(spoken).toEqual(["I can't help with that."]);
+    });
   });
 });
