@@ -20,3 +20,5 @@ export {
   SafeFetchFailure,
 } from './safe-fetch.js';
 export type { FetchedPage, HopFetch, HopResponse, Resolve, SafeFetch } from './safe-fetch.js';
+export { wrapWebContent } from './untrusted.js';
+export type { WebSource, WrappedWeb } from './untrusted.js';
