@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@local-ai/core": "0.0.0",
+    "@local-ai/guardrails": "0.0.0",
     "@mozilla/readability": "^0.6.0",
     "ipaddr.js": "^2.5.0",
     "jsdom": "^31.0.0",
