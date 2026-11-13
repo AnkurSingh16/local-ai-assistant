@@ -39,6 +39,9 @@ export function createMemoryRecall(deps: {
   readonly timeoutMs: number;
 }): MemoryRecall {
   return {
+    async all(sessionId) {
+      return (await deps.memory.list(sessionId)).map((m) => m.content);
+    },
     async recall(sessionId, message, signal) {
       const items = await deps.memory.withEmbeddings(sessionId);
       if (items.length === 0) return [];
@@ -64,6 +67,9 @@ export function createMemoryRecall(deps: {
 
 export type FeedbackOutcome = 'queued' | 'dropped';
 
+/** Items one session may have waiting for review. */
+export const maxPendingPerSession = 20;
+
 export interface FeedbackService {
   submit(
     sessionId: string,
@@ -84,6 +90,9 @@ export function createFeedbackService(deps: {
 }): FeedbackService {
   return {
     async submit(sessionId, kind, text, signal) {
+      // A cap per session, so one session cannot fill the queue (and the disk)
+      // however many addresses it comes from. Answered like any drop.
+      if ((await deps.review.pendingCount(sessionId)) >= maxPendingPerSession) return 'dropped';
       const verdict = await deps.inputGuard.check(text, signal);
       if (!verdict.ok) {
         await deps.flags.record(sessionId, 'refusal' in verdict ? verdict.refusal : 'too_long');
@@ -119,13 +128,21 @@ export function createReviewer(deps: {
       if (item === undefined) return 'not_found';
       const verdict = await deps.inputGuard.check(item.content, signal);
       if (!verdict.ok) return 'refused';
-      if (item.kind !== 'feedback') {
-        const [embedding] = await deps.embeddings.embed([verdict.text], signal);
-        await deps.memory.add(item.sessionId, verdict.text, embedding);
+      if (item.kind === 'feedback') {
+        return (await deps.review.decide(id, 'approved')) ? 'approved' : 'not_found';
       }
-      return (await deps.review.decide(id, 'approved')) ? 'approved' : 'not_found';
+      const [embedding] = await deps.embeddings.embed([verdict.text], signal);
+      const memoryId = await deps.memory.add(item.sessionId, verdict.text, embedding);
+      // The text moves to memory, where the user can see and delete it, so the
+      // review row keeps none. If someone decided the item meanwhile, undo.
+      if (!(await deps.review.decide(id, 'approved', true))) {
+        await deps.memory.delete(item.sessionId, memoryId);
+        return 'not_found';
+      }
+      return 'approved';
     },
-    reject: (id) => deps.review.decide(id, 'rejected'),
+    // A rejected item is never used, so its text is not kept either.
+    reject: (id) => deps.review.decide(id, 'rejected', true),
   };
 }
 
@@ -151,7 +168,7 @@ export function paraphraseProblem(source: string, paraphrase: string): string | 
       return 'shares five or more words in a row with the source';
   }
   if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(paraphrase)) return 'contains an email address';
-  if (/\d{6,}/.test(paraphrase.replace(/[\s-]/g, '')))
+  if (/\d{6,}/.test(paraphrase.replace(/[\s.()-]/g, '')))
     return 'contains six or more digits in a row';
   if (/https?:\/\/\S*\?/.test(paraphrase)) return 'contains a URL with a query string';
   return undefined;

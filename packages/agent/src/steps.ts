@@ -16,7 +16,7 @@ export interface StepContext {
   /** Reports what the turn is doing, as status events for the client. */
   readonly status: (phase: StatusPhase) => void;
   readonly signal: AbortSignal;
-  /** Approved memory in this turn's prompt; a query must not carry it to a search engine. */
+  /** All approved memory for the session; a query must not carry it to a search engine. */
   readonly privateText?: readonly string[];
 }
 
@@ -29,7 +29,8 @@ const words = (text: string): string[] =>
 /**
  * ADR-0003: a query that shares a run of four or more words with an approved
  * memory item is not sent, so what the user asked me to remember does not
- * reach search engines. Only items in this turn's prompt can leak into a query.
+ * reach search engines. Every approved item is checked, not only those recalled
+ * this turn, because earlier answers in the history may repeat others.
  */
 export function sharesPrivateRun(query: string, privateText: readonly string[]): boolean {
   const q = words(query);

@@ -22,7 +22,7 @@ The web app shows the same list under "What I remember", with the wording promis
 
 ## `POST /v1/feedback`
 
-Needs a session. Body: `{ "kind": "feedback" | "correction" | "preference", "text": "1 to 1,000 characters" }`. The text passes the same input guard as a chat message; a flagged item is dropped and only its category and time are recorded. The answer is always `202` with `{ "received": true }`, whether the item was queued or dropped, so the endpoint reveals nothing about moderation. Queued items wait for my review; only items I approve become memory.
+Needs a session. Body: `{ "kind": "feedback" | "correction" | "preference", "text": "1 to 1,000 characters" }`. The text passes the same input guard as a chat message; a flagged item is dropped and only its category and time are recorded. An accepted item gets `202` with `{ "received": true }`, whether it was queued or dropped, so the answer does not say what moderation decided (a rules hit is answered faster than a classifier call, so timing is not hidden). A bad body gets `400`, no session `401`, too many requests `429`, and a guard outage `503`. A session can have at most 20 items waiting for review; more are dropped the same way. Queued items wait for my review; only items I approve become memory.
 
 ## `POST /v1/chat`
 

@@ -81,8 +81,16 @@ export interface MemoryRepo {
 export interface ReviewRepo {
   add(sessionId: string, kind: ReviewKind, content: ModeratedText): Promise<string>;
   pending(): Promise<ReviewItem[]>;
+  /** How many items from this session are waiting for review. */
+  pendingCount(sessionId: string): Promise<number>;
+  /** A pending item; an item already approved or rejected is not returned. */
   get(id: string): Promise<ReviewItem | undefined>;
-  decide(id: string, status: 'approved' | 'rejected'): Promise<boolean>;
+  /**
+   * Decides a pending item, once: false if it was already decided. With
+   * `redact`, the text is blanked in the same update, for items whose text now
+   * lives in memory (where the user can delete it) or was rejected.
+   */
+  decide(id: string, status: 'approved' | 'rejected', redact?: boolean): Promise<boolean>;
 }
 
 export interface FlagLog {
@@ -257,16 +265,30 @@ export function createReviewRepo({ db, clock, newId }: StorageDeps): ReviewRepo 
         .all();
       return Promise.resolve(rows.map(toItem));
     },
+    pendingCount(sessionId) {
+      const row = db
+        .prepare(
+          "SELECT count(*) AS n FROM review_items WHERE session_id = ? AND status = 'pending'",
+        )
+        .get(sessionId);
+      return Promise.resolve(num(row?.n));
+    },
     get(id) {
       const row = db
-        .prepare('SELECT id, session_id, kind, content, created_at FROM review_items WHERE id = ?')
+        .prepare(
+          "SELECT id, session_id, kind, content, created_at FROM review_items WHERE id = ? AND status = 'pending'",
+        )
         .get(id);
       return Promise.resolve(row === undefined ? undefined : toItem(row));
     },
-    decide(id, status) {
+    decide(id, status, redact = false) {
       const result = db
-        .prepare("UPDATE review_items SET status = ? WHERE id = ? AND status = 'pending'")
-        .run(status, id);
+        .prepare(
+          "UPDATE review_items SET status = ?, content = CASE WHEN ? THEN '' ELSE content END WHERE id = ? AND status = 'pending'",
+        )
+        .run(status, redact ? 1 : 0, id);
+      // The blanked text would otherwise survive in the WAL file (ADR-0001).
+      if (redact) checkpoint(db);
       return Promise.resolve(Number(result.changes) > 0);
     },
   };

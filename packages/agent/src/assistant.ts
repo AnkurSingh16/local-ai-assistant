@@ -2,7 +2,11 @@ import type { ChatMessage, ChatProvider, Clock, ModeratedText, ToolCall } from '
 import { isAbortError, ProviderError } from '@local-ai/core';
 import type { FinishReason, SseEvent, StatusPhase } from '@local-ai/contract';
 import type { InputGuard, OutputGuard } from '@local-ai/guardrails';
-import { createParagraphSplitter, refusalMessages } from '@local-ai/guardrails';
+import {
+  createParagraphSplitter,
+  neutraliseTemplateTokens,
+  refusalMessages,
+} from '@local-ai/guardrails';
 
 import { persona, webGuide } from '../persona/persona.js';
 import { contextBudget, estimateTokens, maxPromptTokens, promptTokens } from './budget.js';
@@ -34,6 +38,12 @@ export interface AssistantDeps {
 /** Items the owner approved for this session that relate to the message (ADR-0009). */
 export interface MemoryRecall {
   recall(sessionId: string, message: string, signal: AbortSignal): Promise<string[]>;
+  /**
+   * Every approved item for the session. Search queries are checked against all
+   * of them, since an earlier answer in the history may repeat one that was not
+   * recalled this turn (ADR-0003).
+   */
+  all(sessionId: string): Promise<string[]>;
 }
 
 /**
@@ -103,7 +113,9 @@ export function buildMessages(
     const cost = estimateTokens(m.content) + 4;
     if (used + cost > contextBudget.history) break;
     used += cost;
-    kept.unshift({ role: m.role, content: m.content });
+    // Stored text was moderated, but an answer can spell out chat-template
+    // tokens; replayed raw, they would forge a system turn (ADR-0004).
+    kept.unshift({ role: m.role, content: neutraliseTemplateTokens(m.content) });
   }
   // Approved memory fills its own slot, most relevant first, and never displaces history.
   const remembered: string[] = [];
@@ -112,7 +124,7 @@ export function buildMessages(
     const cost = estimateTokens(item) + 2;
     if (memoryUsed + cost > contextBudget.memory) break;
     memoryUsed += cost;
-    remembered.push(`- ${item}`);
+    remembered.push(`- ${neutraliseTemplateTokens(item)}`);
   }
   const memoryMessage: ChatMessage[] =
     remembered.length === 0
@@ -182,6 +194,10 @@ export function createAssistant(deps: AssistantDeps): Assistant {
           deps.memory === undefined || input.sessionId === undefined
             ? []
             : await deps.memory.recall(input.sessionId, verdict.text, signal);
+        const approved =
+          deps.memory === undefined || input.sessionId === undefined
+            ? []
+            : await deps.memory.all(input.sessionId);
         const messages = buildMessages(verdict.text, web !== undefined, history, recalled);
         if (messages === undefined) {
           yield error('bad_request', false);
@@ -277,7 +293,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               const query = await writeQuery(deps.chat, verdict.text, signal);
               const call = { name: 'web_search', arguments: { query: query ?? '' } };
               await runToolCalls(
-                { web, clock: deps.clock, taint, messages, status, signal, privateText: recalled },
+                { web, clock: deps.clock, taint, messages, status, signal, privateText: approved },
                 [call],
               );
             }
@@ -289,7 +305,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               // step budget is a hard stop even if the model keeps asking.
               if (calls.length === 0 || web === undefined || !offerTools) break;
               await runToolCalls(
-                { web, clock: deps.clock, taint, messages, status, signal, privateText: recalled },
+                { web, clock: deps.clock, taint, messages, status, signal, privateText: approved },
                 calls,
               );
             }

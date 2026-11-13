@@ -1,8 +1,11 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 
 import type { AppDeps } from '../deps.js';
 import { apiError } from '../http.js';
 import { sessionCookie, tokenFrom } from '../sessions.js';
+
+const memoryIdSchema = z.string().min(1).max(100);
 
 /** ADR-0009: 30 days idle, matching the session lifetime in storage. */
 const cookieMaxAgeSeconds = 30 * 24 * 60 * 60;
@@ -75,7 +78,8 @@ export function registerSessionRoutes(app: FastifyInstance, deps: AppDeps): void
     if (sessionId === undefined) {
       return apiError(reply, request, 401, 'no_session', 'There is no active session.');
     }
-    if (!(await sessions.forget(sessionId, request.params.id.slice(0, 100)))) {
+    const id = memoryIdSchema.safeParse(request.params.id);
+    if (!id.success || !(await sessions.forget(sessionId, id.data))) {
       return apiError(reply, request, 404, 'not_found', 'That item does not exist.');
     }
     return reply.code(204).send();

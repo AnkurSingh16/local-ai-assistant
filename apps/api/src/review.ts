@@ -65,7 +65,7 @@ async function main(): Promise<void> {
     } else if (command === 'reject' && args[0] !== undefined) {
       process.stdout.write((await reviewer.reject(args[0])) ? 'rejected\n' : 'not_found\n');
     } else if (command === 'promote' && args.length === 4) {
-      const [id, category, expect, paraphrase] = args as [string, string, string, string];
+      const [id = '', category = '', expect = '', paraphrase = ''] = args;
       const item = await review.get(id);
       const expectation = expectations.find((e) => e === expect);
       if (item === undefined) throw new Error('No such review item.');

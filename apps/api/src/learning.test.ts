@@ -73,6 +73,25 @@ describe('feedback', () => {
   });
 });
 
+describe('feedback limits', () => {
+  it('drops feedback once a session has 20 items waiting', async () => {
+    const s = setup();
+    const session = await s.sessions.create('h');
+    const feedback = createFeedbackService({
+      inputGuard: s.inputGuard,
+      review: s.review,
+      flags: s.flags,
+    });
+    for (let i = 0; i < 20; i++) {
+      expect(await feedback.submit(session, 'feedback', `Note ${String(i)}`, signal)).toBe(
+        'queued',
+      );
+    }
+    expect(await feedback.submit(session, 'feedback', 'One more', signal)).toBe('dropped');
+    expect(await s.review.pendingCount(session)).toBe(20);
+  });
+});
+
 describe('review', () => {
   it('turns an approved preference into memory with an embedding, and only marks feedback', async () => {
     const s = setup();
@@ -105,6 +124,61 @@ describe('review', () => {
     });
     expect(await reviewer.reject(id)).toBe(true);
     expect(await s.memory.list(session)).toEqual([]);
+  });
+});
+
+describe('review decisions happen once, and moved text is not kept', () => {
+  function reviewerFor(s: ReturnType<typeof setup>) {
+    return createReviewer({
+      review: s.review,
+      memory: s.memory,
+      embeddings: s.embeddings,
+      inputGuard: s.inputGuard,
+    });
+  }
+
+  it('does not re-create memory the user deleted when an item is approved again', async () => {
+    const s = setup();
+    const session = await s.sessions.create('h');
+    const id = await s.review.add(
+      session,
+      'preference',
+      await mint(s, 'Please call me Sam from Leeds.'),
+    );
+    const reviewer = reviewerFor(s);
+    expect(await reviewer.approve(id, signal)).toBe('approved');
+    const [item] = await s.memory.list(session);
+    expect(await s.memory.delete(session, item?.id ?? '')).toBe(true);
+    expect(await reviewer.approve(id, signal)).toBe('not_found');
+    expect(await s.memory.list(session)).toEqual([]);
+  });
+
+  it('never turns a rejected item into memory', async () => {
+    const s = setup();
+    const session = await s.sessions.create('h');
+    const id = await s.review.add(session, 'preference', await mint(s, 'Call me Sam.'));
+    const reviewer = reviewerFor(s);
+    expect(await reviewer.reject(id)).toBe(true);
+    expect(await reviewer.approve(id, signal)).toBe('not_found');
+    expect(await s.memory.list(session)).toEqual([]);
+  });
+
+  it('keeps no copy of the text once it moved to memory and the user forgot it', async () => {
+    const s = setup();
+    const session = await s.sessions.create('h');
+    const id = await s.review.add(
+      session,
+      'preference',
+      await mint(s, 'Please call me Sam from Leeds.'),
+    );
+    expect(await reviewerFor(s).approve(id, signal)).toBe('approved');
+    const [item] = await s.memory.list(session);
+    await s.memory.delete(session, item?.id ?? '');
+    const everything = JSON.stringify([
+      s.db.prepare('SELECT * FROM review_items').all(),
+      s.db.prepare('SELECT * FROM memory').all(),
+    ]);
+    expect(everything).not.toContain('Leeds');
   });
 });
 
@@ -148,6 +222,8 @@ describe('promoting an eval case', () => {
     expect(paraphraseProblem(source, 'he keeps the deposit and will not answer')).toContain('five');
     expect(paraphraseProblem(source, 'write to sam@example.com about it')).toContain('email');
     expect(paraphraseProblem(source, 'call 020 7946 0958 today')).toContain('digits');
+    expect(paraphraseProblem(source, 'call 555.123.4567 today')).toContain('digits');
+    expect(paraphraseProblem(source, 'call (555) 123-4567 today')).toContain('digits');
     expect(paraphraseProblem(source, 'see https://x.example/a?id=4 now')).toContain('query');
   });
 });

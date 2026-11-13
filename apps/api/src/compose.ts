@@ -187,8 +187,15 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
           keepAlive: config.ollamaKeepAlive,
           fetch: fetchFn,
         });
-  // Idle sessions and everything under them go at start-up (ADR-0009).
+  // Idle sessions and everything under them go at start-up and every hour
+  // after, so a long-running API keeps nothing past the 30-day idle limit (ADR-0009).
   void sessionRepo.purgeIdle();
+  setInterval(
+    () => {
+      void sessionRepo.purgeIdle().catch(() => undefined);
+    },
+    60 * 60 * 1000,
+  ).unref();
   const assistant = createAssistant({
     chat,
     inputGuard: createInputGuard(guard),
