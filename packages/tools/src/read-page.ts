@@ -72,8 +72,9 @@ export function createReadPage(config: ReadPageConfig): ReadPage {
         return { ok: true, ...result };
       } catch (err) {
         if (callerSignal.aborted) throw err;
-        if (err instanceof SafeFetchFailure || err instanceof ParseFailure) {
-          return { ok: false, error: err.reason };
+        if (err instanceof SafeFetchFailure) return { ok: false, error: err.reason };
+        if (err instanceof ParseFailure) {
+          return { ok: false, error: err.reason === 'parse_busy' ? 'unavailable' : err.reason };
         }
         return { ok: false, error: deadline.aborted ? 'timeout' : 'unavailable' };
       }
