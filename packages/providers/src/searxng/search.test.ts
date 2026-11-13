@@ -94,7 +94,7 @@ describe('SearXNG search provider edge cases', () => {
   });
 
   it('keeps a path prefix in the base URL and refuses redirects', async () => {
-    const seen: { url: string; redirect: RequestRedirect | undefined }[] = [];
+    const seen: { url: string; redirect: RequestInit['redirect'] }[] = [];
     const provider = createSearxngSearchProvider({
       baseUrl: 'http://127.0.0.1:8888/searx',
       fetch: (url, init) => {

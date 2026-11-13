@@ -56,7 +56,7 @@ npm run searxng:up
 npm run searxng:down
 ```
 
-`searxng:up` generates a fresh random `SEARXNG_SECRET` on every start, so no secret is stored, and does nothing when `PROVIDERS=mock`. The doctor checks that SearXNG answers on its health endpoint.
+`searxng:up` generates a fresh random `SEARXNG_SECRET` on every start, so no secret is stored, and does nothing when `PROVIDERS=mock` is set in the shell (it does not read `.env`). The doctor checks that SearXNG answers on its health endpoint.
 
 ## Running the assistant
 
