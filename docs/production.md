@@ -101,7 +101,7 @@ In order of cost:
 | Postgres, Neon                                                     | $0 (free plan)                      | about $15 to $50                                                                                                                 |
 | **Total**                                                          | **about $15**                       | **about $600 to $700**                                                                                                           |
 
-These are estimates from list prices, not measurements. The biggest swing is the model tier: the same 10,000 users on Claude Sonnet 5.5 would cost about $3,000 for chat alone. Prompt caching of the persona would cut input costs. Self-hosting instead, one always-on L4 at $0.69/hour is about $500/month before redundancy, about what the hosted small models' tokens cost at this volume, before redundancy, and I expect it to answer worse.
+These are estimates from list prices, not measurements. The biggest swing is the model tier: the same 10,000 users on Claude Sonnet 5.5 would cost about $3,000 for chat alone. Prompt caching of the persona would cut input costs. Self-hosting instead, one always-on L4 at $0.69/hour is about $500/month before redundancy: two to three times the hosted small models' chat and moderation tokens at this volume, and I expect it to answer worse.
 
 ## 6. Production readiness checklist
 
