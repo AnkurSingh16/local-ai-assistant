@@ -48,7 +48,7 @@ export interface WebSearchConfig {
  * ADR-0003: a query that matches the personal-data patterns of ADR-0009 never
  * goes to a search engine. Checked here, inside the tool, so forced and
  * model-chosen queries both pass through it. The approved-memory overlap check
- * joins it when memory arrives in Milestone 5.
+ * runs in the agent (steps.ts), which knows the memory in the turn's prompt.
  */
 const personalDataRules = createRules({ categories: ['personal_data'] });
 

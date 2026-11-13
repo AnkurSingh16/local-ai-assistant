@@ -18,8 +18,8 @@ It is a demo project, separate from my retrieval-only portfolio chatbot.
 | 1         | Architecture debate and ADRs                        | Done    |
 | 2         | Chat with Ollama, streaming API, minimal web client | Done    |
 | 3         | Guardrails and the red-team eval in CI              | Done    |
-| 4         | Web search with SearXNG, SSRF protection, citations | Planned |
-| 5         | Memory, feedback and safe learning                  | Planned |
+| 4         | Web search with SearXNG, SSRF protection, citations | Done    |
+| 5         | Memory, feedback and safe learning                  | Done    |
 | 6         | Polished web client and Expo mobile app             | Planned |
 | 7         | Production write-up and final audit                 | Planned |
 

@@ -177,7 +177,12 @@ export function createAssistant(deps: AssistantDeps): Assistant {
         const store = input.remember === true ? deps.conversations : undefined;
         const history =
           store === undefined ? [] : await store.recent(conversationId, historyLookback);
-        const messages = buildMessages(verdict.text, web !== undefined, history);
+        // Only approved items come back, and only for this session (ADR-0009).
+        const recalled =
+          deps.memory === undefined || input.sessionId === undefined
+            ? []
+            : await deps.memory.recall(input.sessionId, verdict.text, signal);
+        const messages = buildMessages(verdict.text, web !== undefined, history, recalled);
         if (messages === undefined) {
           yield error('bad_request', false);
           yield done('error');
@@ -271,9 +276,10 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               steps += 1;
               const query = await writeQuery(deps.chat, verdict.text, signal);
               const call = { name: 'web_search', arguments: { query: query ?? '' } };
-              await runToolCalls({ web, clock: deps.clock, taint, messages, status, signal }, [
-                call,
-              ]);
+              await runToolCalls(
+                { web, clock: deps.clock, taint, messages, status, signal, privateText: recalled },
+                [call],
+              );
             }
             for (;;) {
               steps += 1;
@@ -283,7 +289,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               // step budget is a hard stop even if the model keeps asking.
               if (calls.length === 0 || web === undefined || !offerTools) break;
               await runToolCalls(
-                { web, clock: deps.clock, taint, messages, status, signal },
+                { web, clock: deps.clock, taint, messages, status, signal, privateText: recalled },
                 calls,
               );
             }
@@ -299,7 +305,6 @@ export function createAssistant(deps: AssistantDeps): Assistant {
 
         try {
           const cited = new Set<number>();
-          let released = false;
           for (;;) {
             const item = pending.shift();
             if (item === undefined) {
@@ -328,7 +333,6 @@ export function createAssistant(deps: AssistantDeps): Assistant {
             }
             released.push(checked.text);
             yield { type: 'delta', text: checked.text };
-            released = true;
             // A citation is sent only after the paragraph that cites it is released (ADR-0005).
             // [n] markers, and links straight to a listed source, both count as citing it.
             const linked = sources.filter((s) => checked.text.includes(s.url)).map((s) => s.id);
@@ -344,7 +348,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               ? pumpState.error
               : new Error('chat stream failed');
           }
-          if (!released) {
+          if (released.length === 0) {
             // The model spent every step on tool calls, or wrote nothing: an
             // empty answer would look like success, so it is reported instead.
             yield error('internal', true);
