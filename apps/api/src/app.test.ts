@@ -501,11 +501,8 @@ describe('sessions and conversation memory', () => {
         memory: createMemoryRepo({ db, clock, newId: () => 'x' }),
       }).resolve(token)) ?? '';
     const guard = createInputGuard({ moderation: createMockModerationProvider(), timeoutMs: 1000 });
-    const memory = createMemoryRepo({
-      db,
-      clock,
-      newId: () => `m-${String(Math.random()).slice(2, 8)}`,
-    });
+    let memoryIds = 0;
+    const memory = createMemoryRepo({ db, clock, newId: () => `m-${String(++memoryIds)}` });
     for (const text of ['Call me Sam.', 'Prefers metric units.']) {
       const verdict = await guard.check(text, new AbortController().signal);
       if (!verdict.ok) throw new Error('refused');
