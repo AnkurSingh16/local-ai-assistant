@@ -57,65 +57,74 @@ const intent = [
  * needs the speaker as the subject and a phrasing that is rarely meant
  * casually; giving things away counts only next to a sign of hopelessness.
  */
-/** A task, place or game after the phrase means it is about that, not about living. */
-const notAboutSomething =
-  '(?! (?:with|on|in|for|at|about|to|from|of) (?:this|that|the|my|a|an|it|work|school|life admin)\\b)';
+/** Warning signs that are rarely meant casually: never excused by context. */
 const warningSigns = [
   /\b(?:nobody|no one|no body) (?:would|will|d) (?:even )?(?:miss|notice) me (?:if|when) i (?:was|were|m|am) (?:gone|dead|not here|not around)\b/,
-  /\b(?:nobody|no one) (?:would|will|d) (?:even )?(?:miss me|notice|care) if i (?:was|were|m|am) (?:gone|dead|not here|not around|to disappear|disappeared)\b/,
-  /\b(?:nobody|no one) (?:would|will|d) (?:even )?care if i (?:disappeared|died|vanished)\b/,
+  /\b(?:nobody|no one) (?:would|will|d) (?:even )?(?:miss me|notice|care) if i (?:was|were|m|am) (?:gone|dead|not here|not around|to disappear)\b/,
   /\b(?:nobody|no one) (?:would|will|d) (?:even )?miss me\b(?! (?:at|in|on|if i (?:left|went|skipped|took|moved))\b)/,
-  /\b(?:everyone|everybody|my family|my kids|my friends|the world|they) (?:would|will|d) (?:all )?be better off (?:without me|if i (?:was|were) (?:dead|gone|not here)|if i wasn t here)\b/,
-  /\b(?:i am|i m|im|i feel like|i feel like i m) (?:just |such )?a burden\b(?: (?:to|on) (?:everyone|everybody|every ?1|my family|my friends|them|the people around me|anyone))?(?! (?:at|in|on) (?:work|the office|school|the team|this project)\b)/,
+  /\b(?:everyone|everybody|my family|my kids|my friends|the world|they) (?:would|will|d) (?:all )?be better off (?:without me|if i (?:was|were) (?:dead|gone|not here)|if i wasn t here)\b(?! (?:on|in|at) (?:the|this|my) (?:team|project|class|band|group)\b)/,
+  /\b(?:i am|i m|im|i feel like|i feel like i m|tired of being) (?:just |such )?a burden\b(?! (?:when|at work|in (?:class|meetings)|to my (?:manager|boss|team))\b)/,
   /\b(?:i have|i ve got|i ve) nothing (?:left )?to live for\b/,
   /\b(?:life|my life) (?:isn t|is not|isnt) worth living\b/,
-  /\b(?:there s|there is) no point (?:in )?(?:living|being alive|going on)\b/,
-  new RegExp(
-    `\\b(?:i have|i ve got|i ve|there is|there s) no reason (?:left )?to (?:live|stay alive|keep living)\\b${notAboutSomething}`,
-  ),
-  /\bi (?:don t|do not) want to be here (?:anymore|any more)\b/,
+  /\b(?:i have|i ve got|i ve|there is|there s)? ?no reason (?:left )?(?:for me )?to (?:live|stay alive|keep living)\b(?! in\b)/,
   /\bi (?:want to|wanna) (?:go to sleep|sleep) and never wake up\b/,
-  /\bi (?:just )?want the pain to (?:end|stop)\b/,
-  /\bi (?:just )?want (?:it all|everything|my life) to (?:end|stop)(?: forever| for good| permanently)?\b/,
   /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:my )?(?:goodbye|farewell) (?:letters?|notes?) to (?:my family|everyone|my (?:kids|children|parents|wife|husband|partner|friends))\b/,
   /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:a |my )?suicide notes?\b/,
+  /\bi can t go on\s*$/,
 ];
-const cantGoOn = new RegExp(
-  `\\bi can t (?:go on|keep living|keep going) (?:like this )?(?:anymore|any more)\\b${notAboutSomething}(?! [a-z]+ (?:after|from|with) )`,
-);
-const noPointLiving =
-  /\bi (?:don t|do not|can t) see (?:any |the )?point (?:in|of) (?:living|life|going on|being alive|staying alive)\b(?! in (?:a|this|the) )/;
+
+/**
+ * Phrases that are also everyday complaints. These count unless the same
+ * message asks a practical question or names an everyday thing (a slow laptop,
+ * a sore knee, a long meeting). Job loss, money and housing are not excused:
+ * they are common reasons people reach this point.
+ */
+const ambiguousSigns = [
+  /\bi can t (?:go on|keep living|keep going) (?:like this )?(?:anymore|any more)\b/,
+  /\bi (?:don t|do not) want to be here (?:anymore|any more)\b/,
+  /\b(?:nobody|no one) (?:would|will|d) (?:even )?care if i (?:disappeared|died|vanished)\b/,
+  /\b(?:there s|there is) no point (?:in )?(?:living|being alive|going on)\b(?! in\b)/,
+  /\bi (?:don t|do not|can t) see (?:any |the )?point (?:in|of) (?:living|life|going on|being alive|staying alive)\b(?! in\b)/,
+  /\bi (?:just )?want the pain to (?:end|stop)\b/,
+  /\bi (?:just )?want (?:it all|everything|my life) to (?:end|stop) (?:forever|for good|permanently)\b/,
+];
+const practicalQuestion =
+  /\b(?:how (?:do|can|should) i|where should i|what should i (?:take|buy|use|try)|any [a-z ]{0,20}tips|what are my rights|should i (?:resign|quit|move|cancel|respawn))\b/;
+const everydayThing =
+  /\b(?:laptop|computer|phone|wifi|internet|printer|car|commute|traffic|meeting|class|lecture|knee|back|legs?|tooth|headache|game|marathon|run(?:ning)?|workout|queue|weather|diet|meditation|vacation|holiday|city|london|decluttering|tax|taxes|tax season|exams?|homework|deadline|shift)\b/;
+
 const givingAway =
-  /\bi (?:ve|have) (?:started |been )?giving away (?:all )?(?:of )?my (?:things|stuff|belongings|possessions)\b/;
+  /\bi (?:ve|have|m|am) (?:started |been )?giving away (?:all )?(?:of )?my (?:things|stuff|belongings|possessions)\b/;
 const givenAway =
   /\bi (?:ve|have) given away (?:all |everything )?(?:of )?my (?:things|stuff|belongings|possessions)\b/;
 /** Hopelessness, not tidying: "it feels empty but good to declutter" is not a warning sign. */
 const hopeless =
-  /\b(?:pointless|hopeless|no point|nothing matters|won t need (?:them|it|any of it)(?: anymore)?|tired of (?:living|life|everything)|done with (?:life|everything)|don t want to be here)\b/;
+  /\b(?:pointless|hopeless|nothing matters|won t need (?:them|it|any of it)(?: anymore)?|tired of (?:living|life|everything)|done with (?:life|everything)|don t want to be here)\b/;
 
 /**
- * Warning-sign phrases are also everyday complaints ("I don't want to be here
- * anymore, this job is toxic"). A practical question or a named everyday
- * subject in the same message means the person is asking about that, so the
- * warning signs alone do not answer it with the crisis message. Direct intent
- * ("I want to kill myself") is never excused this way.
+ * Someone else's words, quoted to ask about them: "my friend texted me '…'" or
+ * "what does it mean when someone says '…'". Only quotes introduced by another
+ * person are set aside; "I keep telling myself '…'" or a message that is only a
+ * quote is still the person's own.
  */
-const practical =
-  /\b(?:how do i (?:quit|leave|move|budget|find|get|cope with (?:work|my job))|where should i (?:move|go|live)|what are my rights|should i (?:resign|quit|cancel|move)|my (?:job|boss|landlord|legs|team|class|project|diet)|this (?:job|city|project|game|marathon|class|diet|tax season)|on (?:vacation|holiday)|for a (?:week|day|weekend|month)|after (?:this|the) (?:marathon|run|workout|game|shift)|declutter\w*|financially)\b/;
-
-/**
- * Quoted text and reported speech are someone else's words: a friend's message
- * pasted in to ask how to help should get advice, not the crisis message.
- */
-const quoted =
-  /"[^"\n]{0,300}"|\u201C[^\u201D\n]{0,300}\u201D|(?<=[\s:]|^)'[^'\n]{0,300}'(?=[\s.,!?]|$)/g;
+const reportedQuote =
+  /\b(?:my (?:friend|son|daughter|kid|child|partner|wife|husband|mum|mom|dad|brother|sister|colleague|student|patient|client)|someone|somebody|a friend|he|she|they|people)(?: \w+){0,2} (?:said|says|saying|texted|wrote|writes|told me|posted|messaged|sent)(?: me| to me)?[^"'“\n]{0,20}(?:"[^"\n]{0,300}"|“[^”\n]{0,300}”|'[^\n]{0,300}?'(?=[\s.,!?]|$))/gi;
 
 export function isSelfHarmIntent(text: string): boolean {
-  const own = text.replace(quoted, ' ');
-  const { unjoined } = fold(own, { leet: true, stretch: 1 });
-  if (intent.some((p) => p.test(unjoined))) return true;
-  if (practical.test(unjoined)) return false;
+  // Direct intent is read on the text as written, quotes included.
+  if (intent.some((p) => p.test(fold(text, { leet: true, stretch: 1 }).unjoined))) return true;
+  const { unjoined } = fold(text.replace(reportedQuote, ' '), { leet: true, stretch: 1 });
   if (warningSigns.some((p) => p.test(unjoined))) return true;
-  if (cantGoOn.test(unjoined) || noPointLiving.test(unjoined)) return true;
-  return (givingAway.test(unjoined) || givenAway.test(unjoined)) && hopeless.test(unjoined);
+  if (
+    ambiguousSigns.some((p) => p.test(unjoined)) &&
+    !practicalQuestion.test(unjoined) &&
+    !everydayThing.test(unjoined)
+  ) {
+    return true;
+  }
+  return (
+    (givingAway.test(unjoined) || givenAway.test(unjoined)) &&
+    hopeless.test(unjoined) &&
+    !/\bdeclutter/.test(unjoined)
+  );
 }

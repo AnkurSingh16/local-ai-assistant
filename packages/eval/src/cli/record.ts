@@ -1,5 +1,7 @@
 import { writeFileSync } from 'node:fs';
 
+import { personaVersion } from '@local-ai/agent';
+
 import { runLive } from '../live.js';
 import { fixturesUrl, loadCases, loadFixturesIfAny } from '../run.js';
 import { formatSummary, summarise } from '../score.js';
@@ -19,6 +21,11 @@ const only =
 const cases = only === undefined ? allCases : allCases.filter((c) => only.has(c.id));
 if (only !== undefined && cases.length !== only.size) {
   process.stderr.write('Some --only ids are not in the case set.\n');
+  process.exit(1);
+}
+// Checked before running, so a refused partial re-record costs nothing.
+if (only !== undefined && previous !== undefined && previous.personaVersion !== personaVersion) {
+  process.stderr.write('The persona changed since the last recording; re-record everything.\n');
   process.exit(1);
 }
 const {
