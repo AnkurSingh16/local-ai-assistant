@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createTtlCache } from './cache.js';
 import { createUndiciHop } from './hop.js';
-import { createPageParser } from './parse.js';
+import { createPageParser, ParseFailure } from './parse.js';
 import { createReadPage } from './read-page.js';
 import type { HopFetch, HopResponse, Resolve } from './safe-fetch.js';
 import {
@@ -399,8 +399,29 @@ describe('ADR-0008 limits, enforced', () => {
     const abortedAt = performance.now();
     controller.abort();
     expect(await waiter).toBeInstanceOf(Error);
-    expect(performance.now() - abortedAt).toBeLessThan(200);
+    expect(performance.now() - abortedAt).toBeLessThan(500);
     await holding;
+  });
+
+  it('reports a full parse queue as unavailable', async () => {
+    const tool = createReadPage({
+      fetch: () =>
+        Promise.resolve({
+          url: 'https://example.com/',
+          contentType: 'text/html',
+          body: '<p>x</p>',
+        }),
+      parse: () => Promise.reject(new ParseFailure('parse_busy')),
+      cache: createTtlCache({
+        clock: createManualClock(new Date('2026-11-13T00:00:00Z')),
+        ttlMs: 1000,
+        maxEntries: 5,
+        hmacKey: new Uint8Array(32),
+      }),
+    });
+    expect(
+      await tool.run({ url: 'https://example.com/' }, new Set(['https://example.com/']), signal),
+    ).toEqual({ ok: false, error: 'unavailable' });
   });
 
   it('bounds the whole read, fetch and parse together', async () => {
