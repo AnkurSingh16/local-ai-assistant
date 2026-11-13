@@ -1,4 +1,4 @@
-export { chatRequestSchema, maxMessageChars } from './chat.js';
+export { chatRequestSchema, maxFeedbackChars, maxMessageChars } from './chat.js';
 export type { ChatRequestBody } from './chat.js';
 export {
   citationEventSchema,

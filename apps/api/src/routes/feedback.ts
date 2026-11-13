@@ -1,3 +1,4 @@
+import { maxFeedbackChars } from '@local-ai/contract';
 import type { FastifyInstance } from 'fastify';
 import { refusalMessages } from '@local-ai/guardrails';
 import { z } from 'zod';
@@ -9,7 +10,7 @@ import { tokenFrom } from '../sessions.js';
 
 const bodySchema = z.strictObject({
   kind: z.enum(['feedback', 'correction', 'preference']),
-  text: z.string().trim().min(1).max(1000),
+  text: z.string().trim().min(1).max(maxFeedbackChars),
 });
 
 /**

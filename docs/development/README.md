@@ -82,9 +82,15 @@ The labelled routing questions live in `packages/eval/cases/routing.json` ([ADR-
 npm run eval:routing        # the rules pre-router; CI checks floors on both parts
 ```
 
-```bash
+````bash
 npm run eval:routing:live   # whole turns against Ollama: a search forced or chosen by the model
-```
+## Memory recall eval
+
+The labelled memory items and messages live in `packages/eval/cases/memory-recall.json` ([ADR-0001](../adr/0001-storage-sqlite.md)). The threshold is chosen on the dev messages and reported on the held-out ones.
+
+```bash
+npm run eval:memory         # against Ollama's nomic-embed-text; prints recall and precision
+````
 
 ## Reviewing feedback
 

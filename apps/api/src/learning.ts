@@ -1,5 +1,6 @@
 import type { MemoryRecall } from '@local-ai/agent';
 import type { EmbeddingProvider } from '@local-ai/core';
+import { cosineSimilarity } from '@local-ai/core';
 import type { InputGuard } from '@local-ai/guardrails';
 import type { FlagLog, MemoryRepo, ReviewItem, ReviewKind, ReviewRepo } from '@local-ai/storage';
 
@@ -10,23 +11,15 @@ import type { FlagLog, MemoryRepo, ReviewItem, ReviewKind, ReviewRepo } from '@l
  * session it came from.
  */
 
-/** A recalled item must be at least this similar to the message (cosine, nomic-embed-text). */
-const minSimilarity = 0.35;
+/**
+ * A recalled item must be at least this similar to the message (cosine,
+ * nomic-embed-text). Chosen on the memory recall eval (`npm run eval:memory`,
+ * ADR-0001): at 0.35 three mostly unrelated items went into nearly every
+ * prompt; 0.46 had the best balance on the dev messages.
+ */
+const minSimilarity = 0.46;
+/** At most this many items are recalled for one message (also in the memory recall eval). */
 const maxRecalled = 3;
-
-function cosine(a: Float32Array, b: Float32Array): number {
-  let dot = 0;
-  let na = 0;
-  let nb = 0;
-  for (let i = 0; i < a.length && i < b.length; i++) {
-    const x = a[i] ?? 0;
-    const y = b[i] ?? 0;
-    dot += x * y;
-    na += x * x;
-    nb += y * y;
-  }
-  return na === 0 || nb === 0 ? 0 : dot / Math.sqrt(na * nb);
-}
 
 /**
  * Approved memory scored by brute-force cosine in JavaScript: every item was
@@ -52,7 +45,10 @@ export function createMemoryRecall(deps: {
         );
         if (query === undefined) return [];
         return items
-          .map((item) => ({ content: item.content, score: cosine(query, item.embedding) }))
+          .map((item) => ({
+            content: item.content,
+            score: cosineSimilarity(query, item.embedding),
+          }))
           .filter((s) => s.score >= minSimilarity)
           .sort((x, y) => y.score - x.score)
           .slice(0, maxRecalled)

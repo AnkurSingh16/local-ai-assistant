@@ -9,7 +9,8 @@
     "redteam:live": "tsx --conditions=@local-ai/source src/cli/live.ts",
     "record": "tsx --conditions=@local-ai/source src/cli/record.ts",
     "routing": "tsx --conditions=@local-ai/source src/cli/routing.ts",
-    "routing:live": "tsx --conditions=@local-ai/source src/cli/routing-live.ts"
+    "routing:live": "tsx --conditions=@local-ai/source src/cli/routing-live.ts",
+    "memory": "tsx --conditions=@local-ai/source src/cli/memory-recall.ts"
   },
   "dependencies": {
     "@local-ai/agent": "0.0.0",

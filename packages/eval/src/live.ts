@@ -1,6 +1,15 @@
 import { personaVersion } from '@local-ai/agent';
-import type { ChatProvider, ModerationProvider, ModerationVerdict } from '@local-ai/core';
-import { createOllamaChatProvider, createOllamaModerationProvider } from '@local-ai/providers';
+import type {
+  ChatProvider,
+  EmbeddingProvider,
+  ModerationProvider,
+  ModerationVerdict,
+} from '@local-ai/core';
+import {
+  createOllamaChatProvider,
+  createOllamaEmbeddingProvider,
+  createOllamaModerationProvider,
+} from '@local-ai/providers';
 import { z } from 'zod';
 
 import { runTurn } from './pipeline.js';
@@ -184,6 +193,16 @@ export function createLiveChat(config: LiveConfig): ChatProvider {
   return createOllamaChatProvider({
     baseUrl: config.baseUrl,
     model: config.chatModel,
+    keepAlive: '30m',
+    fetch: config.fetch,
+  });
+}
+
+/** The live embedding provider, for the memory recall eval. */
+export function createLiveEmbeddings(config: LiveConfig, model: string): EmbeddingProvider {
+  return createOllamaEmbeddingProvider({
+    baseUrl: config.baseUrl,
+    model,
     keepAlive: '30m',
     fetch: config.fetch,
   });

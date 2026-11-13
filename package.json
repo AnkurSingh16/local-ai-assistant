@@ -37,7 +37,8 @@
     "eval:record": "npm run record -w @local-ai/eval --",
     "dev:mobile": "npm run dev -w @local-ai/mobile",
     "eval:routing": "npm run routing -w @local-ai/eval",
-    "eval:routing:live": "npm run routing:live -w @local-ai/eval"
+    "eval:routing:live": "npm run routing:live -w @local-ai/eval",
+    "eval:memory": "npm run memory -w @local-ai/eval"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
