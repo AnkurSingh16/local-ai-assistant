@@ -44,13 +44,13 @@ Measured on my M1 Pro (Node 24.22.3, bundled SQLite 3.54.1) on 2026-11-12:
 
 **Amended 2026-11-14 (memory recall eval).** `packages/eval/cases/memory-recall.json` holds 15 memory items and 42 messages, each labelled with the items a good answer should use. The messages are split into dev (22) and held-out (20). `npm run eval:memory` scores every pair with `nomic-embed-text` (0a109f422b47), keeps at most three items per message as the API does, and picks the threshold with the best F1 on dev. The eval and the API share one cosine function (`cosineSimilarity` in `@local-ai/core`).
 
-| Threshold, at most 3 items per message                          | Dev recall | Dev precision | Held-out recall | Held-out precision |
-| --------------------------------------------------------------- | ---------- | ------------- | --------------- | ------------------ |
-| 0.35 (the first guess)                                          | 75.0%      | 23.4%         | 88.9%           | 26.7%              |
-| 0.46 (best on dev, now used)                                    | 60.0%      | 63.2%         | 77.8%           | 70.0%              |
-| 0.56 with nomic's `search_query:` / `search_document:` prefixes | 35.0%      | 87.5%         | 66.7%           | 85.7%              |
+| Threshold, at most 3 items per message                                              | Dev recall | Dev precision | Held-out recall | Held-out precision |
+| ----------------------------------------------------------------------------------- | ---------- | ------------- | --------------- | ------------------ |
+| 0.35 (the first guess)                                                              | 75.0%      | 23.4%         | 88.9%           | 26.7%              |
+| 0.46 (best on dev, now used)                                                        | 60.0%      | 63.2%         | 77.8%           | 70.0%              |
+| 0.48 with nomic's `search_query:` / `search_document:` prefixes (their best on dev) | 70.0%      | 40.0%         | 77.8%           | 53.8%              |
 
-At 0.35, three items went into nearly every prompt, mostly unrelated ones. Moving to 0.46 gives up some recall (75% to 60% on dev, 89% to 78% on held-out) for far fewer unrelated items. The prefixes were worse on dev and about equal on held-out, and would mean re-embedding stored memory, so I kept plain text. Three limits stay:
+At 0.35, three items went into nearly every prompt, mostly unrelated ones. Moving to 0.46 gives up some recall (75% to 60% on dev, 89% to 78% on held-out) for far fewer unrelated items. With the prefixes, the best threshold was less precise on both sets and would mean re-embedding stored memory, so I kept plain text. Three limits stay:
 
 - **Safety-critical items are not reliably recalled.** "I'm allergic to peanuts" was recalled for only 1 of 5 food questions, at both thresholds: "What should I make for dinner?" scores 0.355 against it. Similarity can't be trusted for items whose omission could hurt someone; [#55](https://github.com/AnkurSingh16/local-ai-assistant/issues/55) tracks always including them.
 - **Preferences that apply to every message** ("keep answers short", "use British spelling") are not found by similarity, and I left them out of the labels.
