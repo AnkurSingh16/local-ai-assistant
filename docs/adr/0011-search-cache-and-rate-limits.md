@@ -37,3 +37,5 @@ Option 3.
 - OWASP LLM10:2025 Unbounded Consumption: https://genai.owasp.org/llmrisk/llm102025-unbounded-consumption/ (accessed 2026-11-12).
 
 **Amended 2026-11-13 (Milestone 6).** `@fastify/rate-limit` runs one limiter per request, so the per-session limit is a small fixed-window counter on the injected clock in the chat route (`createWindowLimiter` in `apps/api/src/limits.ts`). It has the same limits and the same 429 response with `Retry-After`. It is keyed by session id, never by the token. A turn counts as soon as it passes validation, including one later refused for an unknown conversation or a full queue.
+
+**Amended 2026-11-13 (Milestone 7).** I am keeping the search cache in memory instead of moving it to a table now that storage exists. The table would be emptied on every start and keyed by a per-process HMAC, so it would add nothing a restart keeps. It would also write search results, which come from user queries, to disk, where secure_delete and checkpoints would have to clean them up. With more than one API process the cache moves to the shared store named above, as planned.

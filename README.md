@@ -21,7 +21,7 @@ It is a demo project, separate from my retrieval-only portfolio chatbot.
 | 4         | Web search with SearXNG, SSRF protection, citations | Done        |
 | 5         | Memory, feedback and safe learning                  | Done        |
 | 6         | Polished web client and Expo mobile app             | In progress |
-| 7         | Production write-up and final audit                 | Planned     |
+| 7         | Production write-up and final audit                 | Done        |
 
 ## Architecture
 
@@ -81,7 +81,7 @@ Then open http://127.0.0.1:5173. It answers from model knowledge, and searches t
 
 ## Documentation
 
-- [Requirements](docs/architecture/requirements.md) and [architecture](docs/architecture/README.md)
+- [Requirements](docs/architecture/requirements.md), the [requirements audit](docs/architecture/audit.md) and [architecture](docs/architecture/README.md)
 - [Architecture decision records](docs/adr/README.md)
 - [Local setup](docs/local-setup.md)
 - [Safety guide](docs/guides/safety.md)

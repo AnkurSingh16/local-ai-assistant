@@ -2,9 +2,10 @@
 
 The README has the system diagram. This page explains how a turn flows through the system and where each decision is recorded. The decisions themselves are in [`docs/adr/`](../adr/README.md).
 
-| Document                           | Contents                                   |
-| ---------------------------------- | ------------------------------------------ |
-| [requirements.md](requirements.md) | What the system must do, and fixed choices |
+| Document                           | Contents                                                                |
+| ---------------------------------- | ----------------------------------------------------------------------- |
+| [requirements.md](requirements.md) | What the system must do, and fixed choices                              |
+| [audit.md](audit.md)               | Each requirement checked against the code, tests and CI, with open gaps |
 
 ## Packages
 

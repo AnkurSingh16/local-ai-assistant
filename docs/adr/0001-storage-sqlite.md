@@ -39,3 +39,5 @@ Measured on my M1 Pro (Node 24.22.3, bundled SQLite 3.54.1) on 2026-11-12:
 - 10,000 rows of 768-dimension Float32 BLOBs inserted in 77 ms; a brute-force dot product over all of them took 29.5 ms.
 - I inserted 50 marker rows, cascade-deleted them and scanned the file bytes. Without `secure_delete`, all 50 markers were still in the file after a checkpoint. With it, 50 copies remained in the WAL before the checkpoint and 0 after `wal_checkpoint(TRUNCATE)`.
 - Node 24 documents `node:sqlite` as "Stability: 1.2 - Release candidate" since v24.15.0: https://nodejs.org/docs/latest-v24.x/api/sqlite.html (accessed 2026-11-12).
+
+**Amended 2026-11-13 (Milestone 7).** The repositories as built are `SessionRepo`, `ConversationRepo`, `MemoryRepo`, `ReviewRepo` (feedback and the review queue in one table) and `FlagLog`. There is no `SearchCacheRepo`: the search cache stays in memory, as the ADR-0011 amendment explains.

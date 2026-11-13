@@ -11,9 +11,9 @@ export const maxCacheEntries = 5_000;
  * A small TTL cache for search results and page extracts (ADR-0011). Entries
  * are keyed by HMAC-SHA256 of the normalised request under a key that exists
  * only in memory for the life of the process, so the cache never holds query
- * text and a key cannot be reversed by guessing queries. It lives in memory
- * until the storage package arrives in Milestone 5; restarting empties it,
- * which ADR-0011 asks for anyway.
+ * text and a key cannot be reversed by guessing queries. It stays in memory, so
+ * search results derived from user queries never reach disk; restarting
+ * empties it, which ADR-0011 asks for anyway.
  */
 export interface TtlCache<T> {
   get(request: string): T | undefined;
