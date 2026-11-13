@@ -102,6 +102,8 @@ describe('web_search tool', () => {
     ['a user id', 'user123456 profile'],
     ['a reference', 'ref ABC1234567'],
     ['an account number', 'acct12345678'],
+    // Fails closed: a number beside a year looks like a local phone number.
+    ['a number beside a year', 'best laptop under 1000 2026'],
   ])('refuses a query that carries %s, without searching', async (_, query) => {
     const search = createMockSearchProvider();
     const tool = createWebSearch({ search, cache: cacheFor(), timeoutMs: 1000 });

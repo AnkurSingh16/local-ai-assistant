@@ -28,7 +28,9 @@ function appendToolResult(ctx: StepContext, call: ToolCall, content: ToolResultC
 const searchNotes = {
   invalid_arguments: 'The search was not run: the query was missing or too long.',
   blocked_query:
-    'The search was not run because the query contained personal details. Answer without searching and say so.',
+    // Neutral on purpose: the check fails closed, so it also stops some ordinary
+    // queries ("best laptop under 1000 2026"), and the answer must not claim otherwise.
+    'The search was not run, to protect privacy. Answer from what you know and say you could not search this time.',
   unavailable:
     'The search engine is not available right now. Answer from what you know and say the search did not work.',
 } as const;

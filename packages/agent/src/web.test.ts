@@ -66,6 +66,8 @@ describe('search routing', () => {
     'Now rewrite it so the cost is lower',
     'Who is the head of HR in my company?',
     'Explain the result of this code now.',
+    // A deliberate false negative: the user's employer stays out of search queries.
+    'What is the price of the stock of my company?',
     'My app currently uses version 2 of React, how do I add a route?',
   ])('does not force a search for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(false);
