@@ -31,6 +31,12 @@ export interface ChatClientOptions {
   readonly idleTimeoutMs?: number;
   /** Upper bound on waiting for the response headers. */
   readonly connectTimeoutMs?: number;
+  /** The bearer token for the Expo app; the web app leaves it out and relies on the cookie. */
+  readonly token?: () => string | undefined;
+}
+
+function bearer(token: string | undefined): Record<string, string> {
+  return token === undefined ? {} : { authorization: `Bearer ${token}` };
 }
 
 /** Covers reaching the API and getting its headers; the server queues turns only briefly. */
@@ -126,9 +132,13 @@ export function createChatClient(options: ChatClientOptions): ChatClient {
         signal.throwIfAborted();
         res = await options.fetch(url, {
           method: 'POST',
-          headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+          headers: {
+            'content-type': 'application/json',
+            accept: 'text/event-stream',
+            ...bearer(options.token?.()),
+          },
           body: JSON.stringify(body),
-          // Same-origin only until sessions exist (ADR-0009); the dev server proxies the API.
+          // The web app's session cookie goes only to its own origin (ADR-0009).
           credentials: 'same-origin',
           signal: request.signal,
         });

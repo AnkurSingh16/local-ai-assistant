@@ -1,10 +1,7 @@
 import type { AccountClient, MemoryEntry } from '@local-ai/client';
+import { memoryDisclosure } from '@local-ai/client';
 import type { ReactElement } from 'react';
 import { useCallback, useEffect, useState } from 'react';
-
-/** The wording promised in ADR-0009, shown wherever memory is managed. */
-export const memoryDisclosure =
-  'Everything stored under your session (conversations, remembered items, feedback and items waiting for my review) is deleted for real when you delete it. If a conversation shows me a useful test, I may write a new, anonymised test case inspired by it. It contains none of your words or personal details and cannot be linked back to you. Your searches are sent through my search server to public search engines.';
 
 type State =
   | { readonly kind: 'loading' }

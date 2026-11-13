@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Local AI Assistant",
+    "slug": "local-ai-assistant",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": { "supportsTablet": true },
+    "android": {}
+  }
+}

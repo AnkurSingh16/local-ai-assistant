@@ -249,6 +249,20 @@ describe('chat client', () => {
     });
   });
 
+  it('sends the bearer token when the Expo app has one, and none otherwise', async () => {
+    const seen: (string | null)[] = [];
+    const fetchFn: FetchLike = (_url, init) => {
+      seen.push(new Headers(init.headers).get('authorization'));
+      return Promise.resolve(sseResponse(wire(fixtureTurns.refused ?? [])));
+    };
+    let token: string | undefined = 't'.repeat(43);
+    const client = createChatClient({ baseUrl: '', fetch: fetchFn, token: () => token });
+    await collect(client.send({ message: 'hi' }, signal));
+    token = undefined;
+    await collect(client.send({ message: 'hi' }, signal));
+    expect(seen).toEqual([`Bearer ${'t'.repeat(43)}`, null]);
+  });
+
   async function errorOf(res: Response | Error): Promise<ChatClientError> {
     const client = createChatClient({
       baseUrl: '',

@@ -1,7 +1,7 @@
 import { createManualClock } from '@local-ai/core';
 import { describe, expect, it } from 'vitest';
 
-import { createClockStore, createTurnSlots } from './limits.js';
+import { createClockStore, createTurnSlots, createWindowLimiter } from './limits.js';
 
 describe('clock-backed rate-limit store', () => {
   it('counts within a window and resets when it ends', () => {
@@ -51,5 +51,30 @@ describe('turn slots', () => {
     expect(slots.queued).toBe(0);
     first?.();
     expect(slots.active).toBe(0);
+  });
+});
+
+describe('per-session window limiter', () => {
+  it('allows up to the limit, reports the wait, and resets when the window ends', () => {
+    const clock = createManualClock(new Date(0));
+    const limiter = createWindowLimiter(clock, 2, 1000);
+    expect(limiter.hit('a')).toBeUndefined();
+    clock.advance(300);
+    expect(limiter.hit('a')).toBeUndefined();
+    expect(limiter.hit('a')).toBe(700);
+    expect(limiter.hit('b')).toBeUndefined();
+    clock.advance(700);
+    expect(limiter.hit('a')).toBeUndefined();
+  });
+
+  it('sweeps expired windows once it holds many keys', () => {
+    const clock = createManualClock(new Date(0));
+    const limiter = createWindowLimiter(clock, 1, 1000);
+    for (let i = 0; i <= 10_001; i++) limiter.hit(`k${String(i)}`);
+    expect(limiter.size()).toBe(10_002);
+    clock.advance(1000);
+    limiter.hit('fresh');
+    // Every expired window was dropped; only the new key remains.
+    expect(limiter.size()).toBe(1);
   });
 });

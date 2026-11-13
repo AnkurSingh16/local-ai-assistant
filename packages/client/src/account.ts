@@ -18,8 +18,12 @@ export interface AccountClient {
   forget(id: string, signal: AbortSignal): Promise<void>;
   /** Deletes the session and everything stored under it. */
   deleteEverything(signal: AbortSignal): Promise<void>;
-  /** Sends feedback, a correction or a preference for review. */
-  sendFeedback(kind: FeedbackKind, text: string, signal: AbortSignal): Promise<void>;
+  /**
+   * Sends feedback, a correction or a preference for review. Resolves to a
+   * message to show when the server answered with one (crisis resources, when
+   * the text read as self-harm).
+   */
+  sendFeedback(kind: FeedbackKind, text: string, signal: AbortSignal): Promise<string | undefined>;
 }
 
 export interface MemoryEntry {
@@ -43,6 +47,7 @@ export interface AccountClientOptions {
 
 const sessionSchema = z.object({ token: z.string().min(20).max(100) });
 const meSchema = z.object({ active: z.boolean() });
+const feedbackReplySchema = z.object({ message: z.string().min(1).max(2000).optional() });
 
 export class AccountError extends Error {
   constructor(readonly status: number | undefined) {
@@ -103,7 +108,8 @@ export function createAccountClient(options: AccountClientOptions): AccountClien
         { method: 'POST', body: JSON.stringify({ kind, text }) },
         signal,
       );
-      await res.body?.cancel().catch(() => undefined);
+      const parsed = feedbackReplySchema.safeParse(await res.json().catch(() => undefined));
+      return parsed.success ? parsed.data.message : undefined;
     },
     async hasSession(signal) {
       let res: Response;
@@ -145,3 +151,7 @@ export function createAccountClient(options: AccountClientOptions): AccountClien
     },
   };
 }
+
+/** The wording promised in ADR-0009, shown wherever memory is managed, on web and mobile. */
+export const memoryDisclosure =
+  'Everything stored under your session (conversations, remembered items, feedback and items waiting for my review) is deleted for real when you delete it. If a conversation shows me a useful test, I may write a new, anonymised test case inspired by it. It contains none of your words or personal details and cannot be linked back to you. Your searches are sent through my search server to public search engines.';

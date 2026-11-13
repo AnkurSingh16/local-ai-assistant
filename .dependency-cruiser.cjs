@@ -110,6 +110,8 @@ module.exports = {
           '(^|/)tsconfig\\.json$',
           '\\.config\\.(js|cjs|mjs|ts)$',
           '(^|/)test-setup\\.ts$',
+          // Loaded through Node's resolver by the mobile test setup, not imported.
+          '^apps/mobile/src/test/react-native-stub\\.cjs$',
         ],
       },
       to: {},

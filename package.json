@@ -34,7 +34,8 @@
     "e2e": "npm run e2e -w @local-ai/web",
     "eval:redteam": "npm run redteam -w @local-ai/eval",
     "eval:redteam:live": "npm run redteam:live -w @local-ai/eval --",
-    "eval:record": "npm run record -w @local-ai/eval --"
+    "eval:record": "npm run record -w @local-ai/eval --",
+    "dev:mobile": "npm run dev -w @local-ai/mobile"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
@@ -56,7 +57,9 @@
     "vitest": "^5.1.0"
   },
   "overrides": {
-    "minimatch": "^11.0.8"
+    "minimatch": "^11.0.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "allowScripts": {
     "fsevents": false

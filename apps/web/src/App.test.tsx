@@ -6,7 +6,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import { toBlocks } from './Answer.js';
+import { toBlocks } from '@local-ai/client';
 import { App } from './App.js';
 
 interface FakeClient extends ChatClient {
@@ -36,6 +36,35 @@ async function* events(list: readonly SseEvent[]): AsyncIterable<SseEvent> {
 async function ask(text: string): Promise<void> {
   await userEvent.type(screen.getByLabelText('Message'), text);
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+}
+
+function fakeAccount(
+  items: { id: string; content: string; createdAt: string }[],
+  feedbackFails = false,
+) {
+  const calls: string[] = [];
+  let current = [...items];
+  const account = {
+    startSession: () => Promise.resolve('t'.repeat(43)),
+    hasSession: () => Promise.resolve(true),
+    memory: () => Promise.resolve(current),
+    forget: (id: string) => {
+      calls.push(`forget ${id}`);
+      current = current.filter((i) => i.id !== id);
+      return Promise.resolve();
+    },
+    deleteEverything: () => {
+      calls.push('delete everything');
+      current = [];
+      return Promise.resolve();
+    },
+    sendFeedback: (kind: string, text: string) => {
+      calls.push(`feedback ${kind}: ${text}`);
+      if (feedbackFails) return Promise.reject(new Error('down'));
+      return Promise.resolve(text.includes('hopeless') ? 'Call or text 988.' : undefined);
+    },
+  };
+  return { account, calls };
 }
 
 describe('web app', () => {
@@ -181,28 +210,6 @@ describe('answer blocks', () => {
 });
 
 describe('memory view', () => {
-  function fakeAccount(items: { id: string; content: string; createdAt: string }[]) {
-    const calls: string[] = [];
-    let current = [...items];
-    const account = {
-      startSession: () => Promise.resolve('t'.repeat(43)),
-      hasSession: () => Promise.resolve(true),
-      memory: () => Promise.resolve(current),
-      forget: (id: string) => {
-        calls.push(`forget ${id}`);
-        current = current.filter((i) => i.id !== id);
-        return Promise.resolve();
-      },
-      deleteEverything: () => {
-        calls.push('delete everything');
-        current = [];
-        return Promise.resolve();
-      },
-      sendFeedback: () => Promise.resolve(),
-    };
-    return { account, calls };
-  }
-
   it('lists what is remembered, with the disclosure, and forgets one item', async () => {
     const { account, calls } = fakeAccount([
       { id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00Z' },
@@ -227,5 +234,107 @@ describe('memory view', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Yes, delete everything' }));
     expect(await screen.findByText(/is deleted\./)).toBeInTheDocument();
     expect(calls).toEqual(['delete everything']);
+  });
+});
+
+describe('feedback and new conversation', () => {
+  const refusal: SseEvent[] = [
+    { type: 'refusal', kind: 'policy', message: 'I cannot help with that.' },
+  ];
+
+  it('sends feedback of the chosen kind for an answered turn', async () => {
+    const { account, calls } = fakeAccount([]);
+    render(
+      <App client={fakeClient(() => events(fixtureTurns.answered ?? []))} account={account} />,
+    );
+    await ask('Hello');
+    await userEvent.click(await screen.findByRole('button', { name: 'Send feedback' }));
+    const form = screen.getByRole('form', { name: 'Feedback' });
+    await userEvent.selectOptions(within(form).getByLabelText('Type'), 'correction');
+    await userEvent.type(within(form).getByLabelText('Details'), 'The year is wrong.');
+    await userEvent.click(within(form).getByRole('button', { name: 'Send' }));
+    expect(
+      await screen.findByText(/I review feedback before anything changes/),
+    ).toBeInTheDocument();
+    expect(calls).toEqual(['feedback correction: The year is wrong.']);
+  });
+
+  it('says so when feedback cannot be sent, and keeps the text', async () => {
+    const { account } = fakeAccount([], true);
+    render(
+      <App client={fakeClient(() => events(fixtureTurns.answered ?? []))} account={account} />,
+    );
+    await ask('Hello');
+    await userEvent.click(await screen.findByRole('button', { name: 'Send feedback' }));
+    const form = screen.getByRole('form', { name: 'Feedback' });
+    await userEvent.type(within(form).getByLabelText('Details'), 'Great answer');
+    await userEvent.click(within(form).getByRole('button', { name: 'Send' }));
+    expect(await within(form).findByRole('alert')).toHaveTextContent(/could not be sent/);
+    expect(within(form).getByLabelText('Details')).toHaveValue('Great answer');
+  });
+
+  it('shows crisis resources when the server answers feedback with them', async () => {
+    const { account } = fakeAccount([]);
+    render(
+      <App client={fakeClient(() => events(fixtureTurns.answered ?? []))} account={account} />,
+    );
+    await ask('Hello');
+    await userEvent.click(await screen.findByRole('button', { name: 'Send feedback' }));
+    const form = screen.getByRole('form', { name: 'Feedback' });
+    await userEvent.type(within(form).getByLabelText('Details'), 'I feel hopeless');
+    await userEvent.click(within(form).getByRole('button', { name: 'Send' }));
+    expect(await screen.findByText('Call or text 988.')).toBeInTheDocument();
+  });
+
+  it('offers no feedback when an answer was withheld part way', async () => {
+    const { account } = fakeAccount([]);
+    render(
+      <App
+        client={fakeClient(() => events(fixtureTurns.refusedMidAnswer ?? []))}
+        account={account}
+      />,
+    );
+    await ask('Hello');
+    await screen.findByText('Released before the flag.');
+    await screen.findByText("I can't help with that.");
+    expect(screen.queryByRole('button', { name: 'Send feedback' })).not.toBeInTheDocument();
+  });
+
+  it('moves focus into the form and then onto the outcome', async () => {
+    const { account } = fakeAccount([]);
+    render(
+      <App client={fakeClient(() => events(fixtureTurns.answered ?? []))} account={account} />,
+    );
+    await ask('Hello');
+    await userEvent.click(await screen.findByRole('button', { name: 'Send feedback' }));
+    const form = screen.getByRole('form', { name: 'Feedback' });
+    expect(within(form).getByLabelText('Type')).toHaveFocus();
+    await userEvent.type(within(form).getByLabelText('Details'), 'Nice.');
+    await userEvent.click(within(form).getByRole('button', { name: 'Send' }));
+    expect(await screen.findByRole('status')).toHaveFocus();
+  });
+
+  it('offers no feedback on a refused turn', async () => {
+    const { account } = fakeAccount([]);
+    render(<App client={fakeClient(() => events(refusal))} account={account} />);
+    await ask('Hello');
+    await screen.findByText('I cannot help with that.');
+    expect(screen.queryByRole('button', { name: 'Send feedback' })).not.toBeInTheDocument();
+  });
+
+  it('starts a new conversation without the old conversation id', async () => {
+    const client = fakeClient(() => events(fixtureTurns.answered ?? []));
+    render(<App client={client} />);
+    await ask('First');
+    await screen.findByRole('list', { name: 'Sources' });
+    await ask('Follow-up');
+    await waitFor(() => {
+      expect(screen.getAllByRole('list', { name: 'Sources' })).toHaveLength(2);
+    });
+    expect(client.bodies[1]?.conversationId).toBeDefined();
+    await userEvent.click(screen.getByRole('button', { name: 'New conversation' }));
+    expect(screen.queryByLabelText('You')).not.toBeInTheDocument();
+    await ask('Fresh start');
+    expect(client.bodies[2]?.conversationId).toBeUndefined();
   });
 });

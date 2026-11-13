@@ -31,7 +31,7 @@ Option 3. `POST /v1/chat` returns `text/event-stream`. `packages/contract` defin
 - Each event carries `id: <messageId>:<seq>`. A `: ping` comment every 15 s keeps proxies from closing the stream. There is no resume in v1; the client retries the whole turn.
 - Errors never include stack traces, model names or provider messages.
 - **Cancellation:** the client aborts its `AbortController`; the server ties the request's `close` event to the turn's signal, which stops Ollama generation.
-- **Host allowlist:** the API rejects any request whose `Host` header is not in a configured allowlist (by default `localhost` and `127.0.0.1` on the API port, plus the LAN address when `dev:mobile` opts in). This stops DNS rebinding: a rebinding page reaches the API under the attacker's hostname, so it fails here before it can create a session and switch to bearer auth.
+- **Host allowlist:** the API rejects any request whose `Host` header is not in a configured allowlist (by default `localhost` and `127.0.0.1` on the API port, plus the LAN address when I add it to `ALLOWED_HOSTS` for phone testing; see the ADR-0010 amendment). This stops DNS rebinding: a rebinding page reaches the API under the attacker's hostname, so it fails here before it can create a session and switch to bearer auth.
 - **CSRF and CORS:** requests must be `Content-Type: application/json` (a form post gets 415), cookie-authenticated requests must carry an allowed `Origin`, and CORS uses an allowlist, never `*` with credentials. The `Origin` check matters locally because browsers treat every `localhost` port as the same site, so `SameSite=Strict` alone does not stop another local dev server.
 
 ## Consequences
@@ -42,3 +42,5 @@ Option 3. `POST /v1/chat` returns `text/event-stream`. `packages/contract` defin
 ## Evidence
 
 - `expo/fetch` streams `response.body` and, in its source, honours `AbortSignal` (the docs do not say so); a device test in Milestone 6 confirms it: https://docs.expo.dev/versions/latest/sdk/expo/ (accessed 2026-11-12).
+
+**Amended 2026-11-13 (Milestone 6).** The device test of `AbortSignal` with `expo/fetch` has not been run yet. It is tracked in [#50](https://github.com/AnkurSingh16/local-ai-assistant/issues/50) and blocks closing Milestone 6.

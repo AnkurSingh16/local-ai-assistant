@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "lib": ["ES2024", "DOM"],
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "customConditions": ["@local-ai/source", "react-native"]
+  },
+  "include": ["index.ts", "src", "vitest.config.ts"]
+}

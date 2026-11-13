@@ -36,3 +36,5 @@ Option 2.
 
 - Ollama CVE-2024-37032 ("Probllama"), exploitable when Ollama is exposed: https://www.wiz.io/blog/probllama-ollama-vulnerability-cve-2024-37032 (accessed 2026-11-12).
 - Docker publishes ports on all interfaces unless an address is given (Compose `ports` short syntax), which is why every entry names `127.0.0.1`.
+
+**Amended 2026-11-13 (Milestone 6).** `npm run dev:mobile` only starts Expo. Binding the API beyond loopback stays a separate, explicit step: I start the API with `HOST=0.0.0.0` and add the Mac's LAN address to `ALLOWED_HOSTS`, as `apps/mobile/README.md` shows. That way a script never opens the API to the network by default. The LAN traffic is plain HTTP, so I use it only on a trusted network.

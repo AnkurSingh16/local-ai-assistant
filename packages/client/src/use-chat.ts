@@ -1,6 +1,9 @@
-import type { ChatClient, TurnView } from '@local-ai/client';
-import { cancelTurn, ChatClientError, failTurn, initialTurn, reduceTurn } from '@local-ai/client';
 import { useCallback, useRef, useState } from 'react';
+
+import type { ChatClient } from './client.js';
+import { ChatClientError } from './client.js';
+import type { TurnView } from './turn.js';
+import { cancelTurn, failTurn, initialTurn, reduceTurn } from './turn.js';
 
 export interface Turn {
   readonly id: number;
@@ -19,7 +22,10 @@ export interface Chat {
 
 const genericFailure = 'Something went wrong. Please try again.';
 
-/** Runs turns through the shared client and turn reducer, one at a time. */
+/**
+ * Runs turns through the shared client and turn reducer, one at a time. A
+ * React hook with no DOM or native code, so the web and Expo apps share it.
+ */
 export function useChat(client: ChatClient): Chat {
   const [turns, setTurns] = useState<readonly Turn[]>([]);
   const [busy, setBusy] = useState(false);

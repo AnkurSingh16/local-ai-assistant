@@ -74,3 +74,24 @@ test('starts a session, shows the memory view and deletes everything', async ({ 
   );
   await expect(page.getByLabel('You')).toHaveCount(0);
 });
+
+test('sends feedback and shows an empty memory view through the real API', async ({ page }) => {
+  await ask(page, 'Hello there');
+  await expect(page.getByLabel('Assistant')).toContainText(mockAnswer);
+  await page.getByRole('button', { name: 'Send feedback' }).click();
+  const form = page.getByRole('form', { name: 'Feedback' });
+  await form.getByLabel('Details').fill('Clear and short, thanks.');
+  await form.getByRole('button', { name: 'Send' }).click();
+  await expect(page.getByRole('status')).toHaveText(
+    'Thanks. I review feedback before anything changes.',
+  );
+  await page.getByRole('button', { name: 'What I remember' }).click();
+  await expect(page.getByText(/deleted for real/)).toBeVisible();
+});
+
+test('starts a new conversation', async ({ page }) => {
+  await ask(page, 'First');
+  await expect(page.getByLabel('Assistant')).toContainText(mockAnswer);
+  await page.getByRole('button', { name: 'New conversation' }).click();
+  await expect(page.getByLabel('You')).toHaveCount(0);
+});
