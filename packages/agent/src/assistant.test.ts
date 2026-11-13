@@ -12,7 +12,17 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import type { AssistantDeps } from './index.js';
-import { buildMessages, contextBudget, createAssistant, estimateTokens, persona } from './index.js';
+import { createManualClock } from '@local-ai/core';
+import { readPageDefinition, webSearchDefinition } from '@local-ai/tools';
+import {
+  buildMessages,
+  contextBudget,
+  createAssistant,
+  datetimeDefinition,
+  estimateTokens,
+  persona,
+  webGuide,
+} from './index.js';
 
 function ids(): () => string {
   let n = 0;
@@ -37,6 +47,7 @@ function setup(
     }),
     newId: ids(),
     turnTimeoutMs: 5000,
+    clock: createManualClock(new Date('2026-11-13T12:00:00Z')),
     ...overrides,
   };
   return { deps, chat };
@@ -272,6 +283,13 @@ describe('prompt budget', () => {
 
   it('keeps the persona inside the system slot', () => {
     expect(estimateTokens(persona)).toBeLessThanOrEqual(contextBudget.system);
+  });
+
+  it('keeps the persona, the web guide and every tool definition inside the system slot', () => {
+    const tools = [datetimeDefinition, webSearchDefinition, readPageDefinition];
+    expect(
+      estimateTokens(`${persona}\n\n${webGuide}`) + estimateTokens(JSON.stringify(tools)),
+    ).toBeLessThanOrEqual(contextBudget.system);
   });
 
   it('sums the slots to the context window', () => {

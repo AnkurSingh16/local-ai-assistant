@@ -1,11 +1,16 @@
-import type { ChatMessage, ChatProvider, ModeratedText } from '@local-ai/core';
+import type { ChatMessage, ChatProvider, Clock, ModeratedText, ToolCall } from '@local-ai/core';
 import { isAbortError, ProviderError } from '@local-ai/core';
-import type { FinishReason, SseEvent } from '@local-ai/contract';
+import type { FinishReason, SseEvent, StatusPhase } from '@local-ai/contract';
 import type { InputGuard, OutputGuard } from '@local-ai/guardrails';
 import { createParagraphSplitter, refusalMessages } from '@local-ai/guardrails';
 
-import { persona } from '../persona/persona.js';
-import { contextBudget, estimateTokens } from './budget.js';
+import { persona, webGuide } from '../persona/persona.js';
+import { contextBudget, estimateTokens, maxPromptTokens, promptTokens } from './budget.js';
+import { citationsIn, keepListedLinks } from './links.js';
+import { isTimeSensitive } from './routing.js';
+import { runToolCalls, writeQuery } from './steps.js';
+import type { WebTools } from './web.js';
+import { allowedTools, newTaint } from './web.js';
 
 export interface AssistantDeps {
   readonly chat: ChatProvider;
@@ -16,7 +21,14 @@ export interface AssistantDeps {
   /** Upper bound on a whole turn (ADR-0003). */
   readonly turnTimeoutMs: number;
   readonly temperature?: number;
+  /** For get_current_datetime and the router's sense of the current year. */
+  readonly clock: Clock;
+  /** Web search and page reading; without them the assistant answers from the model alone. */
+  readonly web?: WebTools;
 }
+
+/** ADR-0003: four model steps per turn, the forced-query step included. */
+export const maxModelSteps = 4;
 
 export interface TurnInput {
   readonly message: string;
@@ -41,11 +53,12 @@ const genericErrors = {
 } as const;
 
 /** Builds the prompt. The user slot accepts only text that passed the input guard. */
-export function buildMessages(user: ModeratedText): ChatMessage[] | undefined {
-  if (estimateTokens(persona) > contextBudget.system) return undefined;
+export function buildMessages(user: ModeratedText, withWeb = false): ChatMessage[] | undefined {
+  const system = withWeb ? `${persona}\n\n${webGuide}` : persona;
+  if (estimateTokens(system) > contextBudget.system) return undefined;
   if (estimateTokens(user) > contextBudget.user) return undefined;
   return [
-    { role: 'system', content: persona },
+    { role: 'system', content: system },
     { role: 'user', content: user },
   ];
 }
@@ -92,20 +105,21 @@ export function createAssistant(deps: AssistantDeps): Assistant {
           return;
         }
 
-        const messages = buildMessages(verdict.text);
+        const web = deps.web;
+        const messages = buildMessages(verdict.text, web !== undefined);
         if (messages === undefined) {
           yield error('bad_request', false);
           yield done('error');
           return;
         }
 
-        yield { type: 'status', phase: 'answering' };
-
         // Generation and moderation run side by side (ADR-0005): a pump reads the
         // model stream into the hold-back buffer while this loop checks and
         // releases units in order. The pump never yields to the client itself.
         const splitter = createParagraphSplitter();
-        const pending: string[] = [];
+        // Units of the answer and status changes, in order; the pump fills it.
+        const pending: ({ kind: 'unit'; text: string } | { kind: 'status'; phase: StatusPhase })[] =
+          [];
         // Shared with the pump; an object so the compiler does not narrow it away.
         const pumpState: {
           done: boolean;
@@ -123,29 +137,83 @@ export function createAssistant(deps: AssistantDeps): Assistant {
           wake?.();
           wake = undefined;
         };
+        const taint = newTaint();
+        let lastPhase: StatusPhase | undefined;
+        const status = (phase: StatusPhase): void => {
+          // The forced path announces searching before writing the query; the search itself need not repeat it.
+          if (phase === lastPhase) return;
+          lastPhase = phase;
+          pending.push({ kind: 'status', phase });
+          notify();
+        };
+        const pushUnits = (units: readonly string[]): void => {
+          for (const text of units) pending.push({ kind: 'unit', text });
+          notify();
+        };
+
+        /** One model step: streams text into the splitter, collects tool calls. */
+        const step = async (offerTools: boolean): Promise<readonly ToolCall[]> => {
+          const calls: ToolCall[] = [];
+          let wroteText = false;
+          const tools = offerTools ? allowedTools(taint) : undefined;
+          if (promptTokens(messages, tools) > maxPromptTokens) {
+            throw new Error('the prompt is over the context budget');
+          }
+          const stream = deps.chat.chat(
+            {
+              messages,
+              ...(tools === undefined ? {} : { tools }),
+              options: {
+                numCtx: contextBudget.numCtx,
+                maxOutputTokens: contextBudget.output,
+                ...(deps.temperature === undefined ? {} : { temperature: deps.temperature }),
+              },
+            },
+            signal,
+          );
+          for await (const chunk of stream) {
+            if (chunk.type === 'text') {
+              if (chunk.text.trim() !== '' || wroteText) {
+                if (!wroteText) status('answering');
+                wroteText = true;
+                pushUnits(splitter.push(chunk.text));
+              }
+            } else if (chunk.type === 'tool_call') {
+              calls.push(chunk.call);
+            } else {
+              pumpState.finish = chunk.finishReason === 'length' ? 'length' : 'stop';
+            }
+          }
+          // Once the model has started answering, the step is the answer: tool
+          // calls after text are ignored rather than half-releasing a reply.
+          return wroteText ? [] : calls;
+        };
+
         const pump = (async () => {
           try {
-            const stream = deps.chat.chat(
-              {
-                messages,
-                options: {
-                  numCtx: contextBudget.numCtx,
-                  maxOutputTokens: contextBudget.output,
-                  ...(deps.temperature === undefined ? {} : { temperature: deps.temperature }),
-                },
-              },
-              signal,
-            );
-            for await (const chunk of stream) {
-              if (chunk.type === 'text') {
-                pending.push(...splitter.push(chunk.text));
-                notify();
-              } else if (chunk.type === 'done') {
-                pumpState.finish = chunk.finishReason === 'length' ? 'length' : 'stop';
-              }
-              // No tools are offered yet, so tool_call chunks are ignored.
+            let steps = 0;
+            if (web !== undefined && isTimeSensitive(verdict.text, deps.clock.now())) {
+              status('searching');
+              steps += 1;
+              const query = await writeQuery(deps.chat, verdict.text, signal);
+              const call = { name: 'web_search', arguments: { query: query ?? '' } };
+              await runToolCalls({ web, clock: deps.clock, taint, messages, status, signal }, [
+                call,
+              ]);
             }
-            pending.push(...splitter.flush());
+            for (;;) {
+              steps += 1;
+              const offerTools = web !== undefined && steps < maxModelSteps;
+              const calls = await step(offerTools);
+              // Tool calls on a step that was offered no tools are ignored, so the
+              // step budget is a hard stop even if the model keeps asking.
+              if (calls.length === 0 || web === undefined || !offerTools) break;
+              await runToolCalls(
+                { web, clock: deps.clock, taint, messages, status, signal },
+                calls,
+              );
+            }
+            pushUnits(splitter.flush());
           } catch (err) {
             pumpState.failed = true;
             pumpState.error = err;
@@ -156,9 +224,11 @@ export function createAssistant(deps: AssistantDeps): Assistant {
         })();
 
         try {
+          const cited = new Set<number>();
+          let released = false;
           for (;;) {
-            const unit = pending.shift();
-            if (unit === undefined) {
+            const item = pending.shift();
+            if (item === undefined) {
               if (pumpState.done) break;
               // Safe: the check above and setting wake below happen in the same tick.
               await new Promise<void>((resolve) => {
@@ -166,6 +236,12 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               });
               continue;
             }
+            if (item.kind === 'status') {
+              yield { type: 'status', phase: item.phase };
+              continue;
+            }
+            const sources = [...taint.sources.values()];
+            const unit = keepListedLinks(item.text, new Set(sources.map((s) => s.url)));
             const checked = await deps.outputGuard.checkParagraph(unit, signal);
             if (!checked.ok) {
               yield {
@@ -177,11 +253,28 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               return;
             }
             yield { type: 'delta', text: checked.text };
+            released = true;
+            // A citation is sent only after the paragraph that cites it is released (ADR-0005).
+            // [n] markers, and links straight to a listed source, both count as citing it.
+            const linked = sources.filter((s) => checked.text.includes(s.url)).map((s) => s.id);
+            for (const n of [...citationsIn(checked.text), ...linked]) {
+              const source = sources.find((s) => s.id === n);
+              if (source === undefined || cited.has(n)) continue;
+              cited.add(n);
+              yield { type: 'citation', n, url: source.url, title: source.title.slice(0, 300) };
+            }
           }
           if (pumpState.failed) {
             throw pumpState.error instanceof Error
               ? pumpState.error
               : new Error('chat stream failed');
+          }
+          if (!released) {
+            // The model spent every step on tool calls, or wrote nothing: an
+            // empty answer would look like success, so it is reported instead.
+            yield error('internal', true);
+            yield done('error');
+            return;
           }
           yield done(pumpState.finish);
         } finally {

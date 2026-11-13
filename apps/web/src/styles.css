@@ -128,3 +128,15 @@ button:disabled {
   overflow: hidden;
   clip-path: inset(50%);
 }
+
+.sources {
+  margin: 0.5rem 0 0;
+  padding-left: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.sources a {
+  color: inherit;
+  word-break: break-word;
+}

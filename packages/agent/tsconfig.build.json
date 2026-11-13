@@ -8,8 +8,17 @@
   "include": ["src", "persona"],
   "exclude": ["**/*.test.ts", "**/*.test.tsx"],
   "references": [
-    { "path": "../core/tsconfig.build.json" },
-    { "path": "../contract/tsconfig.build.json" },
-    { "path": "../guardrails/tsconfig.build.json" }
+    {
+      "path": "../core/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../guardrails/tsconfig.build.json"
+    },
+    {
+      "path": "../tools/tsconfig.build.json"
+    }
   ]
 }

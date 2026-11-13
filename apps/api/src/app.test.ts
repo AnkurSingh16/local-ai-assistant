@@ -82,6 +82,7 @@ async function harness(
       }),
       newId,
       turnTimeoutMs: 5000,
+      clock,
     }),
     ...options.deps,
   });

@@ -35,6 +35,7 @@ jobs:
             web
             mobile
             client
+            agent
             core
             providers
             guardrails

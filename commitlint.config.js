@@ -11,6 +11,7 @@ export default {
         'web',
         'mobile',
         'client',
+        'agent',
         'core',
         'providers',
         'guardrails',
