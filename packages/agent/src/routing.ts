@@ -22,12 +22,13 @@ const alwaysChanging =
 const currentRoles =
   /\bwho(?: is|'s| are) (?:the )?(?:current |new )?(?:ceo|president|prime minister|chancellor|king|queen|pope|mayor|governor|leader|head|chair(?:man|woman|person)?|owner|coach|captain|manager)\b/;
 /**
- * Questions about a text the user points at ("in this poem"), where "who is the
- * head" means a character. Only "this", "that" or "my": "the score of the game"
+ * Questions about a text, code or group the user points at ("in this poem",
+ * "in my company"), where "who is the head" means a character or a colleague,
+ * and a search would send the user's own context out. Only "this", "that" or "my": "the score of the game"
  * is a question about now.
  */
 const aboutAText =
-  /\b(?:in|of) (?:this|my|that) (?:poem|story|novel|book|text|passage|song|play|film|movie|show|game|essay|chapter|scene|script)\b/;
+  /\b(?:in|of) (?:this|my|that) (?:poem|story|novel|book|text|passage|song|play|film|movie|show|game|essay|chapter|scene|script|code|company|team|office|school|family|workplace|class)\b/;
 /** Creative writing set in a year is fiction, not a question about that year. */
 const creativeRequest =
   /\b(?:write|compose|imagine|invent|draft|make up)\b.{0,60}\b(?:story|poem|song|lyrics|essay|script|scene|fiction|tale|letter|dialogue)\b/;

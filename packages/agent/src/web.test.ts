@@ -64,6 +64,8 @@ describe('search routing', () => {
     'What does the word now mean in this sentence?',
     'Now update the function to return the results',
     'Now rewrite it so the cost is lower',
+    'Who is the head of HR in my company?',
+    'Explain the result of this code now.',
     'My app currently uses version 2 of React, how do I add a route?',
   ])('does not force a search for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(false);

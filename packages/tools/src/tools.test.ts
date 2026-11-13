@@ -91,6 +91,17 @@ describe('web_search tool', () => {
     ['a bracketed phone number', 'reverse lookup (415) 555 0199'],
     ['an international phone number', 'caller +44 20 7946 0958 scam'],
     ['a URL with a query string', 'https://bank.example/reset?token=abc123 safe'],
+    ['a phone number with a year-like group', '212-555-2019'],
+    ['a bracketed number with a year-like group', '(212) 555-2024'],
+    ['an international number with a year-like group', '+1 212 555 1999'],
+    ['a UK number with a year-like group', '020 7946 2001'],
+    ['grouped digits that are not all years', '555 2024 1234'],
+    ['a local seven-digit number', 'who called 555-1234'],
+    ['a passport number', 'passport GB123456789'],
+    ['a tracking number', 'tracking 1Z999AA10123456784'],
+    ['a user id', 'user123456 profile'],
+    ['a reference', 'ref ABC1234567'],
+    ['an account number', 'acct12345678'],
   ])('refuses a query that carries %s, without searching', async (_, query) => {
     const search = createMockSearchProvider();
     const tool = createWebSearch({ search, cache: cacheFor(), timeoutMs: 1000 });
@@ -108,6 +119,7 @@ describe('web_search tool', () => {
     'typescript@5.7 release notes',
     'windows error 0x80070005',
     'KB5034441 install failed',
+    'kb 5034441 download',
     'tax brackets 2024 2025 2026',
     'covid cases 2020 2021 2022',
   ])('lets an ordinary query through: %s', async (query) => {

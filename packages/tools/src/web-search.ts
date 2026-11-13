@@ -56,19 +56,33 @@ const personalDataRules = createRules({ categories: ['personal_data'] });
 const queryPatterns: readonly RegExp[] = [
   // An email address, with a letters-only top-level domain so "lodash@4.17.21" passes.
   /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b/i,
-  // Six or more digits in a row: account, order, ID and most phone numbers. Hex
+  // Six or more digits in a row, also inside an ID such as GB123456789. Hex
   // error codes and Windows KB numbers are excluded, since people search for them.
-  /(?<![\w.])(?!0x)(?<!kb)\d{6,}/i,
-  // A phone number written in groups, such as 555-123-4567 or +44 20 7946 0958,
-  // but not a run of years such as "2024 2025 2026".
-  /(?:\+\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-](?!(?:19|20)\d\d\b)\d{3,4}[\s.-](?!(?:19|20)\d\d\b)\d{3,4}\b/,
+  /(?<!\d)(?<!0x[0-9a-f]{0,16})(?<!\bkb ?)\d{6,}/i,
   // A URL with a query string, which often carries tokens or identifiers.
   /\bhttps?:\/\/\S*\?\S*=/i,
 ];
 
+/** A phone number written in groups: 555-123-4567, (212) 555-2024, +44 20 7946 0958, 555-1234. */
+const phoneShaped =
+  /(?:\+\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-])?\d{3,4}[\s.-]\d{4}\b|(?:\+\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-]\d{3,4}[\s.-]\d{3,4}\b/g;
+
+/** "2024 2025 2026" is a run of years, not a phone number: every group must be a year to pass. */
+function hasPhoneNumber(query: string): boolean {
+  for (const match of query.matchAll(phoneShaped)) {
+    const groups = match[0].match(/\d+/g) ?? [];
+    if (!groups.every((g) => /^(?:19|20)\d\d$/.test(g))) return true;
+  }
+  return false;
+}
+
 /** True when a search query looks like it carries personal data. */
 export function queryHasPersonalData(query: string): boolean {
-  return personalDataRules.check(query) !== undefined || queryPatterns.some((p) => p.test(query));
+  return (
+    personalDataRules.check(query) !== undefined ||
+    hasPhoneNumber(query) ||
+    queryPatterns.some((p) => p.test(query))
+  );
 }
 
 /** Spacing and case do not change the results, so they do not split the cache. */
