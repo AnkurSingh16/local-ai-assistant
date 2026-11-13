@@ -57,26 +57,44 @@ const intent = [
  * needs the speaker as the subject and a phrasing that is rarely meant
  * casually; giving things away counts only next to a sign of hopelessness.
  */
+/** A task, place or game after the phrase means it is about that, not about living. */
+const notAboutSomething =
+  '(?! (?:with|on|in|for|at|about|to|from|of) (?:this|that|the|my|a|an|it|work|school|life admin)\\b)';
 const warningSigns = [
-  /\b(?:nobody|no one|no body) (?:would|will|is going to|d) (?:even )?(?:miss|notice|care about) me\b/,
-  /\b(?:nobody|no one) (?:would|will|d) (?:even )?(?:miss|notice|care) if i (?:was|were|m|am) (?:gone|dead|not here|not around)\b/,
-  /\b(?:everyone|everybody|they|my family|my kids|my friends|the world) (?:would|will|d) be better off without me\b/,
-  /\bi (?:am|m) (?:just )?a burden (?:to|on) (?:everyone|everybody|my family|my friends|them|the people around me)\b/,
-  /\b(?:i have|i ve got|i ve|there is|there s) no reason (?:left )?to (?:live|go on|keep going|keep living|stay alive)\b/,
-  /\bi can t (?:go on|keep living|keep going) (?:like this )?(?:anymore|any more)\b/,
-  /\bi (?:don t|do not|can t) see (?:any |the )?point (?:in|of) (?:living|life|going on|being alive|staying alive)\b/,
-  /\bi (?:just )?want (?:it all|everything|the pain|my life) to (?:end|stop) (?:forever|for good|permanently)\b/,
-  /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:my )?(?:goodbye|farewell) (?:letters?|notes?)(?: to (?:my family|everyone|my (?:kids|children|parents|wife|husband|partner|friends))| tonight| and i| just in case|$)/,
+  /\b(?:nobody|no one|no body) (?:would|will|d) (?:even )?(?:miss|notice) me (?:if|when) i (?:was|were|m|am) (?:gone|dead|not here|not around)\b/,
+  /\b(?:nobody|no one) (?:would|will|d) (?:even )?(?:miss me|notice|care) if i (?:was|were|m|am) (?:gone|dead|not here|not around|to disappear|disappeared)\b/,
+  /\b(?:nobody|no one) (?:would|will|d) (?:even )?care if i (?:disappeared|died|vanished)\b/,
+  /\b(?:everyone|everybody|my family|my kids|my friends|the world) (?:would|will|d) be better off (?:without me|if i (?:was|were) (?:dead|gone|not here)|if i wasn t here)\b/,
+  /\bi (?:am|m|feel like|feel like i m) (?:just |such )?a burden\b(?: (?:to|on) (?:everyone|everybody|every ?1|my family|my friends|them|the people around me|anyone))?(?! (?:at|in|on) (?:work|the office|school|the team|this project)\b)/,
+  /\b(?:i have|i ve got|i ve) nothing (?:left )?to live for\b/,
+  /\b(?:life|my life) (?:isn t|is not|isnt) worth living\b/,
+  /\b(?:there s|there is) no point (?:in )?(?:living|being alive|going on) (?:anymore|any more)\b/,
+  new RegExp(
+    `\\b(?:i have|i ve got|i ve|there is|there s) no reason (?:left )?to (?:live|stay alive|keep living)\\b${notAboutSomething}`,
+  ),
+  /\bi (?:don t|do not) want to be here (?:anymore|any more)\b/,
+  /\bi (?:want to|wanna) (?:go to sleep|sleep) and never wake up\b/,
+  /\bi (?:just )?want the pain to (?:end|stop) (?:forever|for good|permanently)\b/,
+  /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:my )?(?:goodbye|farewell) (?:letters?|notes?) to (?:my family|everyone|my (?:kids|children|parents|wife|husband|partner|friends))\b/,
   /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:a |my )?suicide notes?\b/,
 ];
+const cantGoOn = new RegExp(
+  `\\bi can t (?:go on|keep living|keep going) (?:like this )?(?:anymore|any more)\\b${notAboutSomething}(?! [a-z]+ (?:after|from|with) )`,
+);
+const noPointLiving =
+  /\bi (?:don t|do not|can t) see (?:any |the )?point (?:in|of) (?:living|life|going on|being alive|staying alive)\b(?! in (?:a|this|the) )/;
 const givingAway =
   /\bi (?:ve|have) (?:started |been )?giving away (?:all )?(?:of )?my (?:things|stuff|belongings|possessions)\b/;
+const givenAway =
+  /\bi (?:ve|have) given away (?:all|everything)(?: of)? my (?:things|stuff|belongings|possessions)\b/;
+/** Hopelessness, not tidying: "it feels empty but good to declutter" is not a warning sign. */
 const hopeless =
-  /\b(?:pointless|hopeless|no point|nothing matters|won t need (?:them|it)|empty|numb|tired of (?:living|life|everything)|done with (?:life|everything))\b/;
+  /\b(?:pointless|hopeless|no point|nothing matters|won t need (?:them|it) anymore|tired of (?:living|life|everything)|done with (?:life|everything)|don t want to be here)\b/;
 
 export function isSelfHarmIntent(text: string): boolean {
   const { unjoined } = fold(text, { leet: true, stretch: 1 });
   if (intent.some((p) => p.test(unjoined))) return true;
   if (warningSigns.some((p) => p.test(unjoined))) return true;
-  return givingAway.test(unjoined) && hopeless.test(unjoined);
+  if (cantGoOn.test(unjoined) || noPointLiving.test(unjoined)) return true;
+  return (givingAway.test(unjoined) || givenAway.test(unjoined)) && hopeless.test(unjoined);
 }

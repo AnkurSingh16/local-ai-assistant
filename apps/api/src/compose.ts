@@ -1,5 +1,5 @@
 import type { Assistant } from '@local-ai/agent';
-import { createAssistant, persona, personaCanary } from '@local-ai/agent';
+import { createAssistant, leakCheckPrompt, personaCanary } from '@local-ai/agent';
 import type { ChatProvider, Clock, ModerationProvider } from '@local-ai/core';
 import {
   createCircuitBreaker,
@@ -78,7 +78,7 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
     inputGuard: createInputGuard(guard),
     outputGuard: createOutputGuard({
       ...guard,
-      rules: createOutputRules({ systemPrompt: persona, canary: personaCanary }),
+      rules: createOutputRules({ systemPrompt: leakCheckPrompt, canary: personaCanary }),
     }),
     newId,
     turnTimeoutMs: config.turnTimeoutMs,
