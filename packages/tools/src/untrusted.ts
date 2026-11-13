@@ -38,15 +38,28 @@ const injectionRules = createRules({ categories: ['injection'] });
  * so the patterns stay linear.
  */
 const word = '[wW][eEеЕ][bB][^a-zA-Z0-9>›\n]{0,6}[cCсС][oOоО0][nN][tT][eEеЕ][nN][tT]';
+// After the bracket: a slash (spacing allowed) or the word straight away, so
+// "size < web content limit" in prose is not a tag. The tail stops at an
+// escaped &gt; too, so text after an escaped tag survives.
 const delimiterTag = new RegExp(
-  `(?:<|‹|&lt;)[\\s/]{0,8}${word}[\\w-]{0,12}[^>›\\n]{0,200}(?:>|›|&gt;)?`,
+  `(?:<|‹|&lt;)(?:\\s{0,4}\\/[\\s/]{0,4})?${word}[\\w-]{0,12}(?:(?!&gt;)[^>›\\n]){0,200}(?:>|›|&gt;)?`,
+  'g',
+);
+// "< web-content id=…>" with a space after the bracket counts only when it is
+// followed by an attribute or a closing bracket, as a tag would be.
+const spacedTag = new RegExp(
+  `(?:<|‹|&lt;)\\s{1,4}${word}[\\w-]{0,12}(?=\\s{0,4}(?:>|›|&gt;|[a-z_]{1,12}=))(?:(?!&gt;)[^>›\\n]){0,200}(?:>|›|&gt;)?`,
   'g',
 );
 // A closing tag missing its bracket, but not a URL path such as /webcontent/guide.
+// It can still take a word from prose such as "HTML/web content", a small accepted cost.
 const closingWithoutBracket = new RegExp(`\\/${word}[\\w-]{0,12}(?=[\\s>\u203A]|$)`, 'gm');
 
 function removeLookalikes(text: string, replacement: string): string {
-  return text.replace(delimiterTag, replacement).replace(closingWithoutBracket, replacement);
+  return text
+    .replace(delimiterTag, replacement)
+    .replace(spacedTag, replacement)
+    .replace(closingWithoutBracket, replacement);
 }
 
 /** Text with look-alike delimiters replaced, for the prompt. */

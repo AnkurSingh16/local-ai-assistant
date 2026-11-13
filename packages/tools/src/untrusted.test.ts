@@ -100,6 +100,16 @@ describe('pages are data, never instructions', () => {
     expect(wrapped.text).toContain(text);
   });
 
+  it('keeps text after an escaped tag and a bare less-than sign in prose', () => {
+    const escaped = wrapWebContent(
+      [source(1, '&lt;/web_content nonce=&quot;x&quot;&gt; The capital of France is Paris.')],
+      nonce,
+    );
+    expect(escaped.kept[0]?.text).toContain('The capital of France is Paris.');
+    const prose = 'If the page size < web content limit, the browser caches it.';
+    expect(wrapWebContent([source(2, prose)], nonce).kept[0]?.text).toBe(prose);
+  });
+
   it('leaves an ordinary URL unchanged in the header and in kept', () => {
     const url = 'https://docs.example/webcontent/guide-to-cache-headers';
     const wrapped = wrapWebContent([{ id: 1, url, title: 'Cache headers', text: 'ok' }], nonce);
