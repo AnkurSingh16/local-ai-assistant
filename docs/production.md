@@ -27,9 +27,9 @@ Sources: [Claude pricing](https://platform.claude.com/docs/en/about-claude/prici
 
 - Anthropic's commercial terms say it "may not train models on Customer Content from Services" ([commercial terms](https://www.anthropic.com/legal/commercial-terms), effective 2025-06-17, accessed 2026-11-13).
 - OpenAI does not use API data for training unless the customer opts in, and keeps abuse-monitoring logs for up to 30 days ([your data](https://developers.openai.com/api/docs/guides/your-data), accessed 2026-11-13).
-- Google's pricing page says free-tier data for Flash and Flash-Lite is used to improve its products. That rules the free tier out for real users' messages; the paid tier is a separate question.
+- Google's pricing page says free-tier data for Flash and Flash-Lite is used to improve its products. That rules the free tier out for real users' messages; the same page says paid-tier data is not used to improve its products.
 
-**What I would choose.** The small tier of a hosted family: Claude Haiku 5.5 or gpt-6-luna. Either costs a few cents per thousand turns and is far stronger than a 7B model on a laptop. I would not pick between them from price tables. My eval runner already swaps providers (`packages/eval`), so I would record the red-team set and a small answer-quality set against both and choose on:
+**What I would choose.** The small tier of a hosted family: Claude Haiku 5.5 or gpt-6-luna. Either costs under a dollar per thousand turns (see the estimate below), and I expect either to answer far better than a 7B model on a laptop, but that is what the measurements must show. I would not pick between them from price tables. My eval runner already swaps providers (`packages/eval`), so I would record the red-team set and a small answer-quality set against both and choose on:
 
 1. Zero harmful releases.
 2. Fewest benign refusals.
@@ -62,7 +62,7 @@ SearXNG is right for one person on one machine, but a public deployment would hi
 
 Sources: [OpenAI pricing](https://developers.openai.com/api/docs/pricing), [OpenRouter: Llama Guard 4 12B](https://openrouter.ai/meta-llama/llama-guard-4-12b), accessed 2026-11-13.
 
-I would keep the layered design: the rules baseline first (it caught all self-harm intent the 1B guard missed), then a classifier, then the output rules on every paragraph. For the classifier I would measure both candidates on the red-team set. Llama Guard 4 keeps the same hazard taxonomy my refusal mapping uses, so it is a drop-in `ModerationProvider`. The OpenAI endpoint is free but uses its own categories, so it needs a new mapping. Either way the 1B model's false positives (6 of 31 benign look-alikes in the last run) should drop, and the measured numbers go in the safety guide as they do today.
+I would keep the layered design: the rules baseline first (it caught the direct self-harm messages and the three warning-sign messages the 1B guard missed; two messages phrased so that no rule matches got crisis lines only because the persona tells the model to include them), then a classifier, then the output rules on every paragraph. For the classifier I would measure both candidates on the red-team set. Llama Guard 4 keeps the same hazard taxonomy my refusal mapping uses, so it is a drop-in `ModerationProvider`. The OpenAI endpoint is free but uses its own categories, so it needs a new mapping. Either way the 1B model's false positives (6 of 31 benign look-alikes in the last run) should drop, and the measured numbers go in the safety guide as they do today.
 
 ## 4. Making the assistant better over time
 
@@ -78,7 +78,7 @@ In order of cost:
 **Shape.** The same Fastify API and built web app in containers, with hosted search instead of SearXNG. No GPU is needed once the models are hosted. The changes:
 
 - **Database.** Swap SQLite for managed Postgres behind the existing repositories (ADR-0001 records this as the scaling path). Keep the deletion guarantees: cascades from the session, and no copy of deleted text in backups beyond their retention window, stated on the memory page.
-- **Rate limits and caching.** Move both from process memory to Redis or Valkey, so several API instances share them, and add per-session limits next to the per-IP ones, since users behind one proxy share an IP.
+- **Rate limits and caching.** Move both from process memory to Redis or Valkey, so several API instances share them, including the per-session chat limit that today lives in process memory (`createWindowLimiter` in `apps/api/src/limits.ts`).
 - **Edge.** TLS and the Host allowlist at a reverse proxy; the API never binds to the internet directly (ADR-0010).
 - **Secrets.** Provider keys in the host's secret store, never in the image or the repository. CI stays key-free: it replays recorded outputs (ADR-0012).
 - **Observability.** The existing pino events (no message text) to a log service; alerts on guard timeouts, breaker trips, refusal-rate shifts and provider errors.
@@ -90,25 +90,25 @@ In order of cost:
 - Neon Postgres: a free plan with 1 GB of storage per project and 100 CU-hours a month. The Launch plan is $0.106 per CU-hour and $0.35 per GB-month, and Neon estimates about $15/month for a small, intermittently used database ([Neon pricing](https://neon.com/pricing)).
 - RunPod, if I kept self-hosted models: an L4 is $0.69/hour on Secure Cloud and an H100 SXM is $4.39/hour ([RunPod pricing](https://www.runpod.io/pricing)).
 
-**Estimated monthly cost.** I assume 20 turns per user a month. Each turn is about 3,000 input tokens (persona, history, memory, search snippets) and 400 output tokens, and 30% of turns search. Classifier calls are about 2,500 tokens a turn, for the input and each paragraph.
+**Estimated monthly cost.** I assume 20 turns per user a month and 400 output tokens per turn. A turn without search is one model call of about 3,000 input tokens (persona, history, memory). A turn with search, 30% of turns, makes up to four calls, and each resends the prompt plus the snippets or pages read so far; I count it as about 12,000 input tokens in all. That averages about 5,700 input tokens a turn. Classifier calls are about 2,500 tokens a turn, for the input and each paragraph.
 
-| Item                                                               | Small demo (100 users, 2,000 turns) | 10,000 users (200,000 turns)                |
-| ------------------------------------------------------------------ | ----------------------------------- | ------------------------------------------- |
-| Chat, Claude Haiku 5.5 or gpt-6-luna                               | about $1                            | about $100 (600M input, 80M output tokens)  |
-| Search, Brave (600 / 60,000 queries)                               | $0 within free credit               | about $300                                  |
-| Moderation, Llama Guard 4 at $0.18/M (or the free OpenAI endpoint) | under $1                            | about $90 (or $0)                           |
-| API hosting, Fly.io                                                | $13 (one shared-cpu-2x)             | about $70 (two to four machines plus Redis) |
-| Postgres, Neon                                                     | $0 (free plan)                      | about $15 to $50                            |
-| **Total**                                                          | **about $15**                       | **about $500 to $600**                      |
+| Item                                                               | Small demo (100 users, 2,000 turns) | 10,000 users (200,000 turns)                                                                                                     |
+| ------------------------------------------------------------------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Chat, Claude Haiku 5.5 or gpt-6-luna                               | about $2                            | about $150 to $200 (1.1B input, 80M output tokens)                                                                               |
+| Search, Brave (600 / 60,000 queries)                               | $0 within free credit               | about $300                                                                                                                       |
+| Moderation, Llama Guard 4 at $0.18/M (or the free OpenAI endpoint) | under $1                            | about $90 (or $0)                                                                                                                |
+| API hosting, Fly.io                                                | $13 (one shared-cpu-2x)             | about $70 (two to four machines plus a small managed Redis or Valkey; the Redis share is my rough allowance, not a quoted price) |
+| Postgres, Neon                                                     | $0 (free plan)                      | about $15 to $50                                                                                                                 |
+| **Total**                                                          | **about $15**                       | **about $600 to $700**                                                                                                           |
 
-These are estimates from list prices, not measurements. The biggest swing is the model tier: the same 10,000 users on Claude Sonnet 5.5 would cost about $2,000 for chat alone. Prompt caching of the persona would cut input costs. Self-hosting instead, one always-on L4 at $0.69/hour is about $500/month before redundancy, more than the hosted small models' tokens at this volume, and with a weaker model.
+These are estimates from list prices, not measurements. The biggest swing is the model tier: the same 10,000 users on Claude Sonnet 5.5 would cost about $3,000 for chat alone. Prompt caching of the persona would cut input costs. Self-hosting instead, one always-on L4 at $0.69/hour is about $500/month before redundancy, about what the hosted small models' tokens cost at this volume, before redundancy, and I expect it to answer worse.
 
 ## 6. Production readiness checklist
 
 - [ ] Hosted chat, search and moderation providers chosen by recorded red-team and answer-quality runs, with numbers in the safety guide
 - [ ] Red-team set re-recorded against the production providers; zero harmful releases
 - [ ] Postgres repositories, with the deletion test (raw files checked) rewritten for Postgres and backups
-- [ ] Shared rate limits and search cache in Redis or Valkey, with per-session limits
+- [ ] Per-IP and per-session rate limits and the search cache moved to Redis or Valkey
 - [ ] TLS reverse proxy, Host allowlist and CORS set for the public origin only
 - [ ] Secrets in the host's secret store; key rotation documented
 - [ ] Logs with no message text shipped to a log service; alerts on guard timeouts, breaker state, refusal rate and provider errors
