@@ -207,7 +207,11 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
     assistant,
     moderation: tracked.moderation,
     isReady: tracked.isReady,
-    sessions: createSessionService({ sessions: sessionRepo, conversations: conversationRepo }),
+    sessions: createSessionService({
+      sessions: sessionRepo,
+      conversations: conversationRepo,
+      memory: memoryRepo,
+    }),
     feedback: createFeedbackService({
       inputGuard: createInputGuard(guard),
       review: createReviewRepo(storageDeps),

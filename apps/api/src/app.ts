@@ -73,7 +73,7 @@ export async function createApp(deps: AppDeps): Promise<FastifyInstance> {
 
   await app.register(cors, {
     origin: [...allowedOrigins],
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'DELETE'],
     allowedHeaders: ['content-type'],
     maxAge: 600,
   });

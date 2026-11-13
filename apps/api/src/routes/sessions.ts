@@ -46,4 +46,49 @@ export function registerSessionRoutes(app: FastifyInstance, deps: AppDeps): void
     }
     return reply.send({ active: true });
   });
+
+  const sessionOf = async (
+    cookies: Readonly<Record<string, string | undefined>>,
+    authorization: string | undefined,
+  ): Promise<string | undefined> => {
+    const token = tokenFrom(cookies, authorization);
+    return token === undefined ? undefined : sessions.resolve(token);
+  };
+
+  // ADR-0009: everything remembered is visible, and deleting is real.
+  app.get('/v1/me/memory', async (request, reply) => {
+    const sessionId = await sessionOf(request.cookies, request.headers.authorization);
+    if (sessionId === undefined) {
+      return apiError(reply, request, 401, 'no_session', 'There is no active session.');
+    }
+    const items = await sessions.memory(sessionId);
+    return reply.send({
+      items: items.map((m) => ({
+        id: m.id,
+        content: m.content,
+        createdAt: m.createdAt.toISOString(),
+      })),
+    });
+  });
+
+  app.delete<{ Params: { id: string } }>('/v1/me/memory/:id', async (request, reply) => {
+    const sessionId = await sessionOf(request.cookies, request.headers.authorization);
+    if (sessionId === undefined) {
+      return apiError(reply, request, 401, 'no_session', 'There is no active session.');
+    }
+    if (!(await sessions.forget(sessionId, request.params.id.slice(0, 100)))) {
+      return apiError(reply, request, 404, 'not_found', 'That item does not exist.');
+    }
+    return reply.code(204).send();
+  });
+
+  app.delete('/v1/me', async (request, reply) => {
+    const sessionId = await sessionOf(request.cookies, request.headers.authorization);
+    if (sessionId === undefined) {
+      return apiError(reply, request, 401, 'no_session', 'There is no active session.');
+    }
+    await sessions.deleteEverything(sessionId);
+    void reply.clearCookie(sessionCookie, { path: '/' });
+    return reply.code(204).send();
+  });
 }

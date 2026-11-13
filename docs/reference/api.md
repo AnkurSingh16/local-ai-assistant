@@ -10,6 +10,16 @@ There are no accounts. `POST /v1/sessions` creates an anonymous session and answ
 
 With a session, `POST /v1/chat` remembers the conversation: the most recent turns that fit the history budget are sent with the next message, and the moderated message and the released answer are stored. A `conversationId` that belongs to another session is answered with `404`. Without a session every turn is stateless.
 
+## Memory and deletion
+
+All need a session ([ADR-0009](../adr/0009-sessions-and-memory-deletion.md)).
+
+- `GET /v1/me/memory` lists everything remembered: `{ "items": [{ "id", "content", "createdAt" }] }`. Items appear only after I approve them.
+- `DELETE /v1/me/memory/:id` forgets one item: `204`, or `404` if it is not this session's.
+- `DELETE /v1/me` deletes the session and everything under it (conversations, memory, feedback, items waiting for review) and clears the cookie: `204`. Deletion cascades in the database, and a WAL checkpoint follows, so the text is gone from the files as well as the tables.
+
+The web app shows the same list under "What I remember", with the wording promised in ADR-0009.
+
 ## `POST /v1/feedback`
 
 Needs a session. Body: `{ "kind": "feedback" | "correction" | "preference", "text": "1 to 1,000 characters" }`. The text passes the same input guard as a chat message; a flagged item is dropped and only its category and time are recorded. The answer is always `202` with `{ "received": true }`, whether the item was queued or dropped, so the endpoint reveals nothing about moderation. Queued items wait for my review; only items I approve become memory.

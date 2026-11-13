@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 
-import type { ConversationRepo, SessionRepo } from '@local-ai/storage';
+import type { ConversationRepo, MemoryRepo, SessionRepo } from '@local-ai/storage';
 
 /**
  * Sessions without accounts (ADR-0009). The token is 256 random bits; only its
@@ -14,6 +14,12 @@ export interface SessionService {
   resolve(token: string): Promise<string | undefined>;
   /** True when the conversation is new or already belongs to this session. */
   claimConversation(conversationId: string, sessionId: string): Promise<boolean>;
+  /** Everything remembered about the session (ADR-0009). */
+  memory(sessionId: string): Promise<{ id: string; content: string; createdAt: Date }[]>;
+  /** Forgets one remembered item; false if it does not belong to this session. */
+  forget(sessionId: string, memoryId: string): Promise<boolean>;
+  /** Deletes the session and everything stored under it, for real. */
+  deleteEverything(sessionId: string): Promise<void>;
 }
 
 export const sessionCookie = 'lai_session';
@@ -23,6 +29,7 @@ const hash = (token: string): string => createHash('sha256').update(token).diges
 export function createSessionService(deps: {
   readonly sessions: SessionRepo;
   readonly conversations: ConversationRepo;
+  readonly memory: MemoryRepo;
   readonly randomToken?: () => string;
 }): SessionService {
   const randomToken = deps.randomToken ?? (() => randomBytes(32).toString('base64url'));
@@ -41,6 +48,9 @@ export function createSessionService(deps: {
     claimConversation(conversationId, sessionId) {
       return deps.conversations.claim(conversationId, sessionId);
     },
+    memory: (sessionId) => deps.memory.list(sessionId),
+    forget: (sessionId, memoryId) => deps.memory.delete(sessionId, memoryId),
+    deleteEverything: (sessionId) => deps.sessions.delete(sessionId),
   };
 }
 

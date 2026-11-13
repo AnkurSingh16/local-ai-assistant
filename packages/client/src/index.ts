@@ -11,4 +11,4 @@ export type { SseFrame } from './sse.js';
 export { cancelTurn, failTurn, initialTurn, reduceTurn } from './turn.js';
 export type { TurnView } from './turn.js';
 export { AccountError, createAccountClient } from './account.js';
-export type { AccountClient, AccountClientOptions } from './account.js';
+export type { AccountClient, AccountClientOptions, FeedbackKind, MemoryEntry } from './account.js';

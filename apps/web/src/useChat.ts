@@ -13,6 +13,8 @@ export interface Chat {
   readonly busy: boolean;
   send(question: string): Promise<void>;
   stop(): void;
+  /** Clears the conversation, after its data was deleted. */
+  reset(): void;
 }
 
 const genericFailure = 'Something went wrong. Please try again.';
@@ -68,5 +70,11 @@ export function useChat(client: ChatClient): Chat {
     controller.current?.abort();
   }, []);
 
-  return { turns, busy, send, stop };
+  const reset = useCallback(() => {
+    controller.current?.abort();
+    conversationId.current = undefined;
+    setTurns([]);
+  }, []);
+
+  return { turns, busy, send, stop, reset };
 }

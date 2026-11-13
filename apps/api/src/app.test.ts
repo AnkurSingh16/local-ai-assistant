@@ -6,6 +6,7 @@ import { sseEventSchema } from '@local-ai/contract';
 import {
   createConversationRepo,
   createFlagLog,
+  createMemoryRepo,
   createReviewRepo,
   createSessionRepo,
   openDatabase,
@@ -39,6 +40,7 @@ interface Harness {
   clock: ManualClock;
   logs: string[];
   routes: { method: string; url: string }[];
+  db?: ReturnType<typeof openDatabase>;
 }
 
 let open: FastifyInstance[] = [];
@@ -79,7 +81,11 @@ async function harness(
   const sessions =
     db === undefined || conversations === undefined
       ? undefined
-      : createSessionService({ sessions: createSessionRepo({ db, clock, newId }), conversations });
+      : createSessionService({
+          sessions: createSessionRepo({ db, clock, newId }),
+          conversations,
+          memory: createMemoryRepo({ db, clock, newId }),
+        });
   const feedback =
     db === undefined
       ? undefined
@@ -114,7 +120,7 @@ async function harness(
     ...options.deps,
   });
   open.push(app);
-  return { app, chat, clock, logs, routes };
+  return { app, chat, clock, logs, routes, ...(db === undefined ? {} : { db }) };
 }
 
 function post(app: FastifyInstance, body: unknown, headers: Record<string, string> = {}) {
@@ -480,6 +486,80 @@ describe('sessions and conversation memory', () => {
     expect(queued.statusCode).toBe(202);
     expect(dropped.statusCode).toBe(202);
     expect(dropped.body).toBe(queued.body);
+  });
+
+  it('shows remembered items and deletes one, or everything, for real', async () => {
+    const { app, db, clock } = await harness({ storage: true });
+    if (db === undefined) throw new Error('no db');
+    const login = await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } });
+    const cookie = cookieFrom(login);
+    const token = (JSON.parse(login.body) as { token: string }).token;
+    const sessionId =
+      (await createSessionService({
+        sessions: createSessionRepo({ db, clock, newId: () => 'x' }),
+        conversations: createConversationRepo({ db, clock, newId: () => 'x' }),
+        memory: createMemoryRepo({ db, clock, newId: () => 'x' }),
+      }).resolve(token)) ?? '';
+    const guard = createInputGuard({ moderation: createMockModerationProvider(), timeoutMs: 1000 });
+    const memory = createMemoryRepo({
+      db,
+      clock,
+      newId: () => `m-${String(Math.random()).slice(2, 8)}`,
+    });
+    for (const text of ['Call me Sam.', 'Prefers metric units.']) {
+      const verdict = await guard.check(text, new AbortController().signal);
+      if (!verdict.ok) throw new Error('refused');
+      await memory.add(sessionId, verdict.text, undefined);
+    }
+    await post(app, { message: 'Hello there.' }, { cookie });
+
+    const list = await app.inject({
+      method: 'GET',
+      url: '/v1/me/memory',
+      headers: { host, cookie },
+    });
+    const items = (JSON.parse(list.body) as { items: { id: string; content: string }[] }).items;
+    expect(items.map((i) => i.content)).toEqual(['Call me Sam.', 'Prefers metric units.']);
+
+    const first = items[0]?.id ?? '';
+    expect(
+      (
+        await app.inject({
+          method: 'DELETE',
+          url: `/v1/me/memory/${first}`,
+          headers: { host, cookie },
+        })
+      ).statusCode,
+    ).toBe(204);
+    expect(
+      (
+        await app.inject({
+          method: 'DELETE',
+          url: `/v1/me/memory/${first}`,
+          headers: { host, cookie },
+        })
+      ).statusCode,
+    ).toBe(404);
+
+    const gone = await app.inject({ method: 'DELETE', url: '/v1/me', headers: { host, cookie } });
+    expect(gone.statusCode).toBe(204);
+    expect(String(gone.headers['set-cookie'])).toContain('lai_session=;');
+    expect(
+      (await app.inject({ method: 'GET', url: '/v1/me', headers: { host, cookie } })).statusCode,
+    ).toBe(401);
+    for (const table of ['sessions', 'conversations', 'messages', 'memory', 'review_items']) {
+      expect(db.prepare(`SELECT count(*) AS n FROM ${table}`).get(), table).toEqual({ n: 0 });
+    }
+  });
+
+  it('refuses memory calls without a session', async () => {
+    const { app } = await harness({ storage: true });
+    expect(
+      (await app.inject({ method: 'GET', url: '/v1/me/memory', headers: { host } })).statusCode,
+    ).toBe(401);
+    expect(
+      (await app.inject({ method: 'DELETE', url: '/v1/me', headers: { host } })).statusCode,
+    ).toBe(401);
   });
 
   it('stays stateless without a session', async () => {

@@ -49,3 +49,42 @@ describe('account client', () => {
     await expect(bad.startSession(signal)).rejects.toBeInstanceOf(AccountError);
   });
 });
+
+describe('memory and feedback calls', () => {
+  it('lists, forgets, deletes everything and sends feedback', async () => {
+    const calls: { url: string; method: string | undefined; body: unknown }[] = [];
+    const account = createAccountClient({
+      baseUrl: '',
+      fetch: (url, init) => {
+        calls.push({ url, method: init.method, body: init.body });
+        if (url === '/v1/me/memory') {
+          return Promise.resolve(
+            Response.json({
+              items: [{ id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00.000Z' }],
+            }),
+          );
+        }
+        return Promise.resolve(new Response(null, { status: url === '/v1/feedback' ? 202 : 204 }));
+      },
+    });
+    expect((await account.memory(signal)).map((m) => m.content)).toEqual(['Call me Sam.']);
+    await account.forget('m 1', signal);
+    await account.deleteEverything(signal);
+    await account.sendFeedback('preference', 'Use metric.', signal);
+    expect(calls.map((c) => `${c.method ?? ''} ${c.url}`)).toEqual([
+      'GET /v1/me/memory',
+      'DELETE /v1/me/memory/m%201',
+      'DELETE /v1/me',
+      'POST /v1/feedback',
+    ]);
+    expect(calls[3]?.body).toBe(JSON.stringify({ kind: 'preference', text: 'Use metric.' }));
+  });
+
+  it('throws AccountError on a failed call', async () => {
+    const account = createAccountClient({
+      baseUrl: '',
+      fetch: () => Promise.resolve(new Response(null, { status: 401 })),
+    });
+    await expect(account.memory(signal)).rejects.toMatchObject({ status: 401 });
+  });
+});

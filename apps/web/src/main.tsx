@@ -24,7 +24,7 @@ const root = document.getElementById('root');
 if (root !== null) {
   createRoot(root).render(
     <StrictMode>
-      <App client={client} />
+      <App client={client} account={account} />
     </StrictMode>,
   );
 }
