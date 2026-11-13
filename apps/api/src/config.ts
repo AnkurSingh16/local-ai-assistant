@@ -23,7 +23,13 @@ const envSchema = z.object({
   /** `mock` runs the deterministic providers, for end-to-end tests and demos without Ollama. */
   PROVIDERS: z.enum(['ollama', 'mock']).default('ollama'),
   OLLAMA_BASE_URL: z.url({ protocol: /^https?$/ }).default('http://127.0.0.1:11434'),
-  SEARXNG_URL: z.url({ protocol: /^https?$/ }).default('http://127.0.0.1:8888'),
+  // Loopback only (ADR-0010): queries derived from user messages never travel in clear text.
+  SEARXNG_URL: z
+    .url({ protocol: /^https?$/ })
+    .refine((u) => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(u).hostname), {
+      message: 'SEARXNG_URL must point at loopback (127.0.0.1, localhost or [::1])',
+    })
+    .default('http://127.0.0.1:8888'),
   SEARCH_TIMEOUT_MS: positiveInt.default(5_000),
   CHAT_MODEL: z.string().min(1).default('qwen2.5:7b'),
   GUARD_MODEL: z.string().min(1).default('llama-guard3:1b'),

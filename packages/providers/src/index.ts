@@ -4,7 +4,7 @@
  */
 export { createOllamaChatProvider } from './ollama/chat.js';
 export type { OllamaChatConfig } from './ollama/chat.js';
-export type { FetchFn } from './ollama/http.js';
+export type { FetchFn } from './shared/http.js';
 export {
   createOllamaModerationProvider,
   guardNumCtx,

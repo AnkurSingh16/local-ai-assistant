@@ -46,7 +46,7 @@ launchctl setenv OLLAMA_NUM_PARALLEL 1
 
 ## SearXNG
 
-SearXNG runs in Docker Compose (`compose.yaml`) and needs no API key. It is published on `127.0.0.1:8888` only, with a read-only filesystem, no Linux capabilities and the image pinned by digest; `searxng/settings.yml` turns on JSON output and safe search and leaves everything else at SearXNG's defaults. `npm run dev` starts it, or start and stop it yourself:
+SearXNG runs in Docker Compose (`compose.yaml`) and needs no API key. It is published on `127.0.0.1:8888` only, with a read-only filesystem, no Linux capabilities and the image pinned by digest; `searxng/settings.yml` turns on JSON output and strict safe search, turns off the bot limiter (it is reachable only from this machine), the image proxy and metrics, and shortens the outgoing timeouts; the rest stays at SearXNG's defaults. The container runs as SearXNG's own unprivileged user with memory and process limits. `npm run dev` starts it, or start and stop it yourself:
 
 ```bash
 npm run searxng:up
@@ -56,7 +56,7 @@ npm run searxng:up
 npm run searxng:down
 ```
 
-`searxng:up` generates a fresh random `SEARXNG_SECRET` on every start, so no secret is stored. The doctor checks that SearXNG answers on its health endpoint.
+`searxng:up` generates a fresh random `SEARXNG_SECRET` on every start, so no secret is stored, and does nothing when `PROVIDERS=mock`. The doctor checks that SearXNG answers on its health endpoint.
 
 ## Running the assistant
 

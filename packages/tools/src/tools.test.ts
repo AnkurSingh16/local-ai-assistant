@@ -2,7 +2,7 @@ import { createManualClock, isAbortError } from '@local-ai/core';
 import { createMockSearchProvider } from '@local-ai/providers/mock';
 import { describe, expect, it } from 'vitest';
 
-import { createTtlCache } from './cache.js';
+import { createTtlCache, maxCacheEntries, pageCacheTtlMs, searchCacheTtlMs } from './cache.js';
 import type { WebSearchOutcome } from './web-search.js';
 import { createWebSearch, maxSearchResults } from './web-search.js';
 
@@ -11,6 +11,12 @@ const key = new Uint8Array(32).fill(7);
 const signal = new AbortController().signal;
 
 describe('TTL cache', () => {
+  it('uses the ADR-0011 lifetimes and size', () => {
+    expect(searchCacheTtlMs).toBe(600_000);
+    expect(pageCacheTtlMs).toBe(3_600_000);
+    expect(maxCacheEntries).toBe(5_000);
+  });
+
   it('expires entries after the TTL', () => {
     const clock = createManualClock(start);
     const cache = createTtlCache<string>({ clock, ttlMs: 1000, maxEntries: 10, hmacKey: key });

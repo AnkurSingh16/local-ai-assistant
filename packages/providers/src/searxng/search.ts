@@ -2,9 +2,9 @@ import type { SearchProvider, SearchQuery, SearchResult } from '@local-ai/core';
 import { ProviderError } from '@local-ai/core';
 import { z } from 'zod';
 
-import type { FetchFn } from '../ollama/http.js';
-import { parseJsonLine } from '../ollama/http.js';
-import { readCapped } from '../ollama/ndjson.js';
+import type { FetchFn } from '../shared/http.js';
+import { parseJsonLine } from '../shared/http.js';
+import { readCapped } from '../shared/ndjson.js';
 
 /** A results page is tens of kilobytes; this bounds what a broken instance can make us buffer. */
 const maxResponseChars = 1024 * 1024;
@@ -28,15 +28,22 @@ const responseSchema = z.object({
   ),
 });
 
+/** Long enough for real links; anything longer would crowd the context budget (ADR-0004). */
+const maxUrlChars = 2048;
+
 /**
- * Keeps https results only: read_page fetches https only (ADR-0008), so an http
- * result could never be read or cited safely.
+ * Keeps https results without credentials, normalised so duplicates match:
+ * read_page fetches only such URLs (ADR-0008), so anything else could never be
+ * read or cited safely.
  */
-function isHttps(url: string): boolean {
+function usableUrl(raw: string): string | undefined {
+  if (raw.length > maxUrlChars) return undefined;
   try {
-    return new URL(url).protocol === 'https:';
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' || url.username !== '' || url.password !== '') return undefined;
+    return url.toString();
   } catch {
-    return false;
+    return undefined;
   }
 }
 
@@ -46,16 +53,21 @@ const clean = (text: string | undefined, max: number): string =>
 export function createSearxngSearchProvider(config: SearxngConfig): SearchProvider {
   return {
     async search(q: SearchQuery, signal: AbortSignal): Promise<SearchResult[]> {
-      const url = new URL('/search', config.baseUrl);
+      // Relative to the base, so a path prefix in SEARXNG_URL is kept.
+      const url = new URL(
+        'search',
+        config.baseUrl.endsWith('/') ? config.baseUrl : `${config.baseUrl}/`,
+      );
       url.searchParams.set('q', q.query);
       url.searchParams.set('format', 'json');
-      url.searchParams.set('safesearch', '1');
+      url.searchParams.set('safesearch', '2');
       url.searchParams.set('categories', 'general');
       let res: Response;
       try {
         res = await config.fetch(url.toString(), {
           method: 'GET',
           headers: { accept: 'application/json' },
+          redirect: 'error',
           signal,
         });
       } catch (err) {
@@ -74,10 +86,11 @@ export function createSearxngSearchProvider(config: SearxngConfig): SearchProvid
       const results: SearchResult[] = [];
       for (const r of parsed.data.results) {
         if (results.length >= q.limit) break;
-        if (!isHttps(r.url) || seen.has(r.url)) continue;
-        seen.add(r.url);
+        const resultUrl = usableUrl(r.url);
+        if (resultUrl === undefined || seen.has(resultUrl)) continue;
+        seen.add(resultUrl);
         results.push({
-          url: r.url,
+          url: resultUrl,
           title: clean(r.title, maxTitleChars),
           snippet: clean(r.content, maxSnippetChars),
         });

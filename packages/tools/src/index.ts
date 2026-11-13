@@ -1,4 +1,4 @@
-export { createTtlCache } from './cache.js';
+export { createTtlCache, maxCacheEntries, pageCacheTtlMs, searchCacheTtlMs } from './cache.js';
 export type { TtlCache, TtlCacheConfig } from './cache.js';
 export {
   createWebSearch,

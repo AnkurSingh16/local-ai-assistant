@@ -17,7 +17,8 @@ server:
   public_instance: false
 
 search:
-  safe_search: 1
+  # Strict, the safer default for a general assistant.
+  safe_search: 2
   formats:
     - html
     - json

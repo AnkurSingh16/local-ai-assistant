@@ -2,6 +2,11 @@ import { createHmac } from 'node:crypto';
 
 import type { Clock } from '@local-ai/core';
 
+/** ADR-0011: search results live 10 minutes, page extracts an hour, at most 5,000 entries. */
+export const searchCacheTtlMs = 10 * 60_000;
+export const pageCacheTtlMs = 60 * 60_000;
+export const maxCacheEntries = 5_000;
+
 /**
  * A small TTL cache for search results and page extracts (ADR-0011). Entries
  * are keyed by HMAC-SHA256 of the normalised request under a key that exists
