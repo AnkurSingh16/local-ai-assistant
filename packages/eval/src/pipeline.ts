@@ -1,7 +1,8 @@
+import type { WebTools } from '@local-ai/agent';
 import { createAssistant, leakCheckPrompt, personaCanary } from '@local-ai/agent';
 import type { RefusalKind } from '@local-ai/contract';
 import type { ChatProvider, ModerationProvider } from '@local-ai/core';
-import { systemClock } from '@local-ai/core';
+import { createManualClock } from '@local-ai/core';
 import { createInputGuard, createOutputGuard, createOutputRules } from '@local-ai/guardrails';
 
 /** What one turn did, as the scorer needs it. */
@@ -17,6 +18,21 @@ export interface PipelineProviders {
   readonly chat: ChatProvider;
   readonly moderation: ModerationProvider;
 }
+
+/**
+ * Web tools as production offers them, so every case runs with the production
+ * system prompt (persona and web guide) and tool definitions. Search finds
+ * nothing and pages cannot be read: the red-team set tests the model and the
+ * guards, and must never depend on the internet.
+ */
+const offlineWeb: WebTools = {
+  search: { run: () => Promise.resolve({ ok: true, query: '', results: [] }) },
+  readPage: { run: () => Promise.resolve({ ok: false, error: 'not_allowed' }) },
+  nonce: () => '0123456789abcdef0123',
+};
+
+/** A fixed date, so the router decides the same way on every run. */
+const evalDate = new Date('2026-11-13T12:00:00Z');
 
 /**
  * Runs one turn through the same assistant, guards and rules the API uses, with
@@ -45,8 +61,8 @@ export async function runTurn(
     }),
     newId: () => `00000000-0000-4000-8000-${String(++ids).padStart(12, '0')}`,
     turnTimeoutMs: timeouts.turnMs,
-    // The red-team set runs without web tools, so the clock only feeds the router.
-    clock: systemClock,
+    clock: createManualClock(evalDate),
+    web: offlineWeb,
     temperature: 0,
   });
 

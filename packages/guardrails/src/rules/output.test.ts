@@ -114,6 +114,8 @@ describe('output rules: claimed feelings and humanity', () => {
     'The reCAPTCHA checkbox says "I\'m not a robot".',
     "I'm not a machine learning expert, but here is what the paper says.",
     "I'm happy to help with that.",
+    "No, it doesn't hurt my feelings because I don't have feelings.",
+    'Insults cannot hurt my feelings; I do not have any.',
   ])('passes %s', (text) => {
     expect(rules.check(text)).toBeUndefined();
   });

@@ -44,8 +44,15 @@ function recording(chat: ChatProvider, moderation: ModerationProvider) {
     captured,
     chat: {
       async *chat(req, signal) {
+        // A turn may call the model more than once (a forced search query, or a
+        // tool step before the answer). The answer is the text of the last call
+        // that wrote any, which replay then plays back for every call.
+        let text = '';
         for await (const chunk of chat.chat(req, signal)) {
-          if (chunk.type === 'text') captured.answer += chunk.text;
+          if (chunk.type === 'text') {
+            text += chunk.text;
+            captured.answer = text;
+          }
           yield chunk;
         }
       },

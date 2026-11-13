@@ -4,13 +4,13 @@ import type { FinishReason, SseEvent, StatusPhase } from '@local-ai/contract';
 import type { InputGuard, OutputGuard } from '@local-ai/guardrails';
 import { createParagraphSplitter, refusalMessages } from '@local-ai/guardrails';
 
-import { persona } from '../persona/persona.js';
-import { contextBudget, estimateTokens } from './budget.js';
+import { persona, webGuide } from '../persona/persona.js';
+import { contextBudget, estimateTokens, maxPromptTokens, promptTokens } from './budget.js';
 import { citationsIn, keepListedLinks } from './links.js';
 import { isTimeSensitive } from './routing.js';
 import { runToolCalls, writeQuery } from './steps.js';
 import type { WebTools } from './web.js';
-import { allowedTools, newTaint, webGuide } from './web.js';
+import { allowedTools, newTaint } from './web.js';
 
 export interface AssistantDeps {
   readonly chat: ChatProvider;
@@ -155,10 +155,14 @@ export function createAssistant(deps: AssistantDeps): Assistant {
         const step = async (offerTools: boolean): Promise<readonly ToolCall[]> => {
           const calls: ToolCall[] = [];
           let wroteText = false;
+          const tools = offerTools ? allowedTools(taint) : undefined;
+          if (promptTokens(messages, tools) > maxPromptTokens) {
+            throw new Error('the prompt is over the context budget');
+          }
           const stream = deps.chat.chat(
             {
               messages,
-              ...(offerTools ? { tools: allowedTools(taint) } : {}),
+              ...(tools === undefined ? {} : { tools }),
               options: {
                 numCtx: contextBudget.numCtx,
                 maxOutputTokens: contextBudget.output,
@@ -221,6 +225,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
 
         try {
           const cited = new Set<number>();
+          let released = false;
           for (;;) {
             const item = pending.shift();
             if (item === undefined) {
@@ -248,6 +253,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               return;
             }
             yield { type: 'delta', text: checked.text };
+            released = true;
             // A citation is sent only after the paragraph that cites it is released (ADR-0005).
             // [n] markers, and links straight to a listed source, both count as citing it.
             const linked = sources.filter((s) => checked.text.includes(s.url)).map((s) => s.id);
@@ -262,6 +268,13 @@ export function createAssistant(deps: AssistantDeps): Assistant {
             throw pumpState.error instanceof Error
               ? pumpState.error
               : new Error('chat stream failed');
+          }
+          if (!released) {
+            // The model spent every step on tool calls, or wrote nothing: an
+            // empty answer would look like success, so it is reported instead.
+            yield error('internal', true);
+            yield done('error');
+            return;
           }
           yield done(pumpState.finish);
         } finally {

@@ -45,12 +45,29 @@ export interface WebSearchConfig {
 }
 
 /**
- * ADR-0003: a query that carries personal data (card numbers, social security
- * numbers, keys) never goes to a search engine. Checked here, inside the tool,
- * so forced and model-chosen queries both pass through it. The approved-memory
- * overlap check joins it when memory arrives in Milestone 5.
+ * ADR-0003: a query that matches the personal-data patterns of ADR-0009 never
+ * goes to a search engine. Checked here, inside the tool, so forced and
+ * model-chosen queries both pass through it. The approved-memory overlap check
+ * joins it when memory arrives in Milestone 5.
  */
-const personalData = createRules({ categories: ['personal_data'] });
+const personalDataRules = createRules({ categories: ['personal_data'] });
+
+/** The ADR-0009 patterns the input rules do not cover: they guard chat, not queries. */
+const queryPatterns: readonly RegExp[] = [
+  // An email address.
+  /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/,
+  // Six or more digits in a row: account, order, ID and most phone numbers.
+  /\d{6,}/,
+  // A phone number written in groups, such as 555-123-4567 or +44 20 7946 0958.
+  /(?:\+\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-]\d{3,4}[\s.-]\d{3,4}\b/,
+  // A URL with a query string, which often carries tokens or identifiers.
+  /\bhttps?:\/\/\S*\?\S*=/i,
+];
+
+/** True when a search query looks like it carries personal data. */
+export function queryHasPersonalData(query: string): boolean {
+  return personalDataRules.check(query) !== undefined || queryPatterns.some((p) => p.test(query));
+}
 
 /** Spacing and case do not change the results, so they do not split the cache. */
 const normalise = (query: string): string => query.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -66,7 +83,7 @@ export function createWebSearch(config: WebSearchConfig): WebSearch {
       const parsed = argsSchema.safeParse(args);
       if (!parsed.success) return { ok: false, error: 'invalid_arguments' };
       const query = parsed.data.query;
-      if (personalData.check(query) !== undefined) return { ok: false, error: 'blocked_query' };
+      if (queryHasPersonalData(query)) return { ok: false, error: 'blocked_query' };
       const key = normalise(query);
       const cached = config.cache.get(key);
       if (cached !== undefined) return { ok: true, query, results: cached };

@@ -7,9 +7,9 @@ export {
   persona,
   personaCanary,
   personaVersion,
+  webGuide,
 } from '../persona/persona.js';
 export { currentDatetime, datetimeDefinition } from './datetime.js';
 export { citationsIn, keepListedLinks } from './links.js';
 export { isTimeSensitive, trainingCutoffYear } from './routing.js';
-export { webGuide } from './web.js';
 export type { WebTools } from './web.js';

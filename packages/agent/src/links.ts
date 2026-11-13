@@ -5,7 +5,8 @@
  * is checked and released.
  */
 const markdownLink = /\[([^\]\n]{0,300})\]\((\S{1,2048}?)\)/g;
-const bareUrl = /\bhttps?:\/\/[^\s<>()\]]{1,2048}/g;
+// Case-insensitive, and www. without a scheme too, since a client may autolink either.
+const bareUrl = /\b(?:https?:\/\/|www\.)[^\s<>()\]]{1,2048}/gi;
 
 /** Trailing punctuation belongs to the sentence, not the URL. */
 const trailing = /[.,;:!?'"]+$/;

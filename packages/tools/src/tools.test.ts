@@ -83,14 +83,31 @@ describe('web_search tool', () => {
     expect(search.calls).toHaveLength(0);
   });
 
-  it('refuses a query that carries personal data, without searching', async () => {
+  it.each([
+    ['a card number', 'my card 4111 1111 1111 1111 balance'],
+    ['an email address', 'who owns sam.lee+news@example.co.uk'],
+    ['six digits in a row', 'order 4829175 delivery status'],
+    ['a US phone number', 'whose number is 555-123-4567'],
+    ['a bracketed phone number', 'reverse lookup (415) 555 0199'],
+    ['an international phone number', 'caller +44 20 7946 0958 scam'],
+    ['a URL with a query string', 'https://bank.example/reset?token=abc123 safe'],
+  ])('refuses a query that carries %s, without searching', async (_, query) => {
     const search = createMockSearchProvider();
     const tool = createWebSearch({ search, cache: cacheFor(), timeoutMs: 1000 });
-    expect(await tool.run({ query: 'my card 4111 1111 1111 1111 balance' }, signal)).toEqual({
-      ok: false,
-      error: 'blocked_query',
-    });
+    expect(await tool.run({ query }, signal)).toEqual({ ok: false, error: 'blocked_query' });
     expect(search.calls).toHaveLength(0);
+  });
+
+  it.each([
+    'premier league table 2025 2026',
+    'iPhone 17 Pro price',
+    'node 24.11.1 release notes',
+    'weather in London today',
+    'https://nodejs.org/en/about/previous-releases',
+  ])('lets an ordinary query through: %s', async (query) => {
+    const search = createMockSearchProvider();
+    const tool = createWebSearch({ search, cache: cacheFor(), timeoutMs: 1000 });
+    expect((await tool.run({ query }, signal)).ok).toBe(true);
   });
 
   it('serves a repeat query from the cache, ignoring case and spacing', async () => {
