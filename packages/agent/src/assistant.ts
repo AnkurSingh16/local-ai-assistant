@@ -27,6 +27,13 @@ export interface AssistantDeps {
   readonly web?: WebTools;
   /** Conversation history for turns that are remembered (a session is present). */
   readonly conversations?: ConversationStore;
+  /** Approved memory for the session; only items the owner approved are ever returned. */
+  readonly memory?: MemoryRecall;
+}
+
+/** Items the owner approved for this session that relate to the message (ADR-0009). */
+export interface MemoryRecall {
+  recall(sessionId: string, message: string, signal: AbortSignal): Promise<string[]>;
 }
 
 /**
@@ -58,6 +65,8 @@ export interface TurnInput {
   readonly requestId: string;
   /** Load and store history for this conversation; the route sets it only for a claimed conversation. */
   readonly remember?: boolean;
+  /** The session the turn belongs to, for approved memory. */
+  readonly sessionId?: string;
 }
 
 export interface Assistant {
@@ -80,6 +89,7 @@ export function buildMessages(
   user: ModeratedText,
   withWeb = false,
   history: readonly { role: 'user' | 'assistant'; content: string }[] = [],
+  memory: readonly string[] = [],
 ): ChatMessage[] | undefined {
   const system = withWeb ? `${persona}\n\n${webGuide}` : persona;
   if (estimateTokens(system) > contextBudget.system) return undefined;
@@ -95,7 +105,30 @@ export function buildMessages(
     used += cost;
     kept.unshift({ role: m.role, content: m.content });
   }
-  return [{ role: 'system', content: system }, ...kept, { role: 'user', content: user }];
+  // Approved memory fills its own slot, most relevant first, and never displaces history.
+  const remembered: string[] = [];
+  let memoryUsed = 0;
+  for (const item of memory) {
+    const cost = estimateTokens(item) + 2;
+    if (memoryUsed + cost > contextBudget.memory) break;
+    memoryUsed += cost;
+    remembered.push(`- ${item}`);
+  }
+  const memoryMessage: ChatMessage[] =
+    remembered.length === 0
+      ? []
+      : [
+          {
+            role: 'system',
+            content: `Things this user asked you to remember, reviewed and approved:\n${remembered.join('\n')}`,
+          },
+        ];
+  return [
+    { role: 'system', content: system },
+    ...memoryMessage,
+    ...kept,
+    { role: 'user', content: user },
+  ];
 }
 
 export function createAssistant(deps: AssistantDeps): Assistant {

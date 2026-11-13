@@ -8,7 +8,8 @@
     "start": "node --env-file-if-exists=../../.env dist/server.js",
     "build": "tsc -b tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "doctor": "tsx --conditions=@local-ai/source --env-file-if-exists=../../.env src/doctor.ts"
+    "doctor": "tsx --conditions=@local-ai/source --env-file-if-exists=../../.env src/doctor.ts",
+    "review": "tsx --conditions=@local-ai/source --env-file-if-exists=../../.env src/review.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",

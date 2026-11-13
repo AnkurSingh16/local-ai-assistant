@@ -35,6 +35,7 @@ const envSchema = z.object({
   DATABASE_PATH: z.string().min(1).default('data/assistant.db'),
   CHAT_MODEL: z.string().min(1).default('qwen2.5:7b'),
   GUARD_MODEL: z.string().min(1).default('llama-guard3:1b'),
+  EMBED_MODEL: z.string().min(1).default('nomic-embed-text'),
   OLLAMA_KEEP_ALIVE: z
     .string()
     .regex(/^\d+[smh]$/)
@@ -65,6 +66,7 @@ export interface Config {
   readonly guardTimeoutMs: number;
   readonly searxngUrl: string;
   readonly databasePath: string;
+  readonly embedModel: string;
   readonly searchTimeoutMs: number;
   readonly guardWarmTimeoutMs: number;
   readonly turnTimeoutMs: number;
@@ -106,6 +108,7 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>): 
     guardTimeoutMs: e.GUARD_TIMEOUT_MS,
     searxngUrl: e.SEARXNG_URL,
     databasePath: e.DATABASE_PATH,
+    embedModel: e.EMBED_MODEL,
     searchTimeoutMs: e.SEARCH_TIMEOUT_MS,
     guardWarmTimeoutMs: e.GUARD_WARM_TIMEOUT_MS,
     turnTimeoutMs: e.TURN_TIMEOUT_MS,

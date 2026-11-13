@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { FetchFn } from '../shared/http.js';
 import { createOllamaChatProvider } from './chat.js';
+import { createOllamaEmbeddingProvider } from './embeddings.js';
 import { createOllamaModerationProvider, parseGuardVerdict } from './moderation.js';
 import { readCapped, readLines } from '../shared/ndjson.js';
 
@@ -482,5 +483,35 @@ describe('Ollama guard residency', () => {
       fetch: () => Promise.reject(new TypeError('fetch failed')),
     });
     await expect(down.isResident?.(signal)).rejects.toBeInstanceOf(ProviderError);
+  });
+});
+
+describe('Ollama embedding provider', () => {
+  const vector = Array.from({ length: 768 }, (_, i) => i / 768);
+  it('embeds texts through /api/embed', async () => {
+    const captured: Captured[] = [];
+    const provider = createOllamaEmbeddingProvider({
+      ...base,
+      model: 'nomic-embed-text',
+      fetch: fakeFetch(() => Response.json({ embeddings: [vector, vector] }), captured),
+    });
+    const out = await provider.embed(['a', 'b'], new AbortController().signal);
+    expect(out).toHaveLength(2);
+    expect(out[0]?.length).toBe(768);
+    expect(captured[0]?.url).toBe('http://127.0.0.1:11434/api/embed');
+    expect(captured[0]?.body).toMatchObject({ model: 'nomic-embed-text', input: ['a', 'b'] });
+  });
+
+  it('rejects a wrong shape', async () => {
+    for (const body of [{ embeddings: [[1, 2]] }, { embeddings: [] }, { nope: true }]) {
+      const provider = createOllamaEmbeddingProvider({
+        ...base,
+        model: 'nomic-embed-text',
+        fetch: fakeFetch(() => Response.json(body)),
+      });
+      await expect(provider.embed(['a'], new AbortController().signal)).rejects.toBeInstanceOf(
+        ProviderError,
+      );
+    }
   });
 });

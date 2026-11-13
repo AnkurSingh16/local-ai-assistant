@@ -18,6 +18,7 @@
     "dev": "concurrently --kill-others-on-fail -n api,web -c blue,green \"npm run dev -w @local-ai/api\" \"npm run dev -w @local-ai/web\"",
     "predev": "npm run searxng:up && npm run doctor",
     "doctor": "npm run doctor -w @local-ai/api",
+    "review": "npm run review -w @local-ai/api --",
     "searxng:up": "node scripts/searxng-up.mjs",
     "searxng:down": "docker compose down",
     "lint": "eslint . --max-warnings=0",

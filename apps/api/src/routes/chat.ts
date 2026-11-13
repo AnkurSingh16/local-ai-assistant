@@ -115,6 +115,7 @@ export function registerChatRoute(app: FastifyInstance, deps: AppDeps, slots: Tu
             ...(conversationId === undefined ? {} : { conversationId }),
             requestId: request.id,
             remember,
+            ...(sessionId === undefined ? {} : { sessionId }),
           },
           client.signal,
         )) {

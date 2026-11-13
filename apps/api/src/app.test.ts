@@ -3,7 +3,13 @@ import type { ManualClock } from '@local-ai/core';
 import { createManualClock } from '@local-ai/core';
 import type { SseEvent } from '@local-ai/contract';
 import { sseEventSchema } from '@local-ai/contract';
-import { createConversationRepo, createSessionRepo, openDatabase } from '@local-ai/storage';
+import {
+  createConversationRepo,
+  createFlagLog,
+  createReviewRepo,
+  createSessionRepo,
+  openDatabase,
+} from '@local-ai/storage';
 import { createInputGuard, createOutputGuard, createOutputRules } from '@local-ai/guardrails';
 import type { MockChatProvider, MockModerationOptions } from '@local-ai/providers/mock';
 import {
@@ -19,6 +25,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { AppDeps } from './app.js';
 import { bodyLimitBytes, createApp } from './app.js';
 import { trackReadiness } from './compose.js';
+import { createFeedbackService } from './learning.js';
 import { createSessionService } from './sessions.js';
 import { parseConfig } from './config.js';
 import { createLogEvent } from './logging.js';
@@ -73,6 +80,14 @@ async function harness(
     db === undefined || conversations === undefined
       ? undefined
       : createSessionService({ sessions: createSessionRepo({ db, clock, newId }), conversations });
+  const feedback =
+    db === undefined
+      ? undefined
+      : createFeedbackService({
+          inputGuard: createInputGuard({ moderation, timeoutMs: 1000 }),
+          review: createReviewRepo({ db, clock, newId }),
+          flags: createFlagLog({ db, clock, newId }),
+        });
   const app = await createApp({
     config,
     clock,
@@ -95,6 +110,7 @@ async function harness(
       ...(conversations === undefined ? {} : { conversations }),
     }),
     ...(sessions === undefined ? {} : { sessions }),
+    ...(feedback === undefined ? {} : { feedback }),
     ...options.deps,
   });
   open.push(app);
@@ -443,6 +459,27 @@ describe('sessions and conversation memory', () => {
     expect(
       (await app.inject({ method: 'GET', url: '/v1/me', headers: { host, cookie } })).statusCode,
     ).toBe(200);
+  });
+
+  it('takes feedback only with a session and answers the same whether it is queued or dropped', async () => {
+    const { app } = await harness({ storage: true });
+    const send = (payload: unknown, headers: Record<string, string> = {}) =>
+      app.inject({
+        method: 'POST',
+        url: '/v1/feedback',
+        headers: { host, 'content-type': 'application/json', ...headers },
+        payload: JSON.stringify(payload),
+      });
+    expect((await send({ kind: 'feedback', text: 'Nice.' })).statusCode).toBe(401);
+    const cookie = cookieFrom(
+      await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } }),
+    );
+    expect((await send({ kind: 'nope', text: 'x' }, { cookie })).statusCode).toBe(400);
+    const queued = await send({ kind: 'preference', text: 'Use metric units.' }, { cookie });
+    const dropped = await send({ kind: 'feedback', text: 'MOCK_FLAG awful' }, { cookie });
+    expect(queued.statusCode).toBe(202);
+    expect(dropped.statusCode).toBe(202);
+    expect(dropped.body).toBe(queued.body);
   });
 
   it('stays stateless without a session', async () => {

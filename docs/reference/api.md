@@ -10,6 +10,10 @@ There are no accounts. `POST /v1/sessions` creates an anonymous session and answ
 
 With a session, `POST /v1/chat` remembers the conversation: the most recent turns that fit the history budget are sent with the next message, and the moderated message and the released answer are stored. A `conversationId` that belongs to another session is answered with `404`. Without a session every turn is stateless.
 
+## `POST /v1/feedback`
+
+Needs a session. Body: `{ "kind": "feedback" | "correction" | "preference", "text": "1 to 1,000 characters" }`. The text passes the same input guard as a chat message; a flagged item is dropped and only its category and time are recorded. The answer is always `202` with `{ "received": true }`, whether the item was queued or dropped, so the endpoint reveals nothing about moderation. Queued items wait for my review; only items I approve become memory.
+
 ## `POST /v1/chat`
 
 Runs one turn and streams it as Server-Sent Events ([ADR-0007](../adr/0007-streaming-contract.md)). The schemas live in `packages/contract`.

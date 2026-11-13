@@ -13,3 +13,5 @@ export {
 export type { OllamaModerationConfig } from './ollama/moderation.js';
 export { createSearxngSearchProvider } from './searxng/search.js';
 export type { SearxngConfig } from './searxng/search.js';
+export { createOllamaEmbeddingProvider, nomicDimensions } from './ollama/embeddings.js';
+export type { OllamaEmbeddingConfig } from './ollama/embeddings.js';

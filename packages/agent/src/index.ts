@@ -1,5 +1,11 @@
 export { buildMessages, createAssistant, maxModelSteps } from './assistant.js';
-export type { Assistant, AssistantDeps, ConversationStore, TurnInput } from './assistant.js';
+export type {
+  Assistant,
+  AssistantDeps,
+  ConversationStore,
+  MemoryRecall,
+  TurnInput,
+} from './assistant.js';
 export { contextBudget, estimateTokens } from './budget.js';
 export {
   crisisInstruction,

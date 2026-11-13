@@ -9,6 +9,7 @@ import type { AppDeps } from './deps.js';
 import { apiError } from './http.js';
 import { createClockStore, createTurnSlots } from './limits.js';
 import { registerChatRoute } from './routes/chat.js';
+import { registerFeedbackRoute } from './routes/feedback.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerSessionRoutes } from './routes/sessions.js';
 
@@ -129,6 +130,7 @@ export async function createApp(deps: AppDeps): Promise<FastifyInstance> {
 
   registerHealthRoutes(app, deps);
   registerSessionRoutes(app, deps);
+  registerFeedbackRoute(app, deps);
   registerChatRoute(app, deps, createTurnSlots(config.maxConcurrentTurns, config.maxQueuedTurns));
   return app;
 }

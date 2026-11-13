@@ -13,15 +13,24 @@ import {
 } from '@local-ai/guardrails';
 import {
   createOllamaChatProvider,
+  createOllamaEmbeddingProvider,
   createOllamaModerationProvider,
   createSearxngSearchProvider,
 } from '@local-ai/providers';
 import {
   createMockChatProvider,
+  createMockEmbeddingProvider,
   createMockModerationProvider,
   createMockSearchProvider,
 } from '@local-ai/providers/mock';
-import { createConversationRepo, createSessionRepo, openDatabase } from '@local-ai/storage';
+import {
+  createConversationRepo,
+  createFlagLog,
+  createMemoryRepo,
+  createReviewRepo,
+  createSessionRepo,
+  openDatabase,
+} from '@local-ai/storage';
 import type { HopFetch } from '@local-ai/tools';
 import {
   createPageParser,
@@ -39,6 +48,8 @@ import {
 import type { FetchFn } from '@local-ai/providers';
 
 import type { Config } from './config.js';
+import type { FeedbackService } from './learning.js';
+import { createFeedbackService, createMemoryRecall } from './learning.js';
 import type { SessionService } from './sessions.js';
 import { createSessionService } from './sessions.js';
 
@@ -52,6 +63,7 @@ export interface Composition {
   /** True once any guard classification has succeeded (ADR-0005). */
   readonly isReady: () => boolean;
   readonly sessions: SessionService;
+  readonly feedback: FeedbackService;
   /** Closes the database on shutdown. */
   readonly close: () => void;
 }
@@ -165,6 +177,16 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
   const storageDeps = { db, clock, newId };
   const sessionRepo = createSessionRepo(storageDeps);
   const conversationRepo = createConversationRepo(storageDeps);
+  const memoryRepo = createMemoryRepo(storageDeps);
+  const embeddings =
+    config.providers === 'mock'
+      ? createMockEmbeddingProvider()
+      : createOllamaEmbeddingProvider({
+          baseUrl: config.ollamaBaseUrl,
+          model: config.embedModel,
+          keepAlive: config.ollamaKeepAlive,
+          fetch: fetchFn,
+        });
   // Idle sessions and everything under them go at start-up (ADR-0009).
   void sessionRepo.purgeIdle();
   const assistant = createAssistant({
@@ -179,12 +201,18 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
     clock,
     web: webTools(config, clock, fetchFn),
     conversations: conversationRepo,
+    memory: createMemoryRecall({ memory: memoryRepo, embeddings, timeoutMs: 5_000 }),
   });
   return {
     assistant,
     moderation: tracked.moderation,
     isReady: tracked.isReady,
     sessions: createSessionService({ sessions: sessionRepo, conversations: conversationRepo }),
+    feedback: createFeedbackService({
+      inputGuard: createInputGuard(guard),
+      review: createReviewRepo(storageDeps),
+      flags: createFlagLog(storageDeps),
+    }),
     close: () => {
       db.close();
     },

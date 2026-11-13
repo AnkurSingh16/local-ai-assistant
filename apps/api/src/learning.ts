@@ -1,0 +1,158 @@
+import type { MemoryRecall } from '@local-ai/agent';
+import type { EmbeddingProvider } from '@local-ai/core';
+import type { InputGuard } from '@local-ai/guardrails';
+import type { FlagLog, MemoryRepo, ReviewItem, ReviewKind, ReviewRepo } from '@local-ai/storage';
+
+/**
+ * Safe learning (requirement 4, ADR-0009). Nothing users write changes the
+ * assistant directly: feedback, corrections and preferences are moderated,
+ * queued for my review, and only what I approve becomes memory, tied to the
+ * session it came from.
+ */
+
+/** A recalled item must be at least this similar to the message (cosine, nomic-embed-text). */
+const minSimilarity = 0.35;
+const maxRecalled = 3;
+
+function cosine(a: Float32Array, b: Float32Array): number {
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < a.length && i < b.length; i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    dot += x * y;
+    na += x * x;
+    nb += y * y;
+  }
+  return na === 0 || nb === 0 ? 0 : dot / Math.sqrt(na * nb);
+}
+
+/**
+ * Approved memory scored by brute-force cosine in JavaScript: every item was
+ * approved by hand, so there are few of them (ADR-0001). Memory is a nicety,
+ * so a failed embedding means no memory for that turn, never a failed turn.
+ */
+export function createMemoryRecall(deps: {
+  readonly memory: MemoryRepo;
+  readonly embeddings: EmbeddingProvider;
+  readonly timeoutMs: number;
+}): MemoryRecall {
+  return {
+    async recall(sessionId, message, signal) {
+      const items = await deps.memory.withEmbeddings(sessionId);
+      if (items.length === 0) return [];
+      try {
+        const [query] = await deps.embeddings.embed(
+          [message],
+          AbortSignal.any([signal, AbortSignal.timeout(deps.timeoutMs)]),
+        );
+        if (query === undefined) return [];
+        return items
+          .map((item) => ({ content: item.content, score: cosine(query, item.embedding) }))
+          .filter((s) => s.score >= minSimilarity)
+          .sort((x, y) => y.score - x.score)
+          .slice(0, maxRecalled)
+          .map((s) => s.content);
+      } catch (err) {
+        if (signal.aborted) throw err;
+        return [];
+      }
+    },
+  };
+}
+
+export type FeedbackOutcome = 'queued' | 'dropped';
+
+export interface FeedbackService {
+  submit(
+    sessionId: string,
+    kind: ReviewKind,
+    text: string,
+    signal: AbortSignal,
+  ): Promise<FeedbackOutcome>;
+}
+
+/**
+ * Feedback passes the same input guard as a chat message before it is stored.
+ * A flagged item is dropped: only its category and the time are recorded.
+ */
+export function createFeedbackService(deps: {
+  readonly inputGuard: InputGuard;
+  readonly review: ReviewRepo;
+  readonly flags: FlagLog;
+}): FeedbackService {
+  return {
+    async submit(sessionId, kind, text, signal) {
+      const verdict = await deps.inputGuard.check(text, signal);
+      if (!verdict.ok) {
+        await deps.flags.record(sessionId, 'refusal' in verdict ? verdict.refusal : 'too_long');
+        return 'dropped';
+      }
+      await deps.review.add(sessionId, kind, verdict.text);
+      return 'queued';
+    },
+  };
+}
+
+export interface Reviewer {
+  pending(): Promise<ReviewItem[]>;
+  /**
+   * Approves an item. A preference or correction becomes memory for its
+   * session; feedback is only marked approved. The text is checked by the
+   * guard again, which is also the only way to turn it back into storable text.
+   */
+  approve(id: string, signal: AbortSignal): Promise<'approved' | 'not_found' | 'refused'>;
+  reject(id: string): Promise<boolean>;
+}
+
+export function createReviewer(deps: {
+  readonly review: ReviewRepo;
+  readonly memory: MemoryRepo;
+  readonly embeddings: EmbeddingProvider;
+  readonly inputGuard: InputGuard;
+}): Reviewer {
+  return {
+    pending: () => deps.review.pending(),
+    async approve(id, signal) {
+      const item = await deps.review.get(id);
+      if (item === undefined) return 'not_found';
+      const verdict = await deps.inputGuard.check(item.content, signal);
+      if (!verdict.ok) return 'refused';
+      if (item.kind !== 'feedback') {
+        const [embedding] = await deps.embeddings.embed([verdict.text], signal);
+        await deps.memory.add(item.sessionId, verdict.text, embedding);
+      }
+      return (await deps.review.decide(id, 'approved')) ? 'approved' : 'not_found';
+    },
+    reject: (id) => deps.review.decide(id, 'rejected'),
+  };
+}
+
+/**
+ * ADR-0009: an eval case never contains user words. A paraphrase is refused if
+ * it shares a run of five or more words with the source, or looks like personal
+ * data (an email, a phone or card-like number, a URL with a query string, six
+ * or more digits in a row).
+ */
+export function paraphraseProblem(source: string, paraphrase: string): string | undefined {
+  const words = (t: string): string[] =>
+    t
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .filter((w) => w !== '');
+  const sourceWords = words(source);
+  const runs = new Set<string>();
+  for (let i = 0; i + 5 <= sourceWords.length; i++) runs.add(sourceWords.slice(i, i + 5).join(' '));
+  const para = words(paraphrase);
+  for (let i = 0; i + 5 <= para.length; i++) {
+    if (runs.has(para.slice(i, i + 5).join(' ')))
+      return 'shares five or more words in a row with the source';
+  }
+  if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(paraphrase)) return 'contains an email address';
+  if (/\d{6,}/.test(paraphrase.replace(/[\s-]/g, '')))
+    return 'contains six or more digits in a row';
+  if (/https?:\/\/\S*\?/.test(paraphrase)) return 'contains a URL with a query string';
+  return undefined;
+}

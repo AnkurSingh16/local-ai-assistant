@@ -4,6 +4,7 @@ import type { Logger } from 'pino';
 
 import type { Config } from './config.js';
 import type { LogEventFn } from './logging.js';
+import type { FeedbackService } from './learning.js';
 import type { SessionService } from './sessions.js';
 
 export interface AppDeps {
@@ -17,6 +18,8 @@ export interface AppDeps {
   readonly isReady: () => boolean;
   /** Anonymous sessions and conversation memory; absent, every turn is stateless. */
   readonly sessions?: SessionService;
+  /** Moderated feedback into the review queue (ADR-0009). */
+  readonly feedback?: FeedbackService;
   /** Interval between SSE keep-alive comments. */
   readonly pingIntervalMs?: number;
   /** Sees every route as it is registered; the route-inventory test uses it. */
