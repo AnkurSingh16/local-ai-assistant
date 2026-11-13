@@ -3,6 +3,7 @@ import type { ManualClock } from '@local-ai/core';
 import { createManualClock } from '@local-ai/core';
 import type { SseEvent } from '@local-ai/contract';
 import { sseEventSchema } from '@local-ai/contract';
+import { createConversationRepo, createSessionRepo, openDatabase } from '@local-ai/storage';
 import { createInputGuard, createOutputGuard, createOutputRules } from '@local-ai/guardrails';
 import type { MockChatProvider, MockModerationOptions } from '@local-ai/providers/mock';
 import {
@@ -18,6 +19,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { AppDeps } from './app.js';
 import { bodyLimitBytes, createApp } from './app.js';
 import { trackReadiness } from './compose.js';
+import { createSessionService } from './sessions.js';
 import { parseConfig } from './config.js';
 import { createLogEvent } from './logging.js';
 
@@ -44,6 +46,7 @@ async function harness(
     chat?: MockChatProvider;
     moderation?: MockModerationOptions;
     deps?: Partial<AppDeps>;
+    storage?: boolean;
   } = {},
 ): Promise<Harness> {
   const config = parseConfig({ NODE_ENV: 'test', ...options.env });
@@ -64,6 +67,12 @@ async function harness(
     }),
   );
   const routes: { method: string; url: string }[] = [];
+  const db = options.storage === true ? openDatabase(':memory:') : undefined;
+  const conversations = db === undefined ? undefined : createConversationRepo({ db, clock, newId });
+  const sessions =
+    db === undefined || conversations === undefined
+      ? undefined
+      : createSessionService({ sessions: createSessionRepo({ db, clock, newId }), conversations });
   const app = await createApp({
     config,
     clock,
@@ -83,7 +92,9 @@ async function harness(
       newId,
       turnTimeoutMs: 5000,
       clock,
+      ...(conversations === undefined ? {} : { conversations }),
     }),
+    ...(sessions === undefined ? {} : { sessions }),
     ...options.deps,
   });
   open.push(app);
@@ -365,5 +376,79 @@ describe('readiness tracking', () => {
   it('keeps the residency check, so the warm timeout still applies', async () => {
     const tracked = trackReadiness(createMockModerationProvider({ resident: false }));
     expect(await tracked.moderation.isResident?.(new AbortController().signal)).toBe(false);
+  });
+});
+
+describe('sessions and conversation memory', () => {
+  function cookieFrom(res: { headers: Record<string, unknown> }): string {
+    const raw = res.headers['set-cookie'];
+    const header = Array.isArray(raw) ? String(raw[0]) : String(raw);
+    return header.split(';')[0] ?? '';
+  }
+
+  it('creates a session with an HttpOnly, SameSite=Strict cookie and returns the token', async () => {
+    const { app } = await harness({ storage: true });
+    const res = await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } });
+    expect(res.statusCode).toBe(201);
+    const setCookie = String(res.headers['set-cookie']);
+    expect(setCookie).toContain('HttpOnly');
+    expect(setCookie).toContain('SameSite=Strict');
+    expect(JSON.parse(res.body)).toHaveProperty('token');
+  });
+
+  it('remembers a conversation for its session, so the next turn sees the history', async () => {
+    const { app, chat } = await harness({ storage: true });
+    const cookie = cookieFrom(
+      await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } }),
+    );
+    const first = await post(app, { message: 'My name is Sam.' }, { cookie });
+    const conversationId = /"conversationId":"([^"]+)"/.exec(first.body)?.[1] ?? '';
+    await post(app, { message: 'What is my name?', conversationId }, { cookie });
+    const second = chat.calls[1]?.messages.map((m) => `${m.role}:${m.content}`) ?? [];
+    expect(second).toContain('user:My name is Sam.');
+    expect(second).toContain('assistant:One.\n\nTwo.');
+    expect(second.at(-1)).toBe('user:What is my name?');
+  });
+
+  it('accepts a bearer token and refuses another session’s conversation', async () => {
+    const { app } = await harness({ storage: true });
+    const tokenA = (
+      JSON.parse(
+        (await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } })).body,
+      ) as { token: string }
+    ).token;
+    const tokenB = (
+      JSON.parse(
+        (await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } })).body,
+      ) as { token: string }
+    ).token;
+    const first = await post(app, { message: 'Hello.' }, { authorization: `Bearer ${tokenA}` });
+    const conversationId = /"conversationId":"([^"]+)"/.exec(first.body)?.[1] ?? '';
+    const stolen = await post(
+      app,
+      { message: 'Hi.', conversationId },
+      { authorization: `Bearer ${tokenB}` },
+    );
+    expect(stolen.statusCode).toBe(404);
+  });
+
+  it('tells a client whether its session is active', async () => {
+    const { app } = await harness({ storage: true });
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: { host } })).statusCode).toBe(
+      401,
+    );
+    const cookie = cookieFrom(
+      await app.inject({ method: 'POST', url: '/v1/sessions', headers: { host } }),
+    );
+    expect(
+      (await app.inject({ method: 'GET', url: '/v1/me', headers: { host, cookie } })).statusCode,
+    ).toBe(200);
+  });
+
+  it('stays stateless without a session', async () => {
+    const { app, chat } = await harness({ storage: true });
+    await post(app, { message: 'First.' });
+    await post(app, { message: 'Second.' });
+    expect(chat.calls[1]?.messages.filter((m) => m.role === 'user')).toHaveLength(1);
   });
 });

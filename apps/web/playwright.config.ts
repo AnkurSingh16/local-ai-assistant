@@ -29,6 +29,8 @@ export default defineConfig({
       url: `http://127.0.0.1:${String(apiPort)}/healthz`,
       env: {
         PROVIDERS: 'mock',
+        // Nothing from a test run is kept on disk.
+        DATABASE_PATH: ':memory:',
         NODE_ENV: 'test',
         LOG_LEVEL: 'warn',
         PORT: String(apiPort),

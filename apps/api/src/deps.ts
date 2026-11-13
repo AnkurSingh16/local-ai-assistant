@@ -4,6 +4,7 @@ import type { Logger } from 'pino';
 
 import type { Config } from './config.js';
 import type { LogEventFn } from './logging.js';
+import type { SessionService } from './sessions.js';
 
 export interface AppDeps {
   readonly config: Config;
@@ -14,6 +15,8 @@ export interface AppDeps {
   readonly newId: () => string;
   /** Reports whether the guard model answered its warm-up check (ADR-0005). */
   readonly isReady: () => boolean;
+  /** Anonymous sessions and conversation memory; absent, every turn is stateless. */
+  readonly sessions?: SessionService;
   /** Interval between SSE keep-alive comments. */
   readonly pingIntervalMs?: number;
   /** Sees every route as it is registered; the route-inventory test uses it. */

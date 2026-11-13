@@ -7,6 +7,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import type { AppDeps } from '../deps.js';
 import { apiError } from '../http.js';
 import type { TurnSlots } from '../limits.js';
+import { tokenFrom } from '../sessions.js';
 
 const defaultPingIntervalMs = 15_000;
 
@@ -33,6 +34,23 @@ export function registerChatRoute(app: FastifyInstance, deps: AppDeps, slots: Tu
           reason: 'validation',
         });
         return apiError(reply, request, 400, 'bad_request', 'The request body is not valid.');
+      }
+
+      // A session makes the turn remembered: history is loaded and the turn stored.
+      // Without one the turn is stateless, as before.
+      let conversationId = parsed.data.conversationId;
+      let remember = false;
+      const token = tokenFrom(request.cookies, request.headers.authorization);
+      const sessionId =
+        token === undefined || deps.sessions === undefined
+          ? undefined
+          : await deps.sessions.resolve(token);
+      if (sessionId !== undefined && deps.sessions !== undefined) {
+        conversationId ??= deps.newId();
+        if (!(await deps.sessions.claimConversation(conversationId, sessionId))) {
+          return apiError(reply, request, 404, 'not_found', 'That conversation does not exist.');
+        }
+        remember = true;
       }
 
       const client = new AbortController();
@@ -92,7 +110,12 @@ export function registerChatRoute(app: FastifyInstance, deps: AppDeps, slots: Tu
         }, deps.pingIntervalMs ?? defaultPingIntervalMs);
 
         for await (const event of deps.assistant.handleTurn(
-          { ...parsed.data, requestId: request.id },
+          {
+            message: parsed.data.message,
+            ...(conversationId === undefined ? {} : { conversationId }),
+            requestId: request.id,
+            remember,
+          },
           client.signal,
         )) {
           if (event.type === 'meta') messageId = event.messageId;

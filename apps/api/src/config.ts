@@ -31,6 +31,8 @@ const envSchema = z.object({
     })
     .default('http://127.0.0.1:8888'),
   SEARCH_TIMEOUT_MS: positiveInt.default(5_000),
+  /** One SQLite file (ADR-0001); ":memory:" keeps nothing on disk, for tests and demos. */
+  DATABASE_PATH: z.string().min(1).default('data/assistant.db'),
   CHAT_MODEL: z.string().min(1).default('qwen2.5:7b'),
   GUARD_MODEL: z.string().min(1).default('llama-guard3:1b'),
   OLLAMA_KEEP_ALIVE: z
@@ -62,6 +64,7 @@ export interface Config {
   readonly ollamaKeepAlive: string;
   readonly guardTimeoutMs: number;
   readonly searxngUrl: string;
+  readonly databasePath: string;
   readonly searchTimeoutMs: number;
   readonly guardWarmTimeoutMs: number;
   readonly turnTimeoutMs: number;
@@ -102,6 +105,7 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>): 
     ollamaKeepAlive: e.OLLAMA_KEEP_ALIVE,
     guardTimeoutMs: e.GUARD_TIMEOUT_MS,
     searxngUrl: e.SEARXNG_URL,
+    databasePath: e.DATABASE_PATH,
     searchTimeoutMs: e.SEARCH_TIMEOUT_MS,
     guardWarmTimeoutMs: e.GUARD_WARM_TIMEOUT_MS,
     turnTimeoutMs: e.TURN_TIMEOUT_MS,

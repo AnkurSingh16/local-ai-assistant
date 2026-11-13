@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 import type { Assistant, WebTools } from '@local-ai/agent';
 import { createAssistant, leakCheckPrompt, personaCanary } from '@local-ai/agent';
@@ -19,6 +21,7 @@ import {
   createMockModerationProvider,
   createMockSearchProvider,
 } from '@local-ai/providers/mock';
+import { createConversationRepo, createSessionRepo, openDatabase } from '@local-ai/storage';
 import type { HopFetch } from '@local-ai/tools';
 import {
   createPageParser,
@@ -36,6 +39,8 @@ import {
 import type { FetchFn } from '@local-ai/providers';
 
 import type { Config } from './config.js';
+import type { SessionService } from './sessions.js';
+import { createSessionService } from './sessions.js';
 
 /**
  * The composition root (ADR-0002): the only module in the API that imports
@@ -46,6 +51,9 @@ export interface Composition {
   readonly moderation: ModerationProvider;
   /** True once any guard classification has succeeded (ADR-0005). */
   readonly isReady: () => boolean;
+  readonly sessions: SessionService;
+  /** Closes the database on shutdown. */
+  readonly close: () => void;
 }
 
 /** Marks the API ready on the first successful classification, whether warm-up or a real turn. */
@@ -151,6 +159,14 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
     // The lease outlasts the longest check (residency read plus the cold timeout).
     breaker: createCircuitBreaker({ clock, probeLeaseMs: config.guardTimeoutMs + 1_000 }),
   };
+  if (config.databasePath !== ':memory:')
+    mkdirSync(dirname(config.databasePath), { recursive: true });
+  const db = openDatabase(config.databasePath);
+  const storageDeps = { db, clock, newId };
+  const sessionRepo = createSessionRepo(storageDeps);
+  const conversationRepo = createConversationRepo(storageDeps);
+  // Idle sessions and everything under them go at start-up (ADR-0009).
+  void sessionRepo.purgeIdle();
   const assistant = createAssistant({
     chat,
     inputGuard: createInputGuard(guard),
@@ -162,6 +178,15 @@ export function compose(config: Config, newId: () => string, clock: Clock): Comp
     turnTimeoutMs: config.turnTimeoutMs,
     clock,
     web: webTools(config, clock, fetchFn),
+    conversations: conversationRepo,
   });
-  return { assistant, moderation: tracked.moderation, isReady: tracked.isReady };
+  return {
+    assistant,
+    moderation: tracked.moderation,
+    isReady: tracked.isReady,
+    sessions: createSessionService({ sessions: sessionRepo, conversations: conversationRepo }),
+    close: () => {
+      db.close();
+    },
+  };
 }

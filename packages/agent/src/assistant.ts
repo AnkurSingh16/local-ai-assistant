@@ -25,7 +25,28 @@ export interface AssistantDeps {
   readonly clock: Clock;
   /** Web search and page reading; without them the assistant answers from the model alone. */
   readonly web?: WebTools;
+  /** Conversation history for turns that are remembered (a session is present). */
+  readonly conversations?: ConversationStore;
 }
+
+/**
+ * Where remembered turns are kept. It takes only moderated text, so nothing a
+ * guard refused can be stored (ADR-0002, ADR-0005 step 9).
+ */
+export interface ConversationStore {
+  recent(
+    conversationId: string,
+    limit: number,
+  ): Promise<{ role: 'user' | 'assistant'; content: string }[]>;
+  append(
+    conversationId: string,
+    role: 'user' | 'assistant',
+    parts: readonly ModeratedText[],
+  ): Promise<void>;
+}
+
+/** How many stored messages are considered before fitting them to the history budget. */
+const historyLookback = 40;
 
 /** ADR-0003: four model steps per turn, the forced-query step included. */
 export const maxModelSteps = 4;
@@ -35,6 +56,8 @@ export interface TurnInput {
   readonly conversationId?: string | undefined;
   /** Correlates the error event with the API's request log. */
   readonly requestId: string;
+  /** Load and store history for this conversation; the route sets it only for a claimed conversation. */
+  readonly remember?: boolean;
 }
 
 export interface Assistant {
@@ -53,14 +76,26 @@ const genericErrors = {
 } as const;
 
 /** Builds the prompt. The user slot accepts only text that passed the input guard. */
-export function buildMessages(user: ModeratedText, withWeb = false): ChatMessage[] | undefined {
+export function buildMessages(
+  user: ModeratedText,
+  withWeb = false,
+  history: readonly { role: 'user' | 'assistant'; content: string }[] = [],
+): ChatMessage[] | undefined {
   const system = withWeb ? `${persona}\n\n${webGuide}` : persona;
   if (estimateTokens(system) > contextBudget.system) return undefined;
   if (estimateTokens(user) > contextBudget.user) return undefined;
-  return [
-    { role: 'system', content: system },
-    { role: 'user', content: user },
-  ];
+  // The newest turns that fit the history slot; the oldest are dropped first (ADR-0004).
+  const kept: ChatMessage[] = [];
+  let used = 0;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m = history[i];
+    if (m === undefined) continue;
+    const cost = estimateTokens(m.content) + 4;
+    if (used + cost > contextBudget.history) break;
+    used += cost;
+    kept.unshift({ role: m.role, content: m.content });
+  }
+  return [{ role: 'system', content: system }, ...kept, { role: 'user', content: user }];
 }
 
 export function createAssistant(deps: AssistantDeps): Assistant {
@@ -106,12 +141,18 @@ export function createAssistant(deps: AssistantDeps): Assistant {
         }
 
         const web = deps.web;
-        const messages = buildMessages(verdict.text, web !== undefined);
+        const store = input.remember === true ? deps.conversations : undefined;
+        const history =
+          store === undefined ? [] : await store.recent(conversationId, historyLookback);
+        const messages = buildMessages(verdict.text, web !== undefined, history);
         if (messages === undefined) {
           yield error('bad_request', false);
           yield done('error');
           return;
         }
+        await store?.append(conversationId, 'user', [verdict.text]);
+        // Released paragraphs only: text a guard withheld is never stored.
+        const released: ModeratedText[] = [];
 
         // Generation and moderation run side by side (ADR-0005): a pump reads the
         // model stream into the hold-back buffer while this loop checks and
@@ -252,6 +293,7 @@ export function createAssistant(deps: AssistantDeps): Assistant {
               yield done('refused');
               return;
             }
+            released.push(checked.text);
             yield { type: 'delta', text: checked.text };
             released = true;
             // A citation is sent only after the paragraph that cites it is released (ADR-0005).
@@ -282,6 +324,9 @@ export function createAssistant(deps: AssistantDeps): Assistant {
           // for the pump so nothing keeps running after the turn.
           stop.abort();
           await pump;
+          if (store !== undefined && released.length > 0) {
+            await store.append(conversationId, 'assistant', released);
+          }
         }
       } catch (err) {
         if (clientSignal.aborted) return;

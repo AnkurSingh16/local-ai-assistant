@@ -23,7 +23,7 @@ async function main(): Promise<void> {
   const logger = createLogger(config.logLevel, config.nodeEnv === 'development');
   const logEvent = createLogEvent(logger);
   const newId = (): string => randomUUID();
-  const { assistant, moderation, isReady } = compose(config, newId, systemClock);
+  const { assistant, moderation, isReady, sessions, close } = compose(config, newId, systemClock);
 
   const app = await createApp({
     config,
@@ -33,6 +33,7 @@ async function main(): Promise<void> {
     logEvent,
     newId,
     isReady,
+    sessions,
   });
 
   await app.listen({ host: config.host, port: config.port });
@@ -61,7 +62,10 @@ async function main(): Promise<void> {
   });
 
   const shutdown = (): void => {
-    void app.close().then(() => process.exit(0));
+    void app.close().then(() => {
+      close();
+      process.exit(0);
+    });
   };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
