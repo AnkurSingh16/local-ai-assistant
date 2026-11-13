@@ -23,6 +23,8 @@ const envSchema = z.object({
   /** `mock` runs the deterministic providers, for end-to-end tests and demos without Ollama. */
   PROVIDERS: z.enum(['ollama', 'mock']).default('ollama'),
   OLLAMA_BASE_URL: z.url({ protocol: /^https?$/ }).default('http://127.0.0.1:11434'),
+  SEARXNG_URL: z.url({ protocol: /^https?$/ }).default('http://127.0.0.1:8888'),
+  SEARCH_TIMEOUT_MS: positiveInt.default(5_000),
   CHAT_MODEL: z.string().min(1).default('qwen2.5:7b'),
   GUARD_MODEL: z.string().min(1).default('llama-guard3:1b'),
   OLLAMA_KEEP_ALIVE: z
@@ -53,6 +55,8 @@ export interface Config {
   readonly guardModel: string;
   readonly ollamaKeepAlive: string;
   readonly guardTimeoutMs: number;
+  readonly searxngUrl: string;
+  readonly searchTimeoutMs: number;
   readonly guardWarmTimeoutMs: number;
   readonly turnTimeoutMs: number;
   readonly allowedHosts: readonly string[];
@@ -91,6 +95,8 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>): 
     guardModel: e.GUARD_MODEL,
     ollamaKeepAlive: e.OLLAMA_KEEP_ALIVE,
     guardTimeoutMs: e.GUARD_TIMEOUT_MS,
+    searxngUrl: e.SEARXNG_URL,
+    searchTimeoutMs: e.SEARCH_TIMEOUT_MS,
     guardWarmTimeoutMs: e.GUARD_WARM_TIMEOUT_MS,
     turnTimeoutMs: e.TURN_TIMEOUT_MS,
     allowedHosts: e.ALLOWED_HOSTS ?? [`localhost:${String(e.PORT)}`, `127.0.0.1:${String(e.PORT)}`],

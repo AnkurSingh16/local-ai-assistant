@@ -1,0 +1,27 @@
+# Only the settings that differ from SearXNG's defaults (ADR-0010).
+use_default_settings: true
+
+general:
+  instance_name: local-ai-assistant
+  enable_metrics: false
+
+server:
+  # Inside the container; compose publishes it on 127.0.0.1:8888 only.
+  bind_address: '0.0.0.0'
+  port: 8080
+  # Overwritten by SEARXNG_SECRET.
+  secret_key: 'set-from-environment'
+  # Reachable only from this machine, so the bot limiter would only get in the way.
+  limiter: false
+  image_proxy: false
+  public_instance: false
+
+search:
+  safe_search: 1
+  formats:
+    - html
+    - json
+
+outgoing:
+  request_timeout: 4.0
+  max_request_timeout: 5.0

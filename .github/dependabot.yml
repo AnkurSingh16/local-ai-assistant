@@ -28,3 +28,13 @@ updates:
     groups:
       actions:
         patterns: ['*']
+
+  # Keeps the digest-pinned SearXNG image in compose.yaml current (ADR-0010).
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore
+      include: scope

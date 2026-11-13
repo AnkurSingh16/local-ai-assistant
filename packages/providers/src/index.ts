@@ -11,3 +11,5 @@ export {
   parseGuardVerdict,
 } from './ollama/moderation.js';
 export type { OllamaModerationConfig } from './ollama/moderation.js';
+export { createSearxngSearchProvider } from './searxng/search.js';
+export type { SearxngConfig } from './searxng/search.js';
