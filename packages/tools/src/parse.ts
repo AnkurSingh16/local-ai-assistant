@@ -9,7 +9,7 @@ export interface ParsedPage {
   readonly text: string;
 }
 
-export type ParseError = 'parse_failed' | 'parse_timeout';
+export type ParseError = 'parse_failed' | 'parse_timeout' | 'parse_busy';
 
 export class ParseFailure extends Error {
   constructor(readonly reason: ParseError) {
@@ -64,7 +64,9 @@ function createLimiter(
   const waiting: { start: () => void }[] = [];
   return async (task, signal) => {
     if (active >= limit) {
-      if (waiting.length >= maxWaiting) throw new ParseFailure('parse_failed');
+      // The system is busy, not the page bad; read_page reports it as unavailable.
+      if (waiting.length >= maxWaiting) throw new ParseFailure('parse_busy');
+      signal.throwIfAborted();
       await new Promise<void>((resolve, reject) => {
         const entry = {
           start: () => {
@@ -123,7 +125,10 @@ export function createPageParser(config: ParseConfig = {}): ParsePage {
             settled = true;
             clearTimeout(timer);
             signal.removeEventListener('abort', onAbort);
-            void worker.terminate().finally(outcome);
+            void worker
+              .terminate()
+              .catch(() => undefined)
+              .finally(outcome);
           };
           const onAbort = (): void => {
             finish(() => {

@@ -360,20 +360,47 @@ describe('ADR-0008 limits, enforced', () => {
     expect(performance.now() - started).toBeLessThan(3_000);
   });
 
-  it('runs at most two parses at once and lets an aborted waiter leave the queue', async () => {
-    const parse = createPageParser({ timeoutMs: 2_000, maxConcurrent: 2 });
-    const page = {
+  it('runs at most two parses at once', async () => {
+    const parse = createPageParser({ timeoutMs: 400, maxConcurrent: 2 });
+    const deep = {
       url: 'https://example.com/',
       contentType: 'text/html',
-      body: '<p>ok text here</p>',
+      body: `<html><body>${'<div>'.repeat(150_000)}x</body></html>`,
     };
+    const small = { url: 'https://example.com/', contentType: 'text/html', body: '<p>ok text</p>' };
+    const settled: string[] = [];
+    const track = (name: string, p: Promise<unknown>): Promise<void> =>
+      p.then(
+        () => void settled.push(name),
+        () => void settled.push(name),
+      );
+    // Two slow parses hold both slots until they are killed; the small one must wait for a slot.
+    await Promise.all([
+      track('deep-1', parse(deep, signal)),
+      track('deep-2', parse(deep, signal)),
+      track('small', parse(small, signal)),
+    ]);
+    expect(settled.indexOf('small')).toBeGreaterThan(
+      Math.min(settled.indexOf('deep-1'), settled.indexOf('deep-2')),
+    );
+  });
+
+  it('lets a waiter that aborts leave the queue at once', async () => {
+    const parse = createPageParser({ timeoutMs: 1_500, maxConcurrent: 1 });
+    const deep = {
+      url: 'https://example.com/',
+      contentType: 'text/html',
+      body: `<html><body>${'<div>'.repeat(150_000)}x</body></html>`,
+    };
+    const holding = parse(deep, signal).catch(() => undefined);
     const controller = new AbortController();
-    const first = parse(page, signal);
-    const second = parse(page, signal);
-    const third = parse(page, controller.signal).catch((e: unknown) => e);
+    const waiter = parse(deep, controller.signal).catch((e: unknown) => e);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const abortedAt = performance.now();
     controller.abort();
-    expect(await third).toBeInstanceOf(Error);
-    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+    expect(await waiter).toBeInstanceOf(Error);
+    expect(performance.now() - abortedAt).toBeLessThan(200);
+    await holding;
   });
 
   it('bounds the whole read, fetch and parse together', async () => {
