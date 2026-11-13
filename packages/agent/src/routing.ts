@@ -71,12 +71,24 @@ const weakLiveState =
  * assistant to a search engine.
  */
 const personal =
-  /\b(?:i|i'm|i've|i'd|i'll|me|my|mine|myself|you|your|you're|yourself|we|we're|our|us|he|she|him|her|his|hers|they're|their)\b/;
+  /\b(?:i|i'm|i've|i'd|i'll|me|my|mine|myself|you|your|you're|yourself|we|we're|our|he|she|him|her|his|hers|they're|their)\b/;
+
+/** True for a personal question; "us" counts only in lower case, so "the US" does not. */
+function isPersonal(message: string, text: string): boolean {
+  return personal.test(text) || /\bus\b/.test(message);
+}
 
 /** A capitalised word after the first, other than "I": a named product, place, team or person. */
 function namesSomething(message: string): boolean {
-  const words = message.replace(/[‘’ʼ]/g, "'").split(/\s+/).slice(1);
-  return words.some((w) => /^[A-Z][\w'.-]*[a-zA-Z]/.test(w) && !/^I(?:'\w+)?$/.test(w));
+  const words = message.replace(/[‘’ʼ]/g, "'").split(/\s+/);
+  // A capital that only starts a new sentence ("…eat? The rice was out") is not a name.
+  return words.some(
+    (w, i) =>
+      i > 0 &&
+      !/[.?!]$/.test(words[i - 1] ?? '') &&
+      /^[A-Z][\w'.-]*[a-zA-Z]/.test(w) &&
+      !/^I(?:'\w+)?$/.test(w),
+  );
 }
 
 /** Years from the training cutoff on, written as four digits. */
@@ -99,18 +111,17 @@ function mentionsRecentYear(text: string, currentYear: number): boolean {
 export function isTimeSensitive(message: string, now: Date): boolean {
   const text = message.toLowerCase().replace(/[‘’ʼ]/g, "'");
   if (aboutAText.test(text)) return false;
+  // Questions about the user, the assistant or people they know stay local
+  // under every rule: a forced query paraphrases the message, so it would carry
+  // private context ("my blood test results came back today") to a search engine.
+  if (isPersonal(message, text)) return false;
   if (currentRoles.test(text)) return true;
   if (alwaysChanging.test(text)) return true;
   if (!creativeRequest.test(text) && mentionsRecentYear(text, now.getUTCFullYear())) return true;
   if (timeWords.test(text) && changingThings.test(text)) return true;
-  // Broader rules, measured on the routing eval (ADR-0003). They apply only to
-  // factual questions about the world, never to ones about the user, the
-  // assistant or people they know.
-  const question =
-    factualQuestion.test(text) &&
-    !request.test(text) &&
-    !clockQuestion.test(text) &&
-    !personal.test(text);
+  // Broader rules, measured on the routing eval (ADR-0003), for factual
+  // questions about the world.
+  const question = factualQuestion.test(text) && !request.test(text) && !clockQuestion.test(text);
   if (question) {
     const timeOrName = nearTime.test(text) || namesSomething(message);
     if (publicLiveState.test(text)) return true;
@@ -119,11 +130,7 @@ export function isTimeSensitive(message: string, now: Date): boolean {
     if (timeOrName && weakLiveState.test(text)) return true;
   }
   // Price words about a named product ask about now even outside a question.
-  if (
-    !personal.test(text) &&
-    namesSomething(message) &&
-    /\b(?:cheapest|best price|price of|prices? for)\b/.test(text)
-  ) {
+  if (namesSomething(message) && /\b(?:cheapest|best price|price of|prices? for)\b/.test(text)) {
     return true;
   }
   return /\b(?:latest|today's|current) (?:news|price|score|version|release|results?|weather)\b/.test(

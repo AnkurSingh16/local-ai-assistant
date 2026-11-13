@@ -181,7 +181,7 @@ describe('routing eval (rules pre-router)', () => {
   // change that loses recall or starts sending ordinary or private questions to
   // search fails CI. The held-out set is reported, never a target.
   it('keeps dev recall and unneeded searches at what was measured', () => {
-    expect(summary('dev').recall).toBeGreaterThanOrEqual(0.94);
+    expect(summary('dev').recall).toBeGreaterThanOrEqual(0.95);
     expect(summary('dev').falsePositiveRate).toBe(0);
   });
 

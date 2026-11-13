@@ -49,6 +49,7 @@ describe('search routing', () => {
     'How expensive is Netflix per month?',
     'Is Lewis Hamilton still racing for Ferrari?',
     'Is GitHub down right now?',
+    'Is the US still in NATO?',
   ])('searches first for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(true);
   });
@@ -86,6 +87,11 @@ describe('search routing', () => {
     'When is the next prime after 97?',
     'Who leads in a tango?',
     'Has the meeting started?',
+    // Personal questions stay local under the older rules too.
+    'Who is the head of my department?',
+    'My blood test results came back today, what do they mean?',
+    // A capital that only starts a new sentence is not a name.
+    'Is it still safe to eat? The rice was out overnight.',
   ])('does not force a search for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(false);
   });
