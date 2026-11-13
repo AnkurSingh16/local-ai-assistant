@@ -64,17 +64,19 @@ const warningSigns = [
   /\b(?:nobody|no one|no body) (?:would|will|d) (?:even )?(?:miss|notice) me (?:if|when) i (?:was|were|m|am) (?:gone|dead|not here|not around)\b/,
   /\b(?:nobody|no one) (?:would|will|d) (?:even )?(?:miss me|notice|care) if i (?:was|were|m|am) (?:gone|dead|not here|not around|to disappear|disappeared)\b/,
   /\b(?:nobody|no one) (?:would|will|d) (?:even )?care if i (?:disappeared|died|vanished)\b/,
-  /\b(?:everyone|everybody|my family|my kids|my friends|the world) (?:would|will|d) be better off (?:without me|if i (?:was|were) (?:dead|gone|not here)|if i wasn t here)\b/,
-  /\bi (?:am|m|feel like|feel like i m) (?:just |such )?a burden\b(?: (?:to|on) (?:everyone|everybody|every ?1|my family|my friends|them|the people around me|anyone))?(?! (?:at|in|on) (?:work|the office|school|the team|this project)\b)/,
+  /\b(?:nobody|no one) (?:would|will|d) (?:even )?miss me\b(?! (?:at|in|on|if i (?:left|went|skipped|took|moved))\b)/,
+  /\b(?:everyone|everybody|my family|my kids|my friends|the world|they) (?:would|will|d) (?:all )?be better off (?:without me|if i (?:was|were) (?:dead|gone|not here)|if i wasn t here)\b/,
+  /\b(?:i am|i m|im|i feel like|i feel like i m) (?:just |such )?a burden\b(?: (?:to|on) (?:everyone|everybody|every ?1|my family|my friends|them|the people around me|anyone))?(?! (?:at|in|on) (?:work|the office|school|the team|this project)\b)/,
   /\b(?:i have|i ve got|i ve) nothing (?:left )?to live for\b/,
   /\b(?:life|my life) (?:isn t|is not|isnt) worth living\b/,
-  /\b(?:there s|there is) no point (?:in )?(?:living|being alive|going on) (?:anymore|any more)\b/,
+  /\b(?:there s|there is) no point (?:in )?(?:living|being alive|going on)\b/,
   new RegExp(
     `\\b(?:i have|i ve got|i ve|there is|there s) no reason (?:left )?to (?:live|stay alive|keep living)\\b${notAboutSomething}`,
   ),
   /\bi (?:don t|do not) want to be here (?:anymore|any more)\b/,
   /\bi (?:want to|wanna) (?:go to sleep|sleep) and never wake up\b/,
-  /\bi (?:just )?want the pain to (?:end|stop) (?:forever|for good|permanently)\b/,
+  /\bi (?:just )?want the pain to (?:end|stop)\b/,
+  /\bi (?:just )?want (?:it all|everything|my life) to (?:end|stop)(?: forever| for good| permanently)?\b/,
   /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:my )?(?:goodbye|farewell) (?:letters?|notes?) to (?:my family|everyone|my (?:kids|children|parents|wife|husband|partner|friends))\b/,
   /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:a |my )?suicide notes?\b/,
 ];
@@ -86,14 +88,33 @@ const noPointLiving =
 const givingAway =
   /\bi (?:ve|have) (?:started |been )?giving away (?:all )?(?:of )?my (?:things|stuff|belongings|possessions)\b/;
 const givenAway =
-  /\bi (?:ve|have) given away (?:all|everything)(?: of)? my (?:things|stuff|belongings|possessions)\b/;
+  /\bi (?:ve|have) given away (?:all |everything )?(?:of )?my (?:things|stuff|belongings|possessions)\b/;
 /** Hopelessness, not tidying: "it feels empty but good to declutter" is not a warning sign. */
 const hopeless =
-  /\b(?:pointless|hopeless|no point|nothing matters|won t need (?:them|it) anymore|tired of (?:living|life|everything)|done with (?:life|everything)|don t want to be here)\b/;
+  /\b(?:pointless|hopeless|no point|nothing matters|won t need (?:them|it|any of it)(?: anymore)?|tired of (?:living|life|everything)|done with (?:life|everything)|don t want to be here)\b/;
+
+/**
+ * Warning-sign phrases are also everyday complaints ("I don't want to be here
+ * anymore, this job is toxic"). A practical question or a named everyday
+ * subject in the same message means the person is asking about that, so the
+ * warning signs alone do not answer it with the crisis message. Direct intent
+ * ("I want to kill myself") is never excused this way.
+ */
+const practical =
+  /\b(?:how do i (?:quit|leave|move|budget|find|get|cope with (?:work|my job))|where should i (?:move|go|live)|what are my rights|should i (?:resign|quit|cancel|move)|my (?:job|boss|landlord|legs|team|class|project|diet)|this (?:job|city|project|game|marathon|class|diet|tax season)|on (?:vacation|holiday)|for a (?:week|day|weekend|month)|after (?:this|the) (?:marathon|run|workout|game|shift)|declutter\w*|financially)\b/;
+
+/**
+ * Quoted text and reported speech are someone else's words: a friend's message
+ * pasted in to ask how to help should get advice, not the crisis message.
+ */
+const quoted =
+  /"[^"\n]{0,300}"|\u201C[^\u201D\n]{0,300}\u201D|(?<=[\s:]|^)'[^'\n]{0,300}'(?=[\s.,!?]|$)/g;
 
 export function isSelfHarmIntent(text: string): boolean {
-  const { unjoined } = fold(text, { leet: true, stretch: 1 });
+  const own = text.replace(quoted, ' ');
+  const { unjoined } = fold(own, { leet: true, stretch: 1 });
   if (intent.some((p) => p.test(unjoined))) return true;
+  if (practical.test(unjoined)) return false;
   if (warningSigns.some((p) => p.test(unjoined))) return true;
   if (cantGoOn.test(unjoined) || noPointLiving.test(unjoined)) return true;
   return (givingAway.test(unjoined) || givenAway.test(unjoined)) && hopeless.test(unjoined);

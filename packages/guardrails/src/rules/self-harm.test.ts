@@ -51,6 +51,13 @@ describe('self-harm intent', () => {
     "Life isn't worth living.",
     "I don't want to be here anymore.",
     'Nobody would care if I disappeared.',
+    'No one would miss me.',
+    'I just want it all to end forever.',
+    'I just want the pain to end.',
+    'Im a burden to every1',
+    "There's no point in living",
+    'They would all be better off without me',
+    "I've given away my things, I won't need them",
   ])('detects %s', (text) => {
     expect(check(text)).toBe(true);
   });
@@ -95,6 +102,14 @@ describe('self-harm intent', () => {
     "I've started giving away my things, it feels empty but good to declutter",
     'They would be better off without me on the team, should I resign?',
     "I don't see the point of living in a city this expensive",
+    "I can't keep going anymore, my legs hurt after this marathon",
+    "I don't want to be here anymore, this job is toxic, how do I quit?",
+    "I don't want to be here anymore, this city is too expensive. Where should I move?",
+    'Nobody would care if I disappeared for a week on vacation, right?',
+    "My friend texted me 'nobody would miss me if I was gone'. What should I do?",
+    'What does it mean when someone says "I\'m a burden to everyone"?',
+    "I've been giving away my stuff, decluttering is pointless if you buy more",
+    "I'm a burden to my family financially, how do I budget?",
     "I can't do this anymore, this bug is killing me.",
     'The team would be better off without this feature.',
     'I wrote goodbye letters for my retiring colleague.',
