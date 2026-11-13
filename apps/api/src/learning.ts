@@ -213,3 +213,30 @@ export function paraphraseProblem(source: string, paraphrase: string): string | 
   if (/https?:\/\/\S*\?/.test(paraphrase)) return 'contains a URL with a query string';
   return undefined;
 }
+
+/**
+ * Reads `approve <id> [--always]` for the review command. An unknown or
+ * misplaced option is an error rather than ignored, so a typo never approves a
+ * safety item as ordinary memory.
+ */
+export function parseApproveArgs(
+  args: readonly string[],
+): { readonly id: string; readonly always: boolean } | { readonly error: string } {
+  const [id, ...flags] = args;
+  if (id === undefined || id.startsWith('--')) return { error: 'approve needs an id first.' };
+  const unknown = flags.filter((f) => f !== '--always');
+  if (unknown.length > 0) return { error: `Unknown option ${unknown.join(' ')}; only --always.` };
+  return { id, always: flags.includes('--always') };
+}
+
+/** What the review command prints after an approval. */
+export function approvalMessage(
+  outcome: 'approved' | 'not_found' | 'refused' | 'always_full',
+  always: boolean,
+): string {
+  if (outcome === 'approved' && always) return 'approved (always: used in every answer)';
+  if (outcome === 'always_full') {
+    return `refused: this session's always-on items would exceed ${String(maxAlwaysTokens)} tokens; approve it without --always or forget another always-on item`;
+  }
+  return outcome;
+}

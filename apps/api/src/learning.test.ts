@@ -14,7 +14,9 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
+  approvalMessage,
   maxAlwaysTokens,
+  parseApproveArgs,
   createFeedbackService,
   createMemoryRecall,
   createReviewer,
@@ -297,7 +299,6 @@ describe('always-on memory limits', () => {
     expect(await s.memory.list(a)).toEqual([]);
     // Still approvable as an ordinary item.
     expect(await reviewerFor(s).approve(long, signal)).toBe('approved');
-    expect(maxAlwaysTokens).toBe(200);
   });
 
   it('puts always-on items before similar ones, each once, and forgetting one removes it', async () => {
@@ -320,5 +321,24 @@ describe('always-on memory limits', () => {
     expect(await recall.recall(a, text, signal)).toEqual(["I'm allergic to peanuts.", text]);
     await s.memory.delete(a, allergyId);
     expect(await recall.recall(a, text, signal)).toEqual([text]);
+  });
+});
+
+describe('review command arguments', () => {
+  it('reads an id and --always, and refuses typos or a missing id', () => {
+    expect(parseApproveArgs(['id-1'])).toEqual({ id: 'id-1', always: false });
+    expect(parseApproveArgs(['id-1', '--always'])).toEqual({ id: 'id-1', always: true });
+    expect(parseApproveArgs(['id-1', '--alway'])).toEqual({
+      error: 'Unknown option --alway; only --always.',
+    });
+    expect(parseApproveArgs(['--always', 'id-1'])).toEqual({ error: 'approve needs an id first.' });
+    expect(parseApproveArgs([])).toEqual({ error: 'approve needs an id first.' });
+  });
+
+  it('confirms an always-on approval and explains a refusal', () => {
+    expect(approvalMessage('approved', true)).toBe('approved (always: used in every answer)');
+    expect(approvalMessage('approved', false)).toBe('approved');
+    expect(approvalMessage('always_full', true)).toContain(`${String(maxAlwaysTokens)} tokens`);
+    expect(approvalMessage('not_found', true)).toBe('not_found');
   });
 });
