@@ -25,29 +25,44 @@ const {
   scores,
   fixtures: recorded,
   newParagraphs,
-} = await runLive(cases, liveConfigFromEnv(), previous, (c, i) => {
-  process.stderr.write(`[${String(i + 1)}/${String(cases.length)}] ${c.id}\n`);
-});
+  outages,
+  retried,
+} = await runLive(
+  cases,
+  liveConfigFromEnv(),
+  previous,
+  (c, i) => {
+    process.stderr.write(`[${String(i + 1)}/${String(cases.length)}] ${c.id}\n`);
+  },
+  (c, attempt) => {
+    process.stderr.write(`  retrying ${c.id} (attempt ${String(attempt)})\n`);
+  },
+);
+// A partial re-record must match the header it is merged into, or the fixture
+// would claim one persona and model set while mixing two.
+if (
+  only !== undefined &&
+  previous !== undefined &&
+  (previous.personaVersion !== recorded.personaVersion ||
+    previous.chatDigest !== recorded.chatDigest ||
+    previous.guardDigest !== recorded.guardDigest)
+) {
+  process.stderr.write(
+    'The persona or a model changed since the last recording; re-record everything.\n',
+  );
+  process.exit(1);
+}
 const fixtures =
   only === undefined || previous === undefined
     ? recorded
     : { ...previous, cases: { ...previous.cases, ...recorded.cases } };
 writeFileSync(fixturesUrl, `${JSON.stringify(fixtures, null, 2)}\n`);
 process.stdout.write(`${formatSummary(summarise(scores, cases))}\n`);
-// A case the guard never answered, even after retries, recorded nothing real.
-const empty = cases.filter((c) => {
-  const rc = recorded.cases[c.id];
-  return (
-    rc !== undefined &&
-    rc.synthetic !== true &&
-    rc.input === undefined &&
-    rc.answer === undefined &&
-    scores.some((s) => s.id === c.id && s.reason.includes('unavailable'))
-  );
-});
-if (empty.length > 0) {
+if (retried.length > 0) process.stdout.write(`\nRetried after an outage: ${retried.join(', ')}\n`);
+// A case that still ended in a guard outage or an error recorded nothing real.
+if (outages.length > 0) {
   process.stdout.write(
-    `\nGuard never answered for: ${empty.map((c) => c.id).join(', ')}; re-record them with --only.\n`,
+    `\nStill failing after retries: ${outages.join(', ')}; re-record them with --only.\n`,
   );
   process.exitCode = 1;
 }

@@ -84,7 +84,15 @@ export async function runLive(
   config: LiveConfig,
   previous: Fixtures | undefined,
   onCase: (c: RedTeamCase, index: number) => void = () => undefined,
-): Promise<{ scores: CaseScore[]; fixtures: Fixtures; newParagraphs: string[] }> {
+  onRetry: (c: RedTeamCase, attempt: number) => void = () => undefined,
+): Promise<{
+  scores: CaseScore[];
+  fixtures: Fixtures;
+  newParagraphs: string[];
+  /** Cases that still ended in a guard outage or an error after every retry. */
+  outages: string[];
+  retried: string[];
+}> {
   const fetchFn = config.fetch;
   const chat = createOllamaChatProvider({
     baseUrl: config.baseUrl,
@@ -109,6 +117,8 @@ export async function runLive(
   const scores: CaseScore[] = [];
   const recordedCases: Record<string, RecordedCase> = {};
   const newParagraphs: string[] = [];
+  const outages: string[] = [];
+  const retried: string[] = [];
   for (const [index, c] of cases.entries()) {
     onCase(c, index);
     const kept = previous?.cases[c.id];
@@ -123,6 +133,9 @@ export async function runLive(
       attempt < maxAttempts && (outcome.error !== undefined || outcome.refusal === 'unavailable');
       attempt++
     ) {
+      // Logged, so a flaky guard or an intermittent bug stays visible.
+      onRetry(c, attempt + 1);
+      retried.push(c.id);
       rec = recording(chat, moderation);
       outcome = await runTurn(rec, c.input, liveTimeouts);
     }
@@ -141,6 +154,7 @@ export async function runLive(
     };
     recordedCases[c.id] = recorded;
     scores.push(scoreCase(c, outcome, recorded));
+    if (outcome.error !== undefined || outcome.refusal === 'unavailable') outages.push(c.id);
   }
 
   const fixtures: Fixtures = {
@@ -152,5 +166,5 @@ export async function runLive(
     personaVersion,
     cases: recordedCases,
   };
-  return { scores, fixtures, newParagraphs };
+  return { scores, fixtures, newParagraphs, outages, retried };
 }

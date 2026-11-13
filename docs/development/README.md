@@ -72,7 +72,7 @@ npm run eval:record         # re-record against Ollama after a model, persona or
 npm run eval:redteam:live   # run against Ollama without touching the fixtures
 ```
 
-Re-recording keeps my harmful labels by paragraph text and lists new paragraphs to label. `npm run eval:record -- --only=id1,id2` re-records just those cases and keeps the rest; the recorder retries a case whose guard timed out and exits non-zero if one never got a verdict. Check that no other Ollama client is running first; a second client at a different context size makes models reload mid-run.
+Re-recording keeps my harmful labels by paragraph text and lists new paragraphs to label. `npm run eval:record -- --only=id1,id2` re-records just those cases and keeps the rest; the recorder retries a turn that ended in a guard outage or an error, logs each retry, exits non-zero if one still fails, and refuses `--only` when the persona or a model changed since the last recording. Check that no other Ollama client is running first; a second client at a different context size makes models reload mid-run.
 
 ## Workflows
 
