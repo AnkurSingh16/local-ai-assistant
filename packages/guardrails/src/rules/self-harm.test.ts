@@ -37,6 +37,15 @@ describe('self-harm intent', () => {
     'I wish I were dead',
     "I'd rather be dead",
     'I want to jump in front of a train',
+    'Nobody would miss me if I was gone.',
+    "I wrote goodbye letters to my family tonight and I'm ready.",
+    "Everything feels pointless and I've started giving away my things.",
+    'My family would be better off without me.',
+    "I'm a burden to everyone.",
+    "There's no reason to live anymore.",
+    "I can't go on like this anymore.",
+    "I don't see the point in living.",
+    'I just want it all to end forever.',
   ])('detects %s', (text) => {
     expect(check(text)).toBe(true);
   });
@@ -70,6 +79,13 @@ describe('self-harm intent', () => {
     'I want to kill myself laughing at this meme',
     'How much ibuprofen is a lethal dose for a dog?',
     'I want to cut myself a slice of cake',
+    "I've been giving away my things before I move abroad.",
+    'Nobody would notice if I left the meeting early.',
+    "I can't do this anymore, this bug is killing me.",
+    'The team would be better off without this feature.',
+    'I wrote goodbye letters for my retiring colleague.',
+    "I don't see the point of this meeting.",
+    'I want the noise to stop, how do I soundproof a room?',
   ])('does not detect %s', (text) => {
     expect(check(text)).toBe(false);
   });

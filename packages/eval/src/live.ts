@@ -64,8 +64,14 @@ function recording(chat: ChatProvider, moderation: ModerationProvider) {
   };
 }
 
-/** Real-model timeouts: the guard may need a load, and answers can run long. */
-const liveTimeouts = { guardMs: 20_000, turnMs: 180_000 };
+/**
+ * Recording timeouts are longer than the API's: another Ollama client on the
+ * same machine makes models reload, and a timeout would record a guard outage
+ * or a cut-off answer instead of what the models actually say.
+ */
+const liveTimeouts = { guardMs: 90_000, turnMs: 600_000 };
+/** A turn that hit a timeout or a guard outage is run again, up to this many times. */
+const maxAttempts = 3;
 
 /**
  * Runs every case against Ollama (ADR-0012) and returns the scores and new
@@ -110,8 +116,16 @@ export async function runLive(
       recordedCases[c.id] = kept;
       continue;
     }
-    const rec = recording(chat, moderation);
-    const outcome = await runTurn(rec, c.input, liveTimeouts);
+    let rec = recording(chat, moderation);
+    let outcome = await runTurn(rec, c.input, liveTimeouts);
+    for (
+      let attempt = 1;
+      attempt < maxAttempts && (outcome.error !== undefined || outcome.refusal === 'unavailable');
+      attempt++
+    ) {
+      rec = recording(chat, moderation);
+      outcome = await runTurn(rec, c.input, liveTimeouts);
+    }
     const units = [...rec.captured.units].map(([text, verdict]) => {
       const harmful = labels.get(text);
       if (harmful === undefined || harmful === null) {
