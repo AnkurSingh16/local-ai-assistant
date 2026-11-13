@@ -9,7 +9,7 @@ import { createMemoryRepo, createReviewRepo, openDatabase } from '@local-ai/stor
 import { z } from 'zod';
 
 import { loadConfig } from './config.js';
-import { createReviewer, paraphraseProblem } from './learning.js';
+import { createReviewer, maxAlwaysTokens, paraphraseProblem } from './learning.js';
 
 /**
  * `npm run review`: my review queue (ADR-0009). Only items I approve become
@@ -61,9 +61,20 @@ async function main(): Promise<void> {
           `${item.id}  ${item.kind.padEnd(10)}  ${item.content.replace(/\s+/g, ' ').slice(0, 120)}\n`,
         );
       }
-    } else if (command === 'approve' && args[0] !== undefined) {
-      const always = args.slice(1).includes('--always');
-      process.stdout.write(`${await reviewer.approve(args[0], signal, { always })}\n`);
+    } else if (command === 'approve' && args[0] !== undefined && !args[0].startsWith('--')) {
+      const flags = args.slice(1);
+      const unknown = flags.filter((f) => f !== '--always');
+      if (unknown.length > 0)
+        throw new Error(`Unknown option ${unknown.join(' ')}; only --always.`);
+      const always = flags.includes('--always');
+      const outcome = await reviewer.approve(args[0], signal, { always });
+      process.stdout.write(
+        outcome === 'approved' && always
+          ? 'approved (always: used in every answer)\n'
+          : outcome === 'always_full'
+            ? `refused: this session's always-on items would exceed ${String(maxAlwaysTokens)} tokens; approve it without --always or forget another always-on item\n`
+            : `${outcome}\n`,
+      );
     } else if (command === 'reject' && args[0] !== undefined) {
       process.stdout.write((await reviewer.reject(args[0])) ? 'rejected\n' : 'not_found\n');
     } else if (command === 'promote' && args.length === 4) {

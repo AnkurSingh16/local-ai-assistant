@@ -14,6 +14,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
+  maxAlwaysTokens,
   createFeedbackService,
   createMemoryRecall,
   createReviewer,
@@ -277,3 +278,47 @@ async function mint(s: ReturnType<typeof setup>, text: string) {
   if (!verdict.ok) throw new Error('refused');
   return verdict.text;
 }
+
+describe('always-on memory limits', () => {
+  function reviewerFor(s: ReturnType<typeof setup>) {
+    return createReviewer({
+      review: s.review,
+      memory: s.memory,
+      embeddings: s.embeddings,
+      inputGuard: s.inputGuard,
+    });
+  }
+
+  it('refuses an always-on approval that would take more than half the memory slot', async () => {
+    const s = setup();
+    const a = await s.sessions.create('a');
+    const long = await s.review.add(a, 'preference', await mint(s, 'long '.repeat(190)));
+    expect(await reviewerFor(s).approve(long, signal, { always: true })).toBe('always_full');
+    expect(await s.memory.list(a)).toEqual([]);
+    // Still approvable as an ordinary item.
+    expect(await reviewerFor(s).approve(long, signal)).toBe('approved');
+    expect(maxAlwaysTokens).toBe(200);
+  });
+
+  it('puts always-on items before similar ones, each once, and forgetting one removes it', async () => {
+    const s = setup();
+    const a = await s.sessions.create('a');
+    const text = 'Call me Sam.';
+    const [vector] = await s.embeddings.embed([text], signal);
+    await s.memory.add(a, await mint(s, text), vector);
+    const allergyId = await s.memory.add(
+      a,
+      await mint(s, "I'm allergic to peanuts."),
+      undefined,
+      true,
+    );
+    const recall = createMemoryRecall({
+      memory: s.memory,
+      embeddings: s.embeddings,
+      timeoutMs: 1000,
+    });
+    expect(await recall.recall(a, text, signal)).toEqual(["I'm allergic to peanuts.", text]);
+    await s.memory.delete(a, allergyId);
+    expect(await recall.recall(a, text, signal)).toEqual([text]);
+  });
+});

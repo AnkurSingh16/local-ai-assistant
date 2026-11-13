@@ -1,4 +1,5 @@
 import type { MemoryRecall } from '@local-ai/agent';
+import { contextBudget, estimateTokens } from '@local-ai/agent';
 import type { EmbeddingProvider } from '@local-ai/core';
 import { cosineSimilarity } from '@local-ai/core';
 import type { InputGuard } from '@local-ai/guardrails';
@@ -18,6 +19,12 @@ import type { FlagLog, MemoryRepo, ReviewItem, ReviewKind, ReviewRepo } from '@l
  * prompt; 0.46 had the best balance on the dev messages.
  */
 const minSimilarity = 0.46;
+/**
+ * Always-on items for one session may use at most half of the memory slot, so
+ * they always fit and similar items still have room (ADR-0001, ADR-0004).
+ */
+export const maxAlwaysTokens = contextBudget.memory / 2;
+
 /** At most this many items are recalled for one message (also in the memory recall eval). */
 const maxRecalled = 3;
 
@@ -131,7 +138,7 @@ export interface Reviewer {
       /** Include the memory in every prompt for its session, for things like allergies. */
       readonly always?: boolean;
     },
-  ): Promise<'approved' | 'not_found' | 'refused'>;
+  ): Promise<'approved' | 'not_found' | 'refused' | 'always_full'>;
   reject(id: string): Promise<boolean>;
 }
 
@@ -154,6 +161,16 @@ export function createReviewer(deps: {
       // An always-on item is never matched by similarity, so it needs no embedding
       // and does not depend on the embedding model being up.
       const always = options.always === true;
+      if (always) {
+        // Always-on items must all fit the memory slot on every turn, with room
+        // left for similar ones, or some would be dropped without notice.
+        const current = (await deps.memory.list(item.sessionId)).filter((m) => m.always);
+        const cost = [...current.map((m) => m.content), verdict.text].reduce(
+          (sum, text) => sum + estimateTokens(text) + 2,
+          0,
+        );
+        if (cost > maxAlwaysTokens) return 'always_full';
+      }
       const [embedding] = always ? [] : await deps.embeddings.embed([verdict.text], signal);
       const memoryId = await deps.memory.add(item.sessionId, verdict.text, embedding, always);
       // The text moves to memory, where the user can see and delete it, so the

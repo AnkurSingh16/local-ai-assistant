@@ -66,6 +66,25 @@ describe('database', () => {
     db = openDatabase(path);
     expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 });
   });
+
+  it('upgrades a version-1 database with memory in it, keeping the rows as not always-on', () => {
+    // Recreate the version-1 shape: the memory table without the always column.
+    db.exec(
+      "INSERT INTO sessions (id, token_hash, created_at, last_seen_at) VALUES ('s', 'h', 0, 0)",
+    );
+    db.exec('ALTER TABLE memory DROP COLUMN always; PRAGMA user_version = 1;');
+    db.exec(
+      "INSERT INTO memory (id, session_id, content, embedding, created_at) VALUES ('m', 's', 'Call me Sam.', NULL, 0)",
+    );
+    db.close();
+    db = openDatabase(path);
+    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 });
+    expect(db.prepare('SELECT content, always FROM memory').all()).toEqual([
+      { content: 'Call me Sam.', always: 0 },
+    ]);
+    db.exec("DELETE FROM sessions WHERE id = 's'");
+    expect(db.prepare('SELECT count(*) AS n FROM memory').get()).toEqual({ n: 0 });
+  });
 });
 
 describe('sessions', () => {

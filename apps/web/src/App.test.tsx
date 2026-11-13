@@ -225,6 +225,21 @@ describe('memory view', () => {
     expect(calls).toEqual(['forget m1']);
   });
 
+  it('labels an always-on item', async () => {
+    const { account } = fakeAccount([
+      {
+        id: 'm2',
+        content: 'Allergic to peanuts.',
+        createdAt: '2026-11-13T00:00:00Z',
+        always: true,
+      },
+    ]);
+    render(<App client={fakeClient(() => events([]))} account={account} />);
+    await userEvent.click(screen.getByRole('button', { name: 'What I remember' }));
+    expect(await screen.findByText('Allergic to peanuts.')).toBeInTheDocument();
+    expect(screen.getByText(/used in every answer/)).toBeInTheDocument();
+  });
+
   it('asks before deleting everything', async () => {
     const { account, calls } = fakeAccount([]);
     render(<App client={fakeClient(() => events([]))} account={account} />);
