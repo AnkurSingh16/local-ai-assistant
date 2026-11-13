@@ -28,9 +28,24 @@ const composeSchema = z.object({
   ),
 });
 
+/**
+ * js-yaml keeps a merge key (`<<: *anchor`) as a literal property while Compose
+ * expands it, so a port inherited that way would be invisible here. Any merge
+ * key anywhere fails the check instead.
+ */
+function hasMergeKey(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasMergeKey);
+  if (value !== null && typeof value === 'object') {
+    return Object.entries(value).some(([key, inner]) => key === '<<' || hasMergeKey(inner));
+  }
+  return false;
+}
+
 /** Every reason the Compose file would expose something beyond loopback. */
 function exposures(yaml: string): string[] {
-  const compose = composeSchema.parse(load(yaml));
+  const loaded: unknown = load(yaml);
+  if (hasMergeKey(loaded)) return ['merge key: write ports out in full'];
+  const compose = composeSchema.parse(loaded);
   const problems: string[] = [];
   for (const [name, service] of Object.entries(compose.services)) {
     if (service.network_mode === 'host') problems.push(`${name}: network_mode host`);
@@ -57,6 +72,10 @@ describe('process topology', () => {
     ["services:\n  a:\n    ports: [\n      '8888:8080'\n      ]\n", ['a: 8888:8080']],
     ["services:\n  a:\n    'ports':\n      - '0.0.0.0:1:2'\n", ['a: 0.0.0.0:1:2']],
     ["x: &p ['9:9']\nservices:\n  a:\n    ports: *p\n", ['a: 9:9']],
+    [
+      'x: &s\n  ports: ["0.0.0.0:1:1"]\nservices:\n  a:\n    <<: *s\n',
+      ['merge key: write ports out in full'],
+    ],
     ['services:\n  a:\n    network_mode: host\n', ['a: network_mode host']],
     ['services:\n  a:\n    ports:\n      - 8080\n', ['a: 8080']],
     [
