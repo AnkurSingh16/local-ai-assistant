@@ -93,6 +93,8 @@ describe('mobile memory screen', () => {
       />,
     );
     expect(await screen.findByRole('alert')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('alert')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     expect(closed).toBe(true);
   });

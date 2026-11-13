@@ -4,6 +4,7 @@ import type { ChatClient } from './client.js';
 import { ChatClientError } from './client.js';
 import type { TurnView } from './turn.js';
 import { cancelTurn, failTurn, initialTurn, reduceTurn } from './turn.js';
+
 export interface Turn {
   readonly id: number;
   readonly question: string;

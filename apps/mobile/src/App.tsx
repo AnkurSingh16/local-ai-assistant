@@ -8,6 +8,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { ChatScreen } from './ChatScreen';
 import { apiBaseUrl } from './config';
+import { createFetchLike } from './fetch';
 import { MemoryScreen } from './MemoryScreen';
 import { secureTokenStore } from './secure-store';
 import { createSession } from './session';
@@ -22,14 +23,7 @@ import { colors } from './theme';
 export function App(): ReactElement {
   const session = useMemo(() => createSession(secureTokenStore), []);
   const clients = useMemo(() => {
-    // expo/fetch takes the same arguments as fetch, with a narrower RequestInit.
-    const fetchLike = (input: string, init: RequestInit): Promise<Response> =>
-      expoFetch(input, {
-        headers: new Headers(init.headers),
-        ...(init.method === undefined ? {} : { method: init.method }),
-        ...(typeof init.body === 'string' ? { body: init.body } : {}),
-        ...(init.signal ? { signal: init.signal } : {}),
-      });
+    const fetchLike = createFetchLike(expoFetch);
     return {
       chat: createChatClient({ baseUrl: apiBaseUrl, fetch: fetchLike, token: session.token }),
       account: createAccountClient({ baseUrl: apiBaseUrl, fetch: fetchLike, token: session.token }),

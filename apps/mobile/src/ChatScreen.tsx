@@ -58,7 +58,8 @@ function TurnItem({
                 accessibilityRole="link"
                 accessibilityLabel={`Source ${String(c.n)}: ${c.title === '' ? hostOf(c.url) : c.title}`}
                 onPress={() => {
-                  openUrl(c.url);
+                  // The contract already allows only https; checked again before leaving the app.
+                  if (c.url.startsWith('https://')) openUrl(c.url);
                 }}
               >
                 <Text style={styles.source}>

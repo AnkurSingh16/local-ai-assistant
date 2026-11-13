@@ -14,12 +14,12 @@ HOST=0.0.0.0 ALLOWED_HOSTS=192.168.1.20:8787,127.0.0.1:8787 npm run dev -w @loca
 EXPO_PUBLIC_API_URL=http://192.168.1.20:8787 npm run dev:mobile
 ```
 
-Replace `192.168.1.20` with the Mac's address on the Wi-Fi. Scan the QR code with Expo Go. In the iOS Simulator, `EXPO_PUBLIC_API_URL` can stay unset: it defaults to `http://127.0.0.1:8787`.
+Replace `192.168.1.20` with the Mac's address on the Wi-Fi. This is plain HTTP, so anyone on the same network can read the session token and the messages: I use it only on a network I trust, and a public setup puts TLS in front of the API (ADR-0010). Scan the QR code with Expo Go. In the iOS Simulator, `EXPO_PUBLIC_API_URL` can stay unset: it defaults to `http://127.0.0.1:8787`.
 
 ## How it differs from the web app
 
 - **Streaming.** React Native's built-in `fetch` does not stream response bodies, so the app passes `expo/fetch` to the client (ADR-0007).
-- **Session.** The app gets a session token from `POST /v1/sessions` and keeps it in `expo-secure-store` (the iOS Keychain or Android Keystore). It sends the token as `Authorization: Bearer`; the web app uses an HttpOnly cookie instead (ADR-0009). "Delete everything" removes the token from the device as well as the data on the server.
+- **Session.** The app gets a session token from `POST /v1/sessions` and keeps it in `expo-secure-store` (the iOS Keychain or Android Keystore). It sends the token as `Authorization: Bearer`; the web app uses an HttpOnly cookie instead (ADR-0009). Requests omit cookies, so the API's `Set-Cookie` never reaches the native cookie jar, and refuse redirects, so the token never follows one (`src/fetch.ts`). "Delete everything" removes the token from the device as well as the data on the server.
 - **Sources** open in the system browser. Answers render as plain text, with code blocks in a monospace font. There is no HTML, no Markdown links and no images.
 - Feedback is sent from the web app only for now.
 
@@ -37,4 +37,4 @@ The Expo source suggests `expo/fetch` honours `AbortSignal`, but the docs do not
 2. The API log shows the request closed by the client.
 3. No further text arrives.
 
-I have not recorded this check on a physical phone yet; until I do, Stop on mobile is covered only by the tests above.
+I have not recorded this check on a physical phone yet ([#50](https://github.com/AnkurSingh16/local-ai-assistant/issues/50)); until I do, Stop on mobile is covered only by the tests above, and Milestone 6 stays in progress.

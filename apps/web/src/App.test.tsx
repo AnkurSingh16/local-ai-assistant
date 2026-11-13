@@ -286,6 +286,34 @@ describe('feedback and new conversation', () => {
     expect(await screen.findByText('Call or text 988.')).toBeInTheDocument();
   });
 
+  it('offers no feedback when an answer was withheld part way', async () => {
+    const { account } = fakeAccount([]);
+    render(
+      <App
+        client={fakeClient(() => events(fixtureTurns.refusedMidAnswer ?? []))}
+        account={account}
+      />,
+    );
+    await ask('Hello');
+    await screen.findByText('Released before the flag.');
+    await screen.findByText("I can't help with that.");
+    expect(screen.queryByRole('button', { name: 'Send feedback' })).not.toBeInTheDocument();
+  });
+
+  it('moves focus into the form and then onto the outcome', async () => {
+    const { account } = fakeAccount([]);
+    render(
+      <App client={fakeClient(() => events(fixtureTurns.answered ?? []))} account={account} />,
+    );
+    await ask('Hello');
+    await userEvent.click(await screen.findByRole('button', { name: 'Send feedback' }));
+    const form = screen.getByRole('form', { name: 'Feedback' });
+    expect(within(form).getByLabelText('Type')).toHaveFocus();
+    await userEvent.type(within(form).getByLabelText('Details'), 'Nice.');
+    await userEvent.click(within(form).getByRole('button', { name: 'Send' }));
+    expect(await screen.findByRole('status')).toHaveFocus();
+  });
+
   it('offers no feedback on a refused turn', async () => {
     const { account } = fakeAccount([]);
     render(<App client={fakeClient(() => events(refusal))} account={account} />);

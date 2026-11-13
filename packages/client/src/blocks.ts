@@ -6,7 +6,8 @@ export interface Block {
 /**
  * Splits the answer into fenced code blocks and paragraphs. Rendering is plain
  * text only: no HTML, no links and never images, which are the classic way to
- * leak data from a chat (ADR-0003). React and React Native escape everything. Shared so both apps split answers the same way.
+ * leak data from a chat (ADR-0003). React and React Native escape everything.
+ * Shared so both apps split answers the same way.
  */
 export function toBlocks(text: string): Block[] {
   const blocks: Block[] = [];

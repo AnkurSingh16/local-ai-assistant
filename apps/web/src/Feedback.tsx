@@ -1,6 +1,6 @@
 import type { AccountClient, FeedbackKind } from '@local-ai/client';
 import type { ReactElement, SyntheticEvent } from 'react';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 const maxFeedbackChars = 1000;
 
@@ -23,6 +23,15 @@ export function Feedback({ account }: { readonly account: AccountClient }): Reac
   const [text, setText] = useState('');
   const [support, setSupport] = useState<string | undefined>(undefined);
   const id = useId();
+  const firstField = useRef<HTMLSelectElement>(null);
+  const result = useRef<HTMLParagraphElement>(null);
+
+  // Keyboard and screen-reader users land in the form when it opens, and on
+  // the outcome when it replaces the Send button, instead of on the page body.
+  useEffect(() => {
+    if (state === 'open') firstField.current?.focus();
+    if (state === 'sent') result.current?.focus();
+  }, [state]);
 
   if (state === 'closed') {
     return (
@@ -40,11 +49,11 @@ export function Feedback({ account }: { readonly account: AccountClient }): Reac
   if (state === 'sent') {
     // Someone who wrote something that reads as self-harm sees where to get help.
     return support === undefined ? (
-      <p className="note" role="status">
+      <p className="note" role="status" tabIndex={-1} ref={result}>
         Thanks. I review feedback before anything changes.
       </p>
     ) : (
-      <p className="refusal" role="status">
+      <p className="refusal" role="status" tabIndex={-1} ref={result}>
         {support}
       </p>
     );
@@ -73,6 +82,7 @@ export function Feedback({ account }: { readonly account: AccountClient }): Reac
     >
       <label htmlFor={`${id}-kind`}>Type</label>
       <select
+        ref={firstField}
         id={`${id}-kind`}
         value={kind}
         onChange={(e) => {

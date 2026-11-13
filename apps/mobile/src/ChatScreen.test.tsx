@@ -1,7 +1,7 @@
 import type { ChatClient } from '@local-ai/client';
 import { createChatClient, toBlocks } from '@local-ai/client';
 import type { ChatRequestBody, SseEvent } from '@local-ai/contract';
-import { encodeSseEvent, sseEventId } from '@local-ai/contract';
+import { chatRequestSchema, encodeSseEvent, sseEventId } from '@local-ai/contract';
 import { fixtureMessageId, fixtureTurns } from '@local-ai/contract/fixtures';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native/dist/pure';
 import { describe, expect, it } from 'vitest';
@@ -18,7 +18,10 @@ function streamingFetch(events: readonly SseEvent[], chunkSize = 7) {
   const bodies: ChatRequestBody[] = [];
   const signals: AbortSignal[] = [];
   const fetch = (_url: string, init: RequestInit): Promise<Response> => {
-    if (typeof init.body === 'string') bodies.push(JSON.parse(init.body) as ChatRequestBody);
+    if (typeof init.body === 'string') {
+      const parsed = chatRequestSchema.safeParse(JSON.parse(init.body));
+      if (parsed.success) bodies.push(parsed.data);
+    }
     if (init.signal) signals.push(init.signal);
     const wire = events.map((e, i) => encodeSseEvent(e, sseEventId(fixtureMessageId, i))).join('');
     const bytes = encoder.encode(wire);

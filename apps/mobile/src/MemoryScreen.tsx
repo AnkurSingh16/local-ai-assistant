@@ -71,9 +71,20 @@ export function MemoryScreen({
       <Text style={styles.note}>{memoryDisclosure}</Text>
       {state.kind === 'loading' && <Text style={styles.note}>Loading…</Text>}
       {state.kind === 'error' && (
-        <Text style={styles.error} accessibilityRole="alert">
-          That didn&apos;t work. Please try again.
-        </Text>
+        <View>
+          <Text style={styles.error} accessibilityRole="alert">
+            That didn&apos;t work. Please try again.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setState({ kind: 'loading' });
+              void load();
+            }}
+          >
+            <Text style={styles.link}>Try again</Text>
+          </Pressable>
+        </View>
       )}
       {state.kind === 'deleted' && (
         <Text style={styles.text}>Everything stored under your session is deleted.</Text>

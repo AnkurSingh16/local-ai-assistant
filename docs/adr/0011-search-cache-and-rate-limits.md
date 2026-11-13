@@ -35,3 +35,5 @@ Option 3.
 - `@fastify/rate-limit` 11.2.2 accepts a custom `store`; its only `Date.now()` calls are in the bundled `LocalStore`, so a store reading our `Clock` makes it deterministic (inspected 2026-11-12).
 - Generation runs at about 26 tokens/s on my Mac, so a typical answer takes 10 to 20 s; 20 turns per 10 minutes is about one turn every 30 s.
 - OWASP LLM10:2025 Unbounded Consumption: https://genai.owasp.org/llmrisk/llm102025-unbounded-consumption/ (accessed 2026-11-12).
+
+**Amended 2026-11-13 (Milestone 6).** `@fastify/rate-limit` runs one limiter per request, so the per-session limit is a small fixed-window counter on the injected clock in the chat route (`createWindowLimiter` in `apps/api/src/limits.ts`). It has the same limits and the same 429 response with `Retry-After`. It is keyed by session id, never by the token. A turn counts as soon as it passes validation, including one later refused for an unknown conversation or a full queue.
