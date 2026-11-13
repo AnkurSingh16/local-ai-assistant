@@ -1,6 +1,15 @@
 import { personaVersion } from '@local-ai/agent';
-import type { ChatProvider, ModerationProvider, ModerationVerdict } from '@local-ai/core';
-import { createOllamaChatProvider, createOllamaModerationProvider } from '@local-ai/providers';
+import type {
+  ChatProvider,
+  EmbeddingProvider,
+  ModerationProvider,
+  ModerationVerdict,
+} from '@local-ai/core';
+import {
+  createOllamaChatProvider,
+  createOllamaEmbeddingProvider,
+  createOllamaModerationProvider,
+} from '@local-ai/providers';
 import { z } from 'zod';
 
 import { runTurn } from './pipeline.js';
@@ -21,7 +30,7 @@ const tagsSchema = z.object({
   models: z.array(z.object({ name: z.string(), digest: z.string() })),
 });
 
-async function digestOf(config: LiveConfig, model: string): Promise<string> {
+export async function digestOf(config: LiveConfig, model: string): Promise<string> {
   const res = await config.fetch(new URL('/api/tags', config.baseUrl).toString(), {
     method: 'GET',
     signal: AbortSignal.timeout(5_000),
@@ -177,4 +186,14 @@ export async function runLive(
     cases: recordedCases,
   };
   return { scores, fixtures, newParagraphs, outages, retried };
+}
+
+/** The live embedding provider, for the memory recall eval. */
+export function createLiveEmbeddings(config: LiveConfig, model: string): EmbeddingProvider {
+  return createOllamaEmbeddingProvider({
+    baseUrl: config.baseUrl,
+    model,
+    keepAlive: '30m',
+    fetch: config.fetch,
+  });
 }

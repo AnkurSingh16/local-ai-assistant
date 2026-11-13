@@ -1,6 +1,8 @@
+import { createMockEmbeddingProvider } from '@local-ai/providers/mock';
 import { describe, expect, it } from 'vitest';
 
 import { runTurn } from './pipeline.js';
+import { atThreshold, bestThreshold, cosine, loadRecallSet, scorePairs } from './memory-recall.js';
 import { replayProviders } from './replay.js';
 import { loadCases, loadFixtures, runReplay } from './run.js';
 import type { RedTeamCase } from './schema.js';
@@ -151,5 +153,41 @@ describe('stale fixtures', () => {
     });
     await runTurn(noVerdict, 'hello', timeouts);
     expect(noVerdict.stale()).toBe(true);
+  });
+});
+
+describe('memory recall eval', () => {
+  it('loads a labelled set whose labels name real items, in both splits', () => {
+    const set = loadRecallSet();
+    expect(set.items.length).toBeGreaterThanOrEqual(10);
+    for (const split of ['dev', 'heldout'] as const) {
+      expect(set.messages.filter((m) => m.split === split).length).toBeGreaterThanOrEqual(20);
+    }
+  });
+
+  it('scores pairs, and measures recall and precision at a threshold', async () => {
+    const set = {
+      items: [
+        { id: 'a', text: 'alpha' },
+        { id: 'b', text: 'beta' },
+      ],
+      messages: [{ id: 'm', message: 'alpha', relevant: ['a'], split: 'dev' as const }],
+    };
+    // Same text, same vector: "alpha" scores 1 against itself and less against "beta".
+    const pairs = await scorePairs(
+      set,
+      createMockEmbeddingProvider(),
+      { query: '', document: '' },
+      new AbortController().signal,
+    );
+    expect(pairs).toHaveLength(2);
+    const self = pairs.find((p) => p.relevant);
+    expect(self?.score).toBeCloseTo(1, 5);
+    const r = atThreshold(pairs, 0.999);
+    expect(r.recall).toBe(1);
+    expect(r.precision).toBe(1);
+    expect(bestThreshold(pairs).f1).toBe(1);
+    expect(cosine(new Float32Array([1, 0]), new Float32Array([0, 1]))).toBe(0);
+    expect(cosine(new Float32Array(0), new Float32Array(0))).toBe(0);
   });
 });

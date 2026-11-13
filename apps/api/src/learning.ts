@@ -10,8 +10,13 @@ import type { FlagLog, MemoryRepo, ReviewItem, ReviewKind, ReviewRepo } from '@l
  * session it came from.
  */
 
-/** A recalled item must be at least this similar to the message (cosine, nomic-embed-text). */
-const minSimilarity = 0.35;
+/**
+ * A recalled item must be at least this similar to the message (cosine,
+ * nomic-embed-text). Chosen on the memory recall eval (`npm run eval:memory`,
+ * ADR-0001): at 0.35 nearly every item passed, so unrelated memory filled the
+ * prompt; 0.46 had the best balance on the dev messages.
+ */
+export const minSimilarity = 0.46;
 const maxRecalled = 3;
 
 function cosine(a: Float32Array, b: Float32Array): number {

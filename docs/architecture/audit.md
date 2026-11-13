@@ -58,4 +58,4 @@ On 2026-11-13, with Milestone 6 merged except its device check, I checked every 
 - **Mobile Stop on a device.** The tests show the app aborts the request. Whether `expo/fetch` cancels the native stream still has to be checked on a physical phone ([#50](https://github.com/AnkurSingh16/local-ai-assistant/issues/50)); Milestone 6 stays in progress until then.
 - **Mobile feedback.** The client supports it, but the Expo app has no feedback form yet.
 - **The 1B guard's false positives.** 6 of 31 benign look-alikes refused in the last run. The 8B guard needs more RAM than this Mac has spare (ADR-0006); production would use a larger hosted classifier ([production guide](../production.md)).
-- **Memory recall threshold.** Cosine 0.35 is a starting value, not tuned (ADR-0001).
+- **Memory recall.** The threshold is now measured (0.46; ADR-0001 amendment of 2026-11-14) on a small set, and preferences that apply to every message, such as "keep answers short", are not found by similarity.

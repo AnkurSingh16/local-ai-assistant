@@ -1,0 +1,318 @@
+{
+  "items": [
+    {
+      "id": "m01",
+      "text": "Please call me Sam."
+    },
+    {
+      "id": "m02",
+      "text": "I prefer metric units: kilometres, kilograms and Celsius."
+    },
+    {
+      "id": "m03",
+      "text": "I am vegetarian and I don't eat fish either."
+    },
+    {
+      "id": "m04",
+      "text": "I live in Leeds in the north of England."
+    },
+    {
+      "id": "m05",
+      "text": "I write most of my code in TypeScript and use Node.js."
+    },
+    {
+      "id": "m06",
+      "text": "Keep answers short, a few sentences at most."
+    },
+    {
+      "id": "m07",
+      "text": "I'm allergic to peanuts."
+    },
+    {
+      "id": "m08",
+      "text": "My daughter is seven and loves dinosaurs."
+    },
+    {
+      "id": "m09",
+      "text": "I am learning Spanish and I'm at an intermediate level."
+    },
+    {
+      "id": "m10",
+      "text": "I use a Mac with an M1 Pro chip."
+    },
+    {
+      "id": "m11",
+      "text": "I run three times a week and I'm training for a half marathon."
+    },
+    {
+      "id": "m12",
+      "text": "I work night shifts as a nurse."
+    },
+    {
+      "id": "m13",
+      "text": "Use British spelling in your answers."
+    },
+    {
+      "id": "m14",
+      "text": "I have a cat called Miso."
+    },
+    {
+      "id": "m15",
+      "text": "My budget for a new laptop is about 1,200 pounds."
+    }
+  ],
+  "messages": [
+    {
+      "id": "recall-001",
+      "message": "What should I make for dinner tonight?",
+      "relevant": ["m03", "m07"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-002",
+      "message": "How far is a half marathon?",
+      "relevant": ["m02", "m11"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-003",
+      "message": "What's the weather usually like where I live in winter?",
+      "relevant": ["m04"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-004",
+      "message": "How do I type a function that returns a promise?",
+      "relevant": ["m05"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-005",
+      "message": "Can you explain quantum entanglement?",
+      "relevant": [],
+      "split": "dev"
+    },
+    {
+      "id": "recall-006",
+      "message": "Is this snack safe for me to eat? It has satay sauce.",
+      "relevant": ["m07"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-007",
+      "message": "Suggest a birthday present for my kid",
+      "relevant": ["m08"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-008",
+      "message": "How do I say 'I would like a coffee' in Spanish?",
+      "relevant": ["m09"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-009",
+      "message": "How do I install Homebrew?",
+      "relevant": ["m10"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-010",
+      "message": "What should I eat before a long run?",
+      "relevant": ["m11", "m03", "m07"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-011",
+      "message": "How can I sleep better during the day?",
+      "relevant": ["m12"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-012",
+      "message": "Write a short paragraph about colours",
+      "relevant": [],
+      "split": "dev"
+    },
+    {
+      "id": "recall-013",
+      "message": "Why does my cat knead blankets?",
+      "relevant": ["m14"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-014",
+      "message": "Which laptop should I buy?",
+      "relevant": ["m15", "m10", "m05"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-015",
+      "message": "What temperature should my oven be for roasting vegetables?",
+      "relevant": ["m02", "m03"],
+      "split": "dev"
+    },
+    {
+      "id": "recall-016",
+      "message": "What's the capital of Peru?",
+      "relevant": [],
+      "split": "dev"
+    },
+    {
+      "id": "recall-017",
+      "message": "How do vaccines work?",
+      "relevant": [],
+      "split": "dev"
+    },
+    {
+      "id": "recall-018",
+      "message": "Translate 'thank you' into Japanese",
+      "relevant": [],
+      "split": "dev"
+    },
+    {
+      "id": "recall-019",
+      "message": "What is the Pythagorean theorem?",
+      "relevant": [],
+      "split": "dev"
+    },
+    {
+      "id": "recall-020",
+      "message": "Recommend a good science fiction novel",
+      "relevant": [],
+      "split": "dev"
+    },
+    {
+      "id": "recall-021",
+      "message": "How do I remove a stripped screw?",
+      "relevant": [],
+      "split": "dev"
+    },
+    {
+      "id": "recall-022",
+      "message": "What caused the fall of the Roman Empire?",
+      "relevant": [],
+      "split": "dev"
+    },
+    {
+      "id": "recall-023",
+      "message": "Plan a vegetarian picnic for my family",
+      "relevant": ["m03", "m07", "m08"],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-024",
+      "message": "How many miles is 10 kilometres? Actually just give me kilometres for my pace.",
+      "relevant": ["m02", "m11"],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-025",
+      "message": "Are there good running clubs near me?",
+      "relevant": ["m04", "m11"],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-026",
+      "message": "How do I set up ESLint for my project?",
+      "relevant": ["m05"],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-027",
+      "message": "Which Spanish podcasts are good for my level?",
+      "relevant": ["m09"],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-028",
+      "message": "My cat keeps scratching the sofa, what can I do?",
+      "relevant": ["m14"],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-029",
+      "message": "Can you recommend a dinosaur museum for kids in the north of England?",
+      "relevant": ["m08", "m04"],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-030",
+      "message": "How do I deal with fatigue after working nights?",
+      "relevant": ["m12"],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-031",
+      "message": "Will Docker run well on my laptop?",
+      "relevant": ["m10"],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-032",
+      "message": "Is a 1,500 pound MacBook worth it for me?",
+      "relevant": ["m15", "m10"],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-033",
+      "message": "Should I spell it colour or color?",
+      "relevant": [],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-034",
+      "message": "Give me a protein-rich lunch idea",
+      "relevant": ["m03", "m07"],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-035",
+      "message": "Explain how black holes form",
+      "relevant": [],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-036",
+      "message": "What's a good name for a goldfish?",
+      "relevant": [],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-037",
+      "message": "How do I calculate the area of a triangle?",
+      "relevant": [],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-038",
+      "message": "Who painted the Mona Lisa?",
+      "relevant": [],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-039",
+      "message": "How do tides work?",
+      "relevant": [],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-040",
+      "message": "What is a mortgage?",
+      "relevant": [],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-041",
+      "message": "How do I fold a fitted sheet?",
+      "relevant": [],
+      "split": "heldout"
+    },
+    {
+      "id": "recall-042",
+      "message": "Summarise the plot of Macbeth",
+      "relevant": [],
+      "split": "heldout"
+    }
+  ]
+}

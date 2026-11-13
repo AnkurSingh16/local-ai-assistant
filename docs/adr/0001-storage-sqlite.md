@@ -21,7 +21,7 @@ I use SQLite through `node:sqlite` (`DatabaseSync`), one file under `data/`, beh
 - **Pragmas on every connection:** `foreign_keys=ON` (SQLite defaults it off, which silently disables cascades), `journal_mode=WAL`, `secure_delete=ON`.
 - **Deletion:** every session-owned table cascades from `sessions`. After any delete I run `PRAGMA wal_checkpoint(TRUNCATE)`, because until the checkpoint the deleted rows still sit in the WAL file.
 - **Migrations:** numbered `.sql` files, one transaction each, tracked with `PRAGMA user_version`. No migration tool.
-- **Vectors:** approved memory is small (the owner approves every item), so `nomic-embed-text` embeddings from Ollama are stored as Float32 BLOBs next to each memory row and scored by brute-force cosine in JavaScript. I chose Ollama over transformers.js to avoid a second inference runtime; its RAM cost next to the other models is measured in Milestone 5. Measured on 2026-11-13 with `ollama ps` on my 16 GB M1 Pro: `nomic-embed-text` takes 0.34 GB when loaded, next to 4.76 GB for `qwen2.5:7b`, so it fits beside the chat and guard models. The recall threshold (cosine 0.35) is a starting value I have not tuned against real approved items; with only approved items in play, a loose threshold adds at most a few hundred tokens to the memory slot.
+- **Vectors:** approved memory is small (the owner approves every item), so `nomic-embed-text` embeddings from Ollama are stored as Float32 BLOBs next to each memory row and scored by brute-force cosine in JavaScript. I chose Ollama over transformers.js to avoid a second inference runtime; its RAM cost next to the other models is measured in Milestone 5. Measured on 2026-11-13 with `ollama ps` on my 16 GB M1 Pro: `nomic-embed-text` takes 0.34 GB when loaded, next to 4.76 GB for `qwen2.5:7b`, so it fits beside the chat and guard models. The recall threshold was first a guess of cosine 0.35; see the amendment below for the measured value.
 - **Never stored:** flagged input or output text (only a category and a timestamp), plaintext session tokens, IP addresses, raw page HTML.
 - **Approved memory stays tied to its session** and is deleted with it. Nothing a user wrote ever leaves the session's tables; see [ADR-0009](0009-sessions-and-memory-deletion.md).
 
@@ -41,3 +41,13 @@ Measured on my M1 Pro (Node 24.22.3, bundled SQLite 3.54.1) on 2026-11-12:
 - Node 24 documents `node:sqlite` as "Stability: 1.2 - Release candidate" since v24.15.0: https://nodejs.org/docs/latest-v24.x/api/sqlite.html (accessed 2026-11-12).
 
 **Amended 2026-11-13 (Milestone 7).** The repositories as built are `SessionRepo`, `ConversationRepo`, `MemoryRepo`, `ReviewRepo` (feedback and the review queue in one table) and `FlagLog`. There is no `SearchCacheRepo`: the search cache stays in memory, as the ADR-0011 amendment explains.
+
+**Amended 2026-11-14 (memory recall eval).** `packages/eval/cases/memory-recall.json` holds 15 memory items and 42 messages, each labelled with the items a good answer should use. The messages are split into dev (22) and held-out (20). `npm run eval:memory` scores every pair with `nomic-embed-text` (0a109f422b47) and picks the threshold with the best F1 on dev.
+
+| Threshold                                                       | Dev recall | Dev precision | Held-out recall | Held-out precision |
+| --------------------------------------------------------------- | ---------- | ------------- | --------------- | ------------------ |
+| 0.35 (the first guess)                                          | 90.0%      | 9.4%          | 100.0%          | 11.2%              |
+| 0.46 (best on dev, now used)                                    | 60.0%      | 63.2%         | 77.8%           | 70.0%              |
+| 0.56 with nomic's `search_query:` / `search_document:` prefixes | 35.0%      | 87.5%         | 66.7%           | 85.7%              |
+
+At 0.35 nearly every item passed, so the three most similar items filled the prompt whatever the question. The prefixes did about as well at their own best threshold but would mean re-embedding stored memory, so I kept plain text. Two limits stay. Preferences that apply to every message, such as "keep answers short" or "use British spelling", are not found by similarity, and I left them out of the labels. And 15 items and 42 messages are a small set: the threshold is a measured starting point, not a tuned constant.
