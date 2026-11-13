@@ -19,7 +19,11 @@ export interface AccountClient {
   /** Deletes the session and everything stored under it. */
   deleteEverything(signal: AbortSignal): Promise<void>;
   /** Sends feedback, a correction or a preference for review. */
-  sendFeedback(kind: FeedbackKind, text: string, signal: AbortSignal): Promise<void>;
+  /**
+   * Sends feedback for review. Resolves to a message to show when the server
+   * answered with one (crisis resources, when the text read as self-harm).
+   */
+  sendFeedback(kind: FeedbackKind, text: string, signal: AbortSignal): Promise<string | undefined>;
 }
 
 export interface MemoryEntry {
@@ -43,6 +47,7 @@ export interface AccountClientOptions {
 
 const sessionSchema = z.object({ token: z.string().min(20).max(100) });
 const meSchema = z.object({ active: z.boolean() });
+const feedbackReplySchema = z.object({ message: z.string().min(1).max(2000).optional() });
 
 export class AccountError extends Error {
   constructor(readonly status: number | undefined) {
@@ -103,7 +108,8 @@ export function createAccountClient(options: AccountClientOptions): AccountClien
         { method: 'POST', body: JSON.stringify({ kind, text }) },
         signal,
       );
-      await res.body?.cancel().catch(() => undefined);
+      const parsed = feedbackReplySchema.safeParse(await res.json().catch(() => undefined));
+      return parsed.success ? parsed.data.message : undefined;
     },
     async hasSession(signal) {
       let res: Response;

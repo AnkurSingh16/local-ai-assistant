@@ -21,6 +21,7 @@ export function Feedback({ account }: { readonly account: AccountClient }): Reac
   const [state, setState] = useState<State>('closed');
   const [kind, setKind] = useState<FeedbackKind>('feedback');
   const [text, setText] = useState('');
+  const [support, setSupport] = useState<string | undefined>(undefined);
   const id = useId();
 
   if (state === 'closed') {
@@ -37,9 +38,14 @@ export function Feedback({ account }: { readonly account: AccountClient }): Reac
     );
   }
   if (state === 'sent') {
-    return (
+    // Someone who wrote something that reads as self-harm sees where to get help.
+    return support === undefined ? (
       <p className="note" role="status">
         Thanks. I review feedback before anything changes.
+      </p>
+    ) : (
+      <p className="refusal" role="status">
+        {support}
       </p>
     );
   }
@@ -49,7 +55,7 @@ export function Feedback({ account }: { readonly account: AccountClient }): Reac
     if (text.trim() === '') return;
     setState('sending');
     try {
-      await account.sendFeedback(kind, text.trim(), AbortSignal.timeout(15_000));
+      setSupport(await account.sendFeedback(kind, text.trim(), AbortSignal.timeout(15_000)));
       setText('');
       setState('sent');
     } catch {

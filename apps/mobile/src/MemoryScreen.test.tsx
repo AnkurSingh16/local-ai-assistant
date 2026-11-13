@@ -21,7 +21,7 @@ function fakeAccount(items: MemoryEntry[], failing = false) {
       current = [];
       return Promise.resolve();
     },
-    sendFeedback: () => Promise.resolve(),
+    sendFeedback: () => Promise.resolve(undefined),
   };
   return { account, calls };
 }

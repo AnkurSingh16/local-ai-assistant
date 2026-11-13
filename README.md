@@ -20,7 +20,7 @@ It is a demo project, separate from my retrieval-only portfolio chatbot.
 | 3         | Guardrails and the red-team eval in CI              | Done    |
 | 4         | Web search with SearXNG, SSRF protection, citations | Done    |
 | 5         | Memory, feedback and safe learning                  | Done    |
-| 6         | Polished web client and Expo mobile app             | Planned |
+| 6         | Polished web client and Expo mobile app             | Done    |
 | 7         | Production write-up and final audit                 | Planned |
 
 ## Architecture

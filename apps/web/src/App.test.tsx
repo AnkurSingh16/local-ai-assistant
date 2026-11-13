@@ -60,7 +60,8 @@ function fakeAccount(
     },
     sendFeedback: (kind: string, text: string) => {
       calls.push(`feedback ${kind}: ${text}`);
-      return feedbackFails ? Promise.reject(new Error('down')) : Promise.resolve();
+      if (feedbackFails) return Promise.reject(new Error('down'));
+      return Promise.resolve(text.includes('hopeless') ? 'Call or text 988.' : undefined);
     },
   };
   return { account, calls };
@@ -270,6 +271,19 @@ describe('feedback and new conversation', () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Send' }));
     expect(await within(form).findByRole('alert')).toHaveTextContent(/could not be sent/);
     expect(within(form).getByLabelText('Details')).toHaveValue('Great answer');
+  });
+
+  it('shows crisis resources when the server answers feedback with them', async () => {
+    const { account } = fakeAccount([]);
+    render(
+      <App client={fakeClient(() => events(fixtureTurns.answered ?? []))} account={account} />,
+    );
+    await ask('Hello');
+    await userEvent.click(await screen.findByRole('button', { name: 'Send feedback' }));
+    const form = screen.getByRole('form', { name: 'Feedback' });
+    await userEvent.type(within(form).getByLabelText('Details'), 'I feel hopeless');
+    await userEvent.click(within(form).getByRole('button', { name: 'Send' }));
+    expect(await screen.findByText('Call or text 988.')).toBeInTheDocument();
   });
 
   it('offers no feedback on a refused turn', async () => {
