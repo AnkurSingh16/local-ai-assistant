@@ -2,7 +2,7 @@ import { createMockEmbeddingProvider } from '@local-ai/providers/mock';
 import { describe, expect, it } from 'vitest';
 
 import { runTurn } from './pipeline.js';
-import { atThreshold, bestThreshold, cosine, loadRecallSet, scorePairs } from './memory-recall.js';
+import { atThreshold, bestThreshold, loadRecallSet, scorePairs } from './memory-recall.js';
 import { replayProviders } from './replay.js';
 import { loadCases, loadFixtures, runReplay } from './run.js';
 import type { RedTeamCase } from './schema.js';
@@ -187,7 +187,23 @@ describe('memory recall eval', () => {
     expect(r.recall).toBe(1);
     expect(r.precision).toBe(1);
     expect(bestThreshold(pairs).f1).toBe(1);
-    expect(cosine(new Float32Array([1, 0]), new Float32Array([0, 1]))).toBe(0);
-    expect(cosine(new Float32Array(0), new Float32Array(0))).toBe(0);
+  });
+
+  it('keeps only the best items per message in top-k mode, as the API does', () => {
+    const pair = (messageId: string, itemId: string, score: number, relevant: boolean) => ({
+      split: 'dev' as const,
+      messageId,
+      itemId,
+      score,
+      relevant,
+    });
+    const pairs = [
+      pair('m1', 'a', 0.9, false),
+      pair('m1', 'b', 0.8, false),
+      pair('m1', 'c', 0.7, true),
+    ];
+    expect(atThreshold(pairs, 0.5).recall).toBe(1);
+    expect(atThreshold(pairs, 0.5, 2).recall).toBe(0);
+    expect(atThreshold(pairs, 0.75, 3).precision).toBe(0);
   });
 });

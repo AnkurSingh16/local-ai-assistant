@@ -27,3 +27,4 @@ export type {
 } from './providers.js';
 export { ProviderError } from './errors.js';
 export type { ProviderErrorKind } from './errors.js';
+export { cosineSimilarity } from './similarity.js';

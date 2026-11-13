@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 import type { EmbeddingProvider } from '@local-ai/core';
+import { cosineSimilarity } from '@local-ai/core';
 import { z } from 'zod';
 
 /**
@@ -37,24 +38,12 @@ export function loadRecallSet(): RecallSet {
   return set;
 }
 
-export function cosine(a: Float32Array, b: Float32Array): number {
-  let dot = 0;
-  let na = 0;
-  let nb = 0;
-  for (let i = 0; i < a.length && i < b.length; i++) {
-    const x = a[i] ?? 0;
-    const y = b[i] ?? 0;
-    dot += x * y;
-    na += x * x;
-    nb += y * y;
-  }
-  return na === 0 || nb === 0 ? 0 : dot / Math.sqrt(na * nb);
-}
-
 const empty = new Float32Array(0);
 
 export interface ScoredPair {
   readonly split: 'dev' | 'heldout';
+  readonly messageId: string;
+  readonly itemId: string;
   readonly relevant: boolean;
   readonly score: number;
 }
@@ -79,8 +68,10 @@ export async function scorePairs(
     set.items.forEach((item, ii) => {
       pairs.push({
         split: m.split,
+        itemId: item.id,
         relevant: m.relevant.includes(item.id),
-        score: cosine(messageVectors[mi] ?? empty, itemVectors[ii] ?? empty),
+        messageId: m.id,
+        score: cosineSimilarity(messageVectors[mi] ?? empty, itemVectors[ii] ?? empty),
       });
     });
   });
@@ -94,8 +85,26 @@ export interface ThresholdResult {
   readonly f1: number;
 }
 
-export function atThreshold(pairs: readonly ScoredPair[], threshold: number): ThresholdResult {
-  const kept = pairs.filter((p) => p.score >= threshold);
+/** Items recalled for each message in the API: at most this many, best first. */
+export const productionTopK = 3;
+
+/**
+ * Recall and precision at a threshold. With `topK`, each message keeps only its
+ * best `topK` items above the threshold, as the API does, so the figures are
+ * what users actually get.
+ */
+export function atThreshold(
+  pairs: readonly ScoredPair[],
+  threshold: number,
+  topK = Number.POSITIVE_INFINITY,
+): ThresholdResult {
+  const byMessage = new Map<string, ScoredPair[]>();
+  for (const p of pairs.filter((x) => x.score >= threshold)) {
+    byMessage.set(p.messageId, [...(byMessage.get(p.messageId) ?? []), p]);
+  }
+  const kept = [...byMessage.values()].flatMap((list) =>
+    list.sort((a, b) => b.score - a.score).slice(0, topK),
+  );
   const relevant = pairs.filter((p) => p.relevant).length;
   const hits = kept.filter((p) => p.relevant).length;
   const recall = relevant === 0 ? 1 : hits / relevant;
