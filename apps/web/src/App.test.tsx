@@ -6,7 +6,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import { toBlocks } from './Answer.js';
+import { toBlocks } from '@local-ai/client';
 import { App } from './App.js';
 
 interface FakeClient extends ChatClient {

@@ -1,4 +1,6 @@
 import type { AccountClient, ChatClient, TurnView } from '@local-ai/client';
+import type { Turn } from '@local-ai/client/react';
+import { useChat } from '@local-ai/client/react';
 import { maxMessageChars } from '@local-ai/contract';
 import type { KeyboardEvent, ReactElement, SyntheticEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
@@ -6,8 +8,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Answer } from './Answer.js';
 import { Feedback } from './Feedback.js';
 import { MemoryPanel } from './MemoryPanel.js';
-import type { Turn } from './useChat.js';
-import { useChat } from './useChat.js';
 
 const phaseLabels: Partial<Record<TurnView['phase'], string>> = {
   sending: 'Sending…',
