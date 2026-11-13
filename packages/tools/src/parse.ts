@@ -32,6 +32,13 @@ export interface ParseConfig {
 }
 
 const readySchema = z.object({ ready: z.literal(true) });
+const squash = (text: string): string =>
+  text
+    .replace(/[ \t\f\v\u00A0]+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
 const resultSchema = z.union([
   z.object({ ok: z.literal(true), title: z.string(), text: z.string() }),
   z.object({ ok: z.literal(false) }),
@@ -43,18 +50,43 @@ const workerUrl = new URL(
   import.meta.url,
 );
 
-/** A counting semaphore, so a burst of reads cannot start more than `limit` workers. */
-function createLimiter(limit: number): <T>(task: () => Promise<T>) => Promise<T> {
+/** Waiting reads are capped too, so a burst cannot pile up page bodies in memory. */
+const maxWaiting = 8;
+
+/**
+ * A counting semaphore, so a burst of reads cannot start more than `limit`
+ * workers. A waiter whose signal aborts leaves the queue at once.
+ */
+function createLimiter(
+  limit: number,
+): <T>(task: () => Promise<T>, signal: AbortSignal) => Promise<T> {
   let active = 0;
-  const waiting: (() => void)[] = [];
-  return async (task) => {
-    if (active >= limit) await new Promise<void>((resolve) => waiting.push(resolve));
+  const waiting: { start: () => void }[] = [];
+  return async (task, signal) => {
+    if (active >= limit) {
+      if (waiting.length >= maxWaiting) throw new ParseFailure('parse_failed');
+      await new Promise<void>((resolve, reject) => {
+        const entry = {
+          start: () => {
+            signal.removeEventListener('abort', onAbort);
+            resolve();
+          },
+        };
+        const onAbort = (): void => {
+          const index = waiting.indexOf(entry);
+          if (index >= 0) waiting.splice(index, 1);
+          reject(signal.reason instanceof Error ? signal.reason : new Error('aborted'));
+        };
+        signal.addEventListener('abort', onAbort, { once: true });
+        waiting.push(entry);
+      });
+    }
     active += 1;
     try {
       return await task();
     } finally {
       active -= 1;
-      waiting.shift()?.();
+      waiting.shift()?.start();
     }
   };
 }
@@ -65,12 +97,17 @@ function createLimiter(limit: number): <T>(task: () => Promise<T>) => Promise<T>
  */
 export function createPageParser(config: ParseConfig = {}): ParsePage {
   const timeoutMs = config.timeoutMs ?? 2_000;
-  const startupTimeoutMs = config.startupTimeoutMs ?? 10_000;
+  // Measured at 250 to 620 ms on my Mac; read_page's 10 s deadline bounds the whole read anyway.
+  const startupTimeoutMs = config.startupTimeoutMs ?? 3_000;
   const maxChars = config.maxChars ?? 4_000;
   const limit = createLimiter(config.maxConcurrent ?? 2);
 
-  return (page, signal) =>
-    limit(
+  return (page, signal) => {
+    // Plain text needs no DOM, so it skips the worker.
+    if (page.contentType === 'text/plain') {
+      return Promise.resolve({ title: '', text: squash(page.body).slice(0, maxChars) });
+    }
+    return limit(
       () =>
         new Promise<ParsedPage>((resolve, reject) => {
           signal.throwIfAborted();
@@ -79,13 +116,14 @@ export function createPageParser(config: ParseConfig = {}): ParsePage {
             resourceLimits: { maxOldGenerationSizeMb: 256 },
           });
           let settled = false;
+          // The slot is freed only once the worker has exited, so no more than
+          // `maxConcurrent` workers are ever alive.
           const finish = (outcome: () => void): void => {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
             signal.removeEventListener('abort', onAbort);
-            void worker.terminate();
-            outcome();
+            void worker.terminate().finally(outcome);
           };
           const onAbort = (): void => {
             finish(() => {
@@ -125,5 +163,7 @@ export function createPageParser(config: ParseConfig = {}): ParsePage {
             });
           });
         }),
+      signal,
     );
+  };
 }

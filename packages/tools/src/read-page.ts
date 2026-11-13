@@ -47,17 +47,23 @@ export interface ReadPageConfig {
   readonly parse: ParsePage;
   /** ADR-0011: page extracts are cached for an hour. */
   readonly cache: TtlCache<ParsedPage & { readonly url: string }>;
+  /** ADR-0008: a page read takes at most 10 s in all, queueing and parsing included. */
+  readonly timeoutMs?: number;
 }
 
 export function createReadPage(config: ReadPageConfig): ReadPage {
+  const timeoutMs = config.timeoutMs ?? 10_000;
   return {
-    async run(args, allowedUrls, signal): Promise<ReadPageOutcome> {
+    async run(args, allowedUrls, callerSignal): Promise<ReadPageOutcome> {
       const parsed = argsSchema.safeParse(args);
       if (!parsed.success) return { ok: false, error: 'invalid_arguments' };
       const url = parsed.data.url;
       if (!allowedUrls.has(url)) return { ok: false, error: 'not_allowed' };
+      // Cached by the URL the model asked for; the value keeps the final URL after redirects.
       const cached = config.cache.get(url);
       if (cached !== undefined) return { ok: true, ...cached };
+      const deadline = AbortSignal.timeout(timeoutMs);
+      const signal = AbortSignal.any([callerSignal, deadline]);
       try {
         const page = await config.fetch(url, signal);
         const extract = await config.parse(page, signal);
@@ -65,11 +71,11 @@ export function createReadPage(config: ReadPageConfig): ReadPage {
         config.cache.set(url, result);
         return { ok: true, ...result };
       } catch (err) {
-        if (signal.aborted) throw err;
+        if (callerSignal.aborted) throw err;
         if (err instanceof SafeFetchFailure || err instanceof ParseFailure) {
           return { ok: false, error: err.reason };
         }
-        return { ok: false, error: 'unavailable' };
+        return { ok: false, error: deadline.aborted ? 'timeout' : 'unavailable' };
       }
     },
   };

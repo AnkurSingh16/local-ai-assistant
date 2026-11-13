@@ -32,6 +32,11 @@ function parse(input: z.infer<typeof inputSchema>): { title: string; text: strin
     resources: undefined,
     virtualConsole: new VirtualConsole(),
   });
+  // Script, style and template text is never page content, so it cannot reach
+  // the model even through the fallback below.
+  for (const node of dom.window.document.querySelectorAll('script, style, noscript, template')) {
+    node.remove();
+  }
   const article = new Readability(dom.window.document).parse();
   const title = squash(article?.title ?? dom.window.document.title).slice(0, 200);
   const text = squash(article?.textContent ?? dom.window.document.body.textContent);

@@ -184,6 +184,15 @@ function decode(bytes: Uint8Array, contentType: string): string {
   }
 }
 
+function causedByBlockedLookup(err: unknown): boolean {
+  let current: unknown = err;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth++) {
+    if ('code' in current && current.code === 'EBLOCKED') return true;
+    current = current.cause;
+  }
+  return false;
+}
+
 export type SafeFetch = (url: string, signal: AbortSignal) => Promise<FetchedPage>;
 
 export function createSafeFetch(config: SafeFetchConfig): SafeFetch {
@@ -225,6 +234,9 @@ export function createSafeFetch(config: SafeFetchConfig): SafeFetch {
     } catch (err) {
       if (callerSignal.aborted) throw err;
       if (err instanceof SafeFetchFailure) throw err;
+      // The guarded lookup refused the address at connect time: a DNS answer
+      // that changed after the first check, which is worth reporting as such.
+      if (causedByBlockedLookup(err)) throw new SafeFetchFailure('blocked_address');
       if (timeout.aborted) throw new SafeFetchFailure('timeout');
       throw new SafeFetchFailure('unavailable');
     }
