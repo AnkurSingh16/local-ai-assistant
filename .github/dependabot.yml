@@ -16,6 +16,10 @@ updates:
       # Remove this entry in the change that moves to a new Node major.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      # Expo and React Native require one exact React version, pinned in the root
+      # overrides; React moves together with an Expo SDK upgrade, never alone.
+      - dependency-name: 'react'
+      - dependency-name: 'react-dom'
     groups:
       dev-tooling:
         dependency-type: development
