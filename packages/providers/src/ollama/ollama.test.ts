@@ -379,7 +379,10 @@ describe('Ollama moderation provider', () => {
     });
     await provider.classify({ role: 'assistant', text: 'para' }, new AbortController().signal);
     expect(captured[0]?.body).toMatchObject({
-      messages: [{ role: 'user' }, { role: 'assistant', content: 'para' }],
+      messages: [
+        { role: 'user', content: 'Can you help me with something?' },
+        { role: 'assistant', content: 'para' },
+      ],
     });
   });
 

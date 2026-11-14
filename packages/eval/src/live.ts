@@ -198,6 +198,16 @@ export function createLiveChat(config: LiveConfig): ChatProvider {
   });
 }
 
+/** The live guard, for the output guard eval. */
+export function createLiveGuard(config: LiveConfig): ModerationProvider {
+  return createOllamaModerationProvider({
+    baseUrl: config.baseUrl,
+    model: config.guardModel,
+    keepAlive: '30m',
+    fetch: config.fetch,
+  });
+}
+
 /** The live embedding provider, for the memory recall eval. */
 export function createLiveEmbeddings(config: LiveConfig, model: string): EmbeddingProvider {
   return createOllamaEmbeddingProvider({

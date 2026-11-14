@@ -28,9 +28,11 @@ export const guardNumCtx = 2048;
 /**
  * llama-guard3 classifies the last turn of a conversation. For an assistant
  * paragraph it needs a preceding user turn; the real user message is not sent,
- * so the verdict depends on the paragraph alone.
+ * so the verdict depends on the paragraph alone. The stand-in is an ordinary
+ * request: with "(user message withheld)" the guard flagged more harmless
+ * paragraphs and caught no more harmful ones (ADR-0014).
  */
-const withheldUserTurn = '(user message withheld)';
+export const standInUserTurn = 'Can you help me with something?';
 
 const responseSchema = z.object({ message: z.object({ content: z.string() }) });
 
@@ -115,7 +117,7 @@ export function createOllamaModerationProvider(config: OllamaModerationConfig): 
         input.role === 'user'
           ? [{ role: 'user', content: input.text }]
           : [
-              { role: 'user', content: withheldUserTurn },
+              { role: 'user', content: standInUserTurn },
               { role: 'assistant', content: input.text },
             ];
       const res = await postJson(

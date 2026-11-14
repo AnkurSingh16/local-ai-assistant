@@ -19,5 +19,6 @@ Statuses: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Rejected`.
 | [0011](0011-search-cache-and-rate-limits.md)   | Search cache and rate limits                                        | Accepted |
 | [0012](0012-evaluation-in-ci.md)               | Red-team and routing evaluation, in CI and locally                  | Accepted |
 | [0013](0013-logging-and-privacy.md)            | Logging without message text                                        | Accepted |
+| [0014](0014-output-guard-stand-in.md)          | An ordinary stand-in question for the output guard                  | Accepted |
 
 I made these decisions after a two-round debate between a simplicity-and-cost view and a security-and-scale view, with every recommendation challenged before it was accepted. Measurements in the ADRs were taken on my M1 Pro with 16 GB on 2026-11-12.

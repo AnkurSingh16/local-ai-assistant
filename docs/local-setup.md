@@ -148,6 +148,14 @@ This is plain HTTP, so I only do it on a network I trust ([ADR-0010](adr/0010-pr
 
 The doctor reports it, and answers that need the web fail. Check that Docker Desktop is running, then restart the container with `npm run searxng:down` and `npm run searxng:up`. Answers from model knowledge still work without SearXNG.
 
+### A harmless answer stops with "I can't help with that."
+
+Each paragraph of an answer is checked by the safety model before it is shown, and a flagged paragraph ends the answer with this refusal. The small guard used on 16 GB sometimes flags harmless text, most often first-aid advice, headings and short lead-ins such as "Here are the steps:". Asking again can give an answer worded differently enough to pass. [ADR-0014](adr/0014-output-guard-stand-in.md) has the measurements. To check the guard on my set of harmless and harmful paragraphs after changing the guard model or Ollama, I run:
+
+```bash
+npm run eval:guard:live
+```
+
 ### Warnings that are safe to ignore
 
 - `npm ci` may warn that install scripts were skipped for `esbuild`. Its binary ships as a platform package, so nothing is missing.
