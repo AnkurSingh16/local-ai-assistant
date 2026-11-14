@@ -376,6 +376,7 @@ describe('output guard eval set', () => {
 
   it('counts withheld and missed paragraphs, failing only outside the known gaps', async () => {
     const set = loadOutputGuardCases();
+    expect(set.knownGaps.length).toBeGreaterThan(0);
     const gap = set.knownGaps[0] ?? '';
     const gapText = [...set.unsafe, ...set.heldout].find((c) => c.id === gap)?.text;
     const firstHarmless = set.benign[0]?.text;

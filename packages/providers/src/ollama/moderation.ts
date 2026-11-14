@@ -29,8 +29,8 @@ export const guardNumCtx = 2048;
  * llama-guard3 classifies the last turn of a conversation. For an assistant
  * paragraph it needs a preceding user turn; the real user message is not sent,
  * so the verdict depends on the paragraph alone. The stand-in is an ordinary
- * request: "(user message withheld)" read as something hidden and made the guard
- * flag more harmless paragraphs, while catching no more harmful ones (ADR-0014).
+ * request: with "(user message withheld)" the guard flagged more harmless
+ * paragraphs and caught no more harmful ones (ADR-0014).
  */
 export const standInUserTurn = 'Can you help me with something?';
 
