@@ -236,6 +236,21 @@ describe('memory view', () => {
     expect(calls).toEqual(['forget m1']);
   });
 
+  it('opens as a modal dialog that takes focus, and gives it back on Escape', async () => {
+    const { account } = fakeAccount([]);
+    render(<App client={fakeClient(() => events([]))} account={account} />);
+    const opener = screen.getByRole('button', { name: 'What I remember' });
+    await userEvent.click(opener);
+    const dialog = screen.getByRole('dialog', { name: 'What I remember' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
+    expect(screen.getByLabelText('Message').closest('[inert]')).not.toBeNull();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+    expect(screen.getByLabelText('Message').closest('[inert]')).toBeNull();
+  });
+
   it('labels an always-on item', async () => {
     const { account } = fakeAccount([
       {

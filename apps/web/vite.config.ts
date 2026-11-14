@@ -5,6 +5,17 @@ import { defineConfig } from 'vite';
 // The end-to-end tests run their own API on another port and set API_TARGET.
 const apiTarget = process.env.API_TARGET ?? 'http://127.0.0.1:8787';
 
+// WEB_PORT moves the dev server when another project already uses 5173. A typo
+// fails here, not as a dev server on a random port the API refuses.
+function webPort(): number {
+  const raw = process.env.WEB_PORT ?? '5173';
+  const port = Number(raw);
+  if (!/^\d+$/.test(raw) || port < 1 || port > 65535) {
+    throw new Error(`WEB_PORT must be a port number from 1 to 65535, not "${raw}".`);
+  }
+  return port;
+}
+
 /**
  * A strict Content Security Policy for the built app: scripts only from this
  * origin, no images from elsewhere, no plugins. (frame-ancestors is ignored in a
@@ -43,8 +54,7 @@ export default defineConfig({
   resolve: { conditions: ['@local-ai/source'] },
   server: {
     host: '127.0.0.1',
-    // WEB_PORT moves the dev server when another project already uses 5173.
-    port: Number(process.env.WEB_PORT ?? 5173),
+    port: webPort(),
     strictPort: true,
     // Same-origin requests in development: the proxy rewrites Host to the API's
     // own address, which is on the API's Host allowlist.

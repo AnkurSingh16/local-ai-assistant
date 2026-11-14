@@ -1,7 +1,7 @@
 import type { AccountClient, MemoryEntry } from '@local-ai/client';
 import { memoryDisclosure } from '@local-ai/client';
 import type { ReactElement } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { CloseIcon } from './Icons.js';
 
@@ -55,6 +55,18 @@ export function MemoryPanel({
     }
   };
 
+  // A modal drawer: focus moves into it on open and goes back to whatever
+  // opened it on close, so keyboard and screen reader users are not left on a
+  // control hidden behind the backdrop. The page behind it is inert (App).
+  const closeButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement;
+    closeButton.current?.focus();
+    return () => {
+      if (opener instanceof HTMLElement) opener.focus();
+    };
+  }, []);
+
   // Escape closes the panel, as it does any overlay.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -69,10 +81,10 @@ export function MemoryPanel({
   return (
     <>
       <div className="backdrop" aria-hidden="true" onClick={onClose} />
-      <section className="memory" aria-labelledby="memory-title">
+      <section className="memory" role="dialog" aria-modal="true" aria-labelledby="memory-title">
         <div className="memory-head">
           <h2 id="memory-title">What I remember</h2>
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
+          <button ref={closeButton} type="button" className="btn btn-ghost" onClick={onClose}>
             <CloseIcon />
             Close
           </button>

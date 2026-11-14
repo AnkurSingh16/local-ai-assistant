@@ -256,14 +256,18 @@ describe('request checks', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('logs what to do when a Host or Origin is refused', async () => {
+  it('logs fixed advice once when a Host or Origin is refused, never the refused value', async () => {
     const { app, logs } = await harness();
-    await post(app, { message: 'Hello' }, { host: 'evil.example:8787' });
+    await post(app, { message: 'Hello' }, { host: `${marker}.example:8787` });
+    await post(app, { message: 'Hello' }, { host: 'other.example:8787' });
+    await post(app, { message: 'Hello' }, { origin: `http://${marker}.example` });
     await post(app, { message: 'Hello' }, { origin: 'http://localhost:3000' });
-    const hints = logs.filter((l) => l.includes('"event":"hint"')).join('\n');
-    expect(hints).toContain('ALLOWED_HOSTS=evil.example:8787');
-    expect(hints).toContain('ALLOWED_ORIGINS=http://localhost:3000');
-    expect(hints).toContain('docs/local-setup.md#troubleshooting');
+    const hints = logs.filter((l) => l.includes('"event":"hint"'));
+    expect(hints).toHaveLength(2);
+    expect(hints.join('\n')).toContain('ipconfig getifaddr en0');
+    expect(hints.join('\n')).toContain('docs/local-setup.md#troubleshooting');
+    expect(logs.join('\n')).not.toContain(marker);
+    expect(logs.join('\n')).not.toContain('localhost:3000');
   });
 
   it('logs what to do when the chat model is not answering', async () => {
@@ -280,7 +284,7 @@ describe('request checks', () => {
     const res = await post(app, { message: 'Hello' });
     expect(res.body).toContain('model_unavailable');
     const hint = logs.find((l) => l.includes('"problem":"chat_model_unavailable"')) ?? '';
-    expect(hint).toContain('ollama pull');
+    expect(hint).toContain('ollama serve');
   });
 
   it('logs what to do when a turn runs past its time limit', async () => {
@@ -290,7 +294,7 @@ describe('request checks', () => {
     });
     await post(app, { message: 'Hello' });
     const hint = logs.find((l) => l.includes('"problem":"turn_timeout"')) ?? '';
-    expect(hint).toContain('TURN_TIMEOUT_MS (50 ms)');
+    expect(hint).toContain('TURN_TIMEOUT_MS');
   });
 
   it('logs what to do when the safety model does not answer', async () => {

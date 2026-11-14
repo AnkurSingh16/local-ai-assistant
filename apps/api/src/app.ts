@@ -8,7 +8,7 @@ import Fastify, { LogController } from 'fastify';
 import type { AppDeps } from './deps.js';
 import { apiError } from './http.js';
 import { createClockStore, createTurnSlots } from './limits.js';
-import { safeHeader, troubleshooting } from './logging.js';
+
 import { registerChatRoute } from './routes/chat.js';
 import { registerFeedbackRoute } from './routes/feedback.js';
 import { registerHealthRoutes } from './routes/health.js';
@@ -59,7 +59,6 @@ export async function createApp(deps: AppDeps): Promise<FastifyInstance> {
       deps.logEvent({
         event: 'hint',
         problem: 'host_rejected',
-        hint: `A request came for host "${safeHeader(host)}", which is not allowed. To reach the API at that address (for example from a phone on your Wi-Fi), start it with ALLOWED_HOSTS=${safeHeader(host)},127.0.0.1:${String(config.port)} and HOST=0.0.0.0. See ${troubleshooting}.`,
       });
       return apiError(reply, request, 403, 'forbidden', 'This host is not allowed.');
     }
@@ -75,7 +74,6 @@ export async function createApp(deps: AppDeps): Promise<FastifyInstance> {
       deps.logEvent({
         event: 'hint',
         problem: 'origin_rejected',
-        hint: `A browser page at "${safeHeader(origin)}" was refused. If that is your web app (for example on another port), add it: ALLOWED_ORIGINS=${safeHeader(origin)}. See ${troubleshooting}.`,
       });
       return apiError(reply, request, 403, 'forbidden', 'This origin is not allowed.');
     }

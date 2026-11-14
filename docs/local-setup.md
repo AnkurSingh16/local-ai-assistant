@@ -82,11 +82,11 @@ The Expo app runs on a phone with Expo Go on the same Wi-Fi network: the API is 
 
 ## Troubleshooting
 
-When something goes wrong that I have hit before, the API prints a `hint` line in the terminal (a pino warning with `"event":"hint"`) saying what happened and what to run. At start-up it also repeats the doctor's Ollama checks and prints a hint for each one that fails. The hints never contain message text. This section has the longer version of each.
+When something goes wrong that I have hit before, the API prints a `hint` line in the terminal (a pino warning with `"event":"hint"` and a `problem` name) saying what happened and what to do. The advice is fixed text for each problem, so it never contains message text or anything from the request. At start-up the API also runs the doctor's Ollama checks and prints each failure with its fix. This section has the longer version of each.
 
-### "The assistant is unavailable right now" on the first turns
+### "I can't answer safely right now because my safety check isn't available"
 
-The safety model has to answer before any message reaches the chat model, and a turn is refused rather than answered unchecked when it does not. The terminal shows a `guard_unavailable` hint. The usual causes:
+The safety model has to answer before any message reaches the chat model, and a turn is refused rather than answered unchecked when it does not. This happened on my first turns from the phone. The terminal shows a `guard_unavailable` hint. The usual causes:
 
 - **The models are still loading.** After a restart, or after Ollama has unloaded them, the first turn loads the guard and the chat model, which can take a minute on 16 GB. Wait until `GET /readyz` reports ready, then try again:
 
@@ -98,9 +98,9 @@ The safety model has to answer before any message reaches the chat model, and a 
 - **Another app loaded the guard at a different context size.** The API counts the guard as warm only when Ollama has it loaded at the context size the API asks for. If another project shares Ollama and loads the same model with other options, Ollama reloads it on every switch and the API waits for the slow, cold timeout instead. Check the `CONTEXT` column of `ollama ps`, and stop the other app while testing.
 - **Ollama runs requests in parallel.** With more than one request at a time, the chat model and the guard compete for memory. Set `OLLAMA_NUM_PARALLEL` to 1 as in [Ollama settings](#ollama-settings).
 
-### "The model is not answering" or a turn timeout
+### "The assistant is not available right now" or "That took too long to answer."
 
-A `chat_model_unavailable` hint means the API could not reach the chat model: start Ollama and pull the model it names. A `turn_timeout` hint means a turn ran past `TURN_TIMEOUT_MS` (60 seconds by default), usually because a model was loading or another app was keeping Ollama busy. Try again once `ollama ps` shows both models loaded, or raise `TURN_TIMEOUT_MS`.
+A `chat_model_unavailable` hint means the API could not reach the chat model: start Ollama, and pull the chat model if `npm run doctor` says it is missing. A `turn_timeout` hint means a turn ran past `TURN_TIMEOUT_MS` (60 seconds by default), usually because a model was loading or another app was keeping Ollama busy. Try again once `ollama ps` shows both models loaded, or raise `TURN_TIMEOUT_MS`.
 
 ### The API will not start: port in use
 
@@ -118,7 +118,7 @@ The web dev server proxies to `127.0.0.1:8787` by default; point it at the new p
 
 ### The web app will not start: port 5173 in use
 
-Another project's dev server often holds 5173. Pick another port with `WEB_PORT`, set for the whole command so the doctor, the API's allowed origins and the web dev server all agree:
+Another project's dev server often holds 5173. Pick another port with `WEB_PORT`, set for the whole command so the doctor, the API's allowed origins and the web dev server all agree. Set it on the command, not in `.env`: the API reads `.env`, but the web dev server does not.
 
 ```bash
 WEB_PORT=5174 npm run dev
@@ -126,10 +126,10 @@ WEB_PORT=5174 npm run dev
 
 ### Requests get 403 Forbidden
 
-The API refuses a `Host` or `Origin` header it does not expect, which is what stops DNS rebinding and other sites calling it. The terminal shows a `request_rejected` line and a hint with the exact variable to set:
+The API refuses a `Host` or `Origin` header it does not expect, which is what stops DNS rebinding and other sites calling it. The terminal shows a `request_rejected` line, and the first refusal of each kind in a run adds a hint. The hint never repeats the refused value as something to allow, because a page trying to reach the API through DNS rebinding causes exactly this refusal: I only allow an address I chose myself.
 
-- **Host rejected** happens when the API is reached by an address that is not in `ALLOWED_HOSTS`, typically the Mac's Wi-Fi address from a phone. Add it, keeping the loopback entry, and bind beyond loopback with `HOST=0.0.0.0`.
-- **Origin rejected** happens when the web app runs on a port the API does not expect. Use `WEB_PORT` as above, or set `ALLOWED_ORIGINS` to the origin the hint names.
+- **Host rejected** happens when the API is reached by an address that is not in `ALLOWED_HOSTS`, typically the Mac's Wi-Fi address from a phone. Find the address with `ipconfig getifaddr en0`, add it with the port to `ALLOWED_HOSTS`, keeping the loopback entry, and bind beyond loopback with `HOST=0.0.0.0`.
+- **Origin rejected** happens when the web app runs on a port the API does not expect. Use `WEB_PORT` as above. If neither applies, something else tried to call the API and the refusal is doing its job.
 
 ### The phone cannot reach the API
 

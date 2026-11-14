@@ -51,6 +51,8 @@ async function main(): Promise<void> {
           `Stop it (find it with: lsof -i :${String(config.port)}) or start this one on another port, for example PORT=8788.\n` +
           `See ${troubleshooting}\n`,
       );
+      await app.close();
+      close();
       process.exit(1);
     }
     throw err;
@@ -79,22 +81,16 @@ async function main(): Promise<void> {
     latencyMs: Math.round(systemClock.monotonicMs() - started),
   });
   if (config.providers === 'ollama') {
-    if (!isReady()) {
-      logEvent({
-        event: 'hint',
-        problem: 'startup_check',
-        hint: `The safety model (${config.guardModel}) did not answer at start-up, so turns will be refused until it does. The checks below say why. See ${troubleshooting}.`,
-      });
-    }
+    if (!isReady()) logEvent({ event: 'hint', problem: 'startup_guard' });
     // The same checks as npm run doctor, so a missing model or a stopped
-    // Ollama shows up here with its fix, not as a refused turn later.
+    // Ollama shows up here with its fix, not as a refused turn later. Written
+    // to the terminal like the doctor's output; they describe this machine,
+    // never a request.
     const results = await checkOllama(config, (url, init) => fetch(url, init)).catch(() => []);
     for (const r of results.filter((x) => !x.ok)) {
-      logEvent({
-        event: 'hint',
-        problem: 'startup_check',
-        hint: `${r.name}: ${r.detail}.${r.fix === undefined ? '' : ` Fix: ${r.fix}.`} See ${troubleshooting}.`,
-      });
+      process.stderr.write(
+        `Start-up check failed. ${r.name}: ${r.detail}.${r.fix === undefined ? '' : ` Fix: ${r.fix}.`} See ${troubleshooting}\n`,
+      );
     }
   }
 

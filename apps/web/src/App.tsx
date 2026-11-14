@@ -3,7 +3,7 @@ import type { Turn } from '@local-ai/client/react';
 import { useChat } from '@local-ai/client/react';
 import { maxMessageChars } from '@local-ai/contract';
 import type { KeyboardEvent, ReactElement, SyntheticEvent } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Answer } from './Answer.js';
 import { Feedback } from './Feedback.js';
@@ -199,9 +199,16 @@ export function App({
     void chat.send(question);
   };
 
+  // Stable, so the panel's Escape listener is not re-added on every streamed token.
+  const closeMemory = useCallback(() => {
+    setShowMemory(false);
+  }, []);
+  // The memory drawer is modal: the rest of the page cannot be reached behind it.
+  const behind = account !== undefined && showMemory;
+
   return (
     <div className="shell">
-      <header className="topbar">
+      <header className="topbar" inert={behind}>
         <div className="brand">
           <Mark size={30} />
           <div>
@@ -212,7 +219,7 @@ export function App({
             </p>
           </div>
         </div>
-        <nav className="actions" aria-label="Conversation actions">
+        <div className="actions top-actions">
           {chat.turns.length > 0 && (
             <button
               type="button"
@@ -239,14 +246,12 @@ export function App({
               <span className="btn-label">What I remember</span>
             </button>
           )}
-        </nav>
+        </div>
       </header>
       {account !== undefined && showMemory && (
         <MemoryPanel
           account={account}
-          onClose={() => {
-            setShowMemory(false);
-          }}
+          onClose={closeMemory}
           onDeletedEverything={() => {
             chat.reset();
             // A fresh session, so the next conversation is remembered again.
@@ -254,7 +259,7 @@ export function App({
           }}
         />
       )}
-      <main className="app">
+      <main className="app" inert={behind}>
         {chat.turns.length === 0 && (
           <section className="welcome" aria-labelledby="welcome-title">
             <Mark size={56} />
@@ -293,7 +298,7 @@ export function App({
         </ol>
         <div ref={end} />
       </main>
-      <div className="dock">
+      <div className="dock" inert={behind}>
         <form className="composer" onSubmit={submit}>
           <label htmlFor="message" className="visually-hidden">
             Message
@@ -304,6 +309,7 @@ export function App({
             value={draft}
             maxLength={maxMessageChars}
             rows={1}
+            aria-describedby="composer-hint"
             placeholder="Ask anything"
             onChange={(e) => {
               setDraft(e.target.value);
@@ -334,7 +340,7 @@ export function App({
             </button>
           )}
         </form>
-        <p className="hint">
+        <p className="hint" id="composer-hint">
           Enter to send, Shift + Enter for a new line. Answers can be wrong; check anything
           important.
         </p>

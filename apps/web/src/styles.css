@@ -369,9 +369,18 @@ button:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .turn,
-  .dots span {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Hover lifts are motion too; these rules come later in the file, hence !important. */
+  .sources a:hover,
+  .suggestion:hover,
+  .round:hover {
+    transform: none !important;
   }
 }
 
@@ -532,12 +541,12 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .actions .btn {
+  .top-actions .btn {
     padding: 8px;
   }
 
   /* Icon-only header buttons on narrow screens; the text stays for screen readers. */
-  .actions .btn-label {
+  .top-actions .btn-label {
     position: absolute;
     width: 1px;
     height: 1px;
