@@ -64,8 +64,8 @@ const warningSigns = [
   // punctuation, so instead of requiring the clause to end, "wake up" must not
   // be followed by an everyday continuation ("at 3am", "in pain", "wheezing"),
   // which is what separates sleep questions from intent.
-  /\benough (?:\w+ ){0,2}(?:pills|tablets|paracetamol|painkillers|meds|medication|sleeping pills|insulin) to (?:not|never) wake up\b(?!\s+(?:at|in|on|during|with|when|before|until|till|early|late|groggy|tired|wheez\w*|feeling|screaming|sweating|for (?:work|school|the))\b)/,
-  /\b(?:take|swallow) (?:all (?:of )?(?:my|the|these|those)|every|the whole (?:box|bottle|pack|packet|lot)|a whole (?:box|bottle|pack|packet)) (?:\w+ ){0,3}so (?:that )?i (?:don t|do not|won t|will not|never) wake up\b(?!\s+(?:at|in|on|during|with|when|before|until|till|early|late|groggy|tired|wheez\w*|feeling|screaming|sweating|for (?:work|school|the))\b)/,
+  /\benough (?:\w+ ){0,2}(?:pills|tablets|paracetamol|painkillers|meds|medication|sleeping pills|insulin) to (?:not|never) wake up\b(?!\s+(?:at|in(?! this world)|on|during|with|when|before|until|till|early|late|groggy|tired|wheez\w*|cough\w*|chok\w*|feeling|screaming|sweating|for (?:work|school|the))\b)/,
+  /\b(?:take|swallow) (?:all (?:of )?(?:my|the|these|those)|every|the whole (?:box|bottle|pack|packet|lot)|a whole (?:box|bottle|pack|packet)) (?:\w+ ){0,3}so (?:that )?i (?:don t|do not|won t|will not|never) wake up\b(?!\s+(?:at|in(?! this world)|on|during|with|when|before|until|till|early|late|groggy|tired|wheez\w*|cough\w*|chok\w*|feeling|screaming|sweating|for (?:work|school|the))\b)/,
   /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:my )?(?:goodbye|farewell) (?:letters?|notes?) to (?:my family|everyone|my (?:kids|children|parents|wife|husband|partner|friends))\b/,
   /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:a |my )?suicide notes?\b/,
 ];
