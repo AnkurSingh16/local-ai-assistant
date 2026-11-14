@@ -75,7 +75,8 @@ const politeWrapper =
  * Such a turn is never searched: a search would hand opening times or routes
  * to someone who may be at risk, and the query prompt would strip the warning
  * sign out. The guard answers the clear cases with crisis resources; this
- * catches vaguer ones it lets through (#57 review).
+ * catches vaguer ones it lets through. A phrase list always misses new wording,
+ * so accessQuestion below covers the shape as well.
  */
 const distress =
   /\b(?:(?:don't|do not) want to (?:be here|live|exist)|want (?:it all|everything|my life|the pain) to (?:end|stop)|(?:nobody|no one) (?:would|will|'d) (?:even )?(?:miss|notice|care)|cannot go on|want to (?:disappear|die|vanish|not exist)|(?:not|never) (?:to )?wake up|done with (?:everything|it all|life)|can't (?:go on|take (?:it|this) anymore|do this anymore)|end (?:it all|everything)|no reason to (?:live|go on)|better off (?:dead|without me)|give up on (?:life|everything)|kill myself|hurt myself|self-harm|suicid\w*|overdose)\b/;
@@ -94,6 +95,17 @@ const personPronoun =
 const privateTopic =
   /\b(?:pain|ache|lump|rash|fever|cough|symptoms?|diagnos\w*|chemo\w*|cancer|tumou?r|pregnan\w*|period|contagious|infect\w*|surgery|operation|wound|bleeding|injur\w*|sprain\w*|broken (?:wrist|arm|leg|bone|ankle)|knee|blood (?:pressure|test)|temperature (?:of|is|too)|memory loss|medic(?:ation|ine)s?|tablets|pills?|antibiotics?|antidepressants?|inhaler|booster|vaccin\w*|therapy|therapist|anxiety|panic attacks?|depress\w*|allerg\w*|dose|prescription|doctor|gp|hospital|heal(?:ed|ing)?|recover\w*|love|feelings for|ex|boyfriend|girlfriend|husband|wife|partner|divorce\w*|married|marriage|separated|breakup|break-up|upset|angry|argument|grounded|curfew|lonely|grief|left home alone|visa|deposit|landlord|tenant|eviction|rights to|custody|probation|holiday pay|sick pay|owed|salary|fired|resign\w*|hr|boss|eligible|qualify|claim|benefits?|grant|school meals|application|refund|receipt|return (?:the|her|his|my)|still good|bull(?:y|ied|ying)|dementia|alzheimer'?s?|ivf|fertility|miscarriage|abortion|hiv|std|sti|clinic|rehab|addiction|relapse|sober|prison|jail|arrested|court case|probation officer|asylum|immigration status|deport\w*|overdrawn|debt|bankrupt\w*|loan|evicted|homeless|food bank|nothing to eat|gay|lesbian|bisexual|trans(?:gender)?|coming out|sexuality|suicid\w*|kill (?:myself|himself|herself)|jump off|end (?:my|his|her) life|self-harm|hurt (?:myself|himself|herself)|overdose|sad|cheer (?:me )?up|feel(?:ing)? (?:down|low)|mood|(?:my|our) (?:department|company|office|school|class|family|workplace|manager|boss))\b/;
 
+/**
+ * Whether a place or a way to get somewhere is open, closed or running, or how
+ * high or deep something is. Asked together with something about the asker,
+ * this is the shape of asking for access to a means of self-harm ("Is the
+ * bridge open tonight? This is my last night."), whatever words the distress
+ * takes, so such a turn stays local. It costs searches for ordinary trips
+ * ("Is the Tate open Sunday? I'm taking my parents"); ADR-0003 gives the cost.
+ */
+const accessQuestion =
+  /\b(?:open|opens|opening|close|closes|closed|closing|running|last (?:train|bus|ferry)|next (?:train|bus|ferry)|which (?:train|bus)|trains? to|bus(?:es)? to|ferr(?:y|ies) to|route to|directions to|how (?:do|can) i get to|tallest|highest|how (?:high|tall|deep)|deepest)\b/;
+
 /** A person named, by a capitalised name or a possessive such as "Priya's". */
 function namesPerson(message: string): boolean {
   return namesSomething(message) || /\b[A-Z][a-z]+'s\b/.test(message.replace(/[‘’ʼ]/g, "'"));
@@ -106,6 +118,8 @@ function namesPerson(message: string): boolean {
  */
 function isPrivate(message: string, text: string): boolean {
   if (distress.test(text)) return true;
+  if (accessQuestion.test(text) && (personPronoun.test(text) || /\bus\b/.test(message)))
+    return true;
   if (toAssistant.test(text.replace(politeWrapper, ''))) return true;
   const person = personPronoun.test(text) || /\bus\b/.test(message) || namesPerson(message);
   return person && privateTopic.test(text);
