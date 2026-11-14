@@ -57,6 +57,10 @@ const migrations: readonly string[] = [
      category TEXT NOT NULL,
      created_at INTEGER NOT NULL
    ) STRICT;`,
+  // An item I mark as always relevant, such as an allergy, goes into every
+  // prompt for its session: similarity recall missed a peanut allergy for 4 of
+  // 5 food questions (ADR-0001, #55).
+  `ALTER TABLE memory ADD COLUMN always INTEGER NOT NULL DEFAULT 0 CHECK (always IN (0, 1));`,
 ];
 
 export function openDatabase(path: string): Database {

@@ -95,6 +95,10 @@ npm run review -- approve <id>
 ```
 
 ```bash
+npm run review -- approve <id> --always   # memory used in every answer: allergies, health conditions
+```
+
+```bash
 npm run review -- reject <id>
 ```
 

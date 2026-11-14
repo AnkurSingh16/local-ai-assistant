@@ -98,7 +98,9 @@ export function MemoryScreen({
           ) : (
             state.items.map((item) => (
               <View key={item.id} style={styles.item}>
-                <Text style={[styles.text, styles.itemText]}>{item.content}</Text>
+                <Text style={[styles.text, styles.itemText]}>
+                  {item.always ? `${item.content} (used in every answer)` : item.content}
+                </Text>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Forget: ${item.content}`}

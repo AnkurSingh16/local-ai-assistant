@@ -34,7 +34,7 @@ function fakeAccount(items: MemoryEntry[], failures = 0) {
   return { account, calls };
 }
 
-const sam = { id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00Z' };
+const sam = { id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00Z', always: false };
 
 describe('mobile memory screen', () => {
   it('lists what is remembered with the disclosure, and forgets one item', async () => {
@@ -51,6 +51,25 @@ describe('mobile memory screen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Forget: Call me Sam.' }));
     expect(await screen.findByText(/Nothing is remembered yet/)).toBeTruthy();
     expect(calls.filter((c) => c !== 'memory')).toEqual(['forget m1']);
+  });
+
+  it('labels an always-on item', async () => {
+    const { account } = fakeAccount([
+      {
+        id: 'm2',
+        content: 'Allergic to peanuts.',
+        createdAt: '2026-11-13T00:00:00Z',
+        always: true,
+      },
+    ]);
+    await render(
+      <MemoryScreen
+        account={account}
+        onClose={() => undefined}
+        onDeletedEverything={() => undefined}
+      />,
+    );
+    expect(await screen.findByText('Allergic to peanuts. (used in every answer)')).toBeTruthy();
   });
 
   it('asks before deleting everything, then reports it', async () => {

@@ -79,7 +79,10 @@ export function MemoryPanel({
             <ul className="memory-items">
               {state.items.map((item) => (
                 <li key={item.id}>
-                  <span>{item.content}</span>
+                  <span>
+                    {item.content}
+                    {item.always && <span className="note"> (used in every answer)</span>}
+                  </span>
                   <button
                     type="button"
                     onClick={() => void forget(item.id)}

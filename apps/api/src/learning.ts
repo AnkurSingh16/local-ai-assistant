@@ -1,4 +1,5 @@
 import type { MemoryRecall } from '@local-ai/agent';
+import { contextBudget, estimateTokens } from '@local-ai/agent';
 import type { EmbeddingProvider } from '@local-ai/core';
 import { cosineSimilarity } from '@local-ai/core';
 import type { InputGuard } from '@local-ai/guardrails';
@@ -18,6 +19,12 @@ import type { FlagLog, MemoryRepo, ReviewItem, ReviewKind, ReviewRepo } from '@l
  * prompt; 0.46 had the best balance on the dev messages.
  */
 const minSimilarity = 0.46;
+/**
+ * Always-on items for one session may use at most half of the memory slot, so
+ * they always fit and similar items still have room (ADR-0001, ADR-0004).
+ */
+export const maxAlwaysTokens = contextBudget.memory / 2;
+
 /** At most this many items are recalled for one message (also in the memory recall eval). */
 const maxRecalled = 3;
 
@@ -36,29 +43,43 @@ export function createMemoryRecall(deps: {
       return (await deps.memory.list(sessionId)).map((m) => m.content);
     },
     async recall(sessionId, message, signal) {
-      const items = await deps.memory.withEmbeddings(sessionId);
-      if (items.length === 0) return [];
-      try {
-        const [query] = await deps.embeddings.embed(
-          [message],
-          AbortSignal.any([signal, AbortSignal.timeout(deps.timeoutMs)]),
-        );
-        if (query === undefined) return [];
-        return items
-          .map((item) => ({
-            content: item.content,
-            score: cosineSimilarity(query, item.embedding),
-          }))
-          .filter((s) => s.score >= minSimilarity)
-          .sort((x, y) => y.score - x.score)
-          .slice(0, maxRecalled)
-          .map((s) => s.content);
-      } catch (err) {
-        if (signal.aborted) throw err;
-        return [];
-      }
+      // Always-on items come first and never depend on the embedding model:
+      // similarity cannot be trusted for things like allergies (ADR-0001).
+      const always = (await deps.memory.list(sessionId))
+        .filter((m) => m.always)
+        .map((m) => m.content);
+      const similar = await recallSimilar(sessionId, message, signal);
+      return [...always, ...similar];
     },
   };
+
+  async function recallSimilar(
+    sessionId: string,
+    message: string,
+    signal: AbortSignal,
+  ): Promise<string[]> {
+    const items = await deps.memory.withEmbeddings(sessionId);
+    if (items.length === 0) return [];
+    try {
+      const [query] = await deps.embeddings.embed(
+        [message],
+        AbortSignal.any([signal, AbortSignal.timeout(deps.timeoutMs)]),
+      );
+      if (query === undefined) return [];
+      return items
+        .map((item) => ({
+          content: item.content,
+          score: cosineSimilarity(query, item.embedding),
+        }))
+        .filter((s) => s.score >= minSimilarity)
+        .sort((x, y) => y.score - x.score)
+        .slice(0, maxRecalled)
+        .map((s) => s.content);
+    } catch (err) {
+      if (signal.aborted) throw err;
+      return [];
+    }
+  }
 }
 
 /** 'support': the text sounded like self-harm, so the reply carries crisis resources. */
@@ -110,7 +131,14 @@ export interface Reviewer {
    * session; feedback is only marked approved. The text is checked by the
    * guard again, which is also the only way to turn it back into storable text.
    */
-  approve(id: string, signal: AbortSignal): Promise<'approved' | 'not_found' | 'refused'>;
+  approve(
+    id: string,
+    signal: AbortSignal,
+    options?: {
+      /** Include the memory in every prompt for its session, for things like allergies. */
+      readonly always?: boolean;
+    },
+  ): Promise<'approved' | 'not_found' | 'refused' | 'always_full'>;
   reject(id: string): Promise<boolean>;
 }
 
@@ -122,7 +150,7 @@ export function createReviewer(deps: {
 }): Reviewer {
   return {
     pending: () => deps.review.pending(),
-    async approve(id, signal) {
+    async approve(id, signal, options = {}) {
       const item = await deps.review.get(id);
       if (item === undefined) return 'not_found';
       const verdict = await deps.inputGuard.check(item.content, signal);
@@ -130,8 +158,21 @@ export function createReviewer(deps: {
       if (item.kind === 'feedback') {
         return (await deps.review.decide(id, 'approved')) ? 'approved' : 'not_found';
       }
-      const [embedding] = await deps.embeddings.embed([verdict.text], signal);
-      const memoryId = await deps.memory.add(item.sessionId, verdict.text, embedding);
+      // An always-on item is never matched by similarity, so it needs no embedding
+      // and does not depend on the embedding model being up.
+      const always = options.always === true;
+      if (always) {
+        // Always-on items must all fit the memory slot on every turn, with room
+        // left for similar ones, or some would be dropped without notice.
+        const current = (await deps.memory.list(item.sessionId)).filter((m) => m.always);
+        const cost = [...current.map((m) => m.content), verdict.text].reduce(
+          (sum, text) => sum + estimateTokens(text) + 2,
+          0,
+        );
+        if (cost > maxAlwaysTokens) return 'always_full';
+      }
+      const [embedding] = always ? [] : await deps.embeddings.embed([verdict.text], signal);
+      const memoryId = await deps.memory.add(item.sessionId, verdict.text, embedding, always);
       // The text moves to memory, where the user can see and delete it, so the
       // review row keeps none. If someone decided the item meanwhile, undo.
       if (!(await deps.review.decide(id, 'approved', true))) {
@@ -171,4 +212,31 @@ export function paraphraseProblem(source: string, paraphrase: string): string | 
     return 'contains six or more digits in a row';
   if (/https?:\/\/\S*\?/.test(paraphrase)) return 'contains a URL with a query string';
   return undefined;
+}
+
+/**
+ * Reads `approve <id> [--always]` for the review command. An unknown or
+ * misplaced option is an error rather than ignored, so a typo never approves a
+ * safety item as ordinary memory.
+ */
+export function parseApproveArgs(
+  args: readonly string[],
+): { readonly id: string; readonly always: boolean } | { readonly error: string } {
+  const [id, ...flags] = args;
+  if (id === undefined || id.startsWith('--')) return { error: 'approve needs an id first.' };
+  const unknown = flags.filter((f) => f !== '--always');
+  if (unknown.length > 0) return { error: `Unknown option ${unknown.join(' ')}; only --always.` };
+  return { id, always: flags.includes('--always') };
+}
+
+/** What the review command prints after an approval. */
+export function approvalMessage(
+  outcome: 'approved' | 'not_found' | 'refused' | 'always_full',
+  always: boolean,
+): string {
+  if (outcome === 'approved' && always) return 'approved (always: used in every answer)';
+  if (outcome === 'always_full') {
+    return `refused: this session's always-on items would exceed ${String(maxAlwaysTokens)} tokens; approve it without --always or forget another always-on item`;
+  }
+  return outcome;
 }

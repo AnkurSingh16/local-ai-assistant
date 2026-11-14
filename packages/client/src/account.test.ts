@@ -80,7 +80,10 @@ describe('memory and feedback calls', () => {
         return Promise.resolve(new Response(null, { status: url === '/v1/feedback' ? 202 : 204 }));
       },
     });
-    expect((await account.memory(signal)).map((m) => m.content)).toEqual(['Call me Sam.']);
+    const listed = await account.memory(signal);
+    expect(listed.map((m) => m.content)).toEqual(['Call me Sam.']);
+    // An older API sends no always flag; the client reads it as false.
+    expect(listed.map((m) => m.always)).toEqual([false]);
     await account.forget('m 1', signal);
     await account.deleteEverything(signal);
     await account.sendFeedback('preference', 'Use metric.', signal);

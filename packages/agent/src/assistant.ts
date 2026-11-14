@@ -117,12 +117,15 @@ export function buildMessages(
     // tokens; replayed raw, they would forge a system turn (ADR-0004).
     kept.unshift({ role: m.role, content: neutraliseTemplateTokens(m.content) });
   }
-  // Approved memory fills its own slot, most relevant first, and never displaces history.
+  // Approved memory fills its own slot and never displaces history. Recall puts
+  // always-on items first (ADR-0001 amendment of 2026-11-14), then the most
+  // similar. An item that does not fit is skipped rather than ending the list,
+  // so one long item cannot hide a short always-on one after it.
   const remembered: string[] = [];
   let memoryUsed = 0;
   for (const item of memory) {
     const cost = estimateTokens(item) + 2;
-    if (memoryUsed + cost > contextBudget.memory) break;
+    if (memoryUsed + cost > contextBudget.memory) continue;
     memoryUsed += cost;
     remembered.push(`- ${neutraliseTemplateTokens(item)}`);
   }

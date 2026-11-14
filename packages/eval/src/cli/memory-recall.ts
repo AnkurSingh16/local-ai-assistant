@@ -1,5 +1,6 @@
 import { createLiveEmbeddings, digestOf } from '../live.js';
 import {
+  alwaysItemCoverage,
   atThreshold,
   bestThreshold,
   loadRecallSet,
@@ -44,4 +45,27 @@ for (const [name, prefixes] of [
       `${name}, ${label}: dev recall ${pct(d.recall)} precision ${pct(d.precision)}; held-out recall ${pct(h.recall)} precision ${pct(h.precision)}\n`,
     );
   }
+}
+
+// The API recalls always-on items for every message (#55). These lines show
+// what similarity alone would have done for them, and the API's figures with them.
+const plain = await scorePairs(
+  set,
+  embeddings,
+  { query: '', document: '' },
+  AbortSignal.timeout(120_000),
+);
+for (const c of alwaysItemCoverage(plain, apiThreshold, productionTopK)) {
+  process.stdout.write(
+    `always-on ${c.itemId}: by similarity alone recalled for ${String(c.bySimilarity)} of ${String(c.needed)} messages that need it; always-on, ${String(c.needed)} of ${String(c.needed)}\n`,
+  );
+}
+for (const [split, list] of [
+  ['dev', plain.filter((p) => p.split === 'dev')],
+  ['held-out', plain.filter((p) => p.split === 'heldout')],
+] as const) {
+  const r = atThreshold(list, apiThreshold, productionTopK, true);
+  process.stdout.write(
+    `API ${apiThreshold.toFixed(2)} with always-on items, ${split}: recall ${pct(r.recall)} precision ${pct(r.precision)}\n`,
+  );
 }

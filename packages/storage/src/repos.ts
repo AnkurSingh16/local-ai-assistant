@@ -19,6 +19,8 @@ export interface MemoryItem {
   readonly id: string;
   readonly content: string;
   readonly createdAt: Date;
+  /** Included in every prompt for the session, not only when similar. */
+  readonly always: boolean;
 }
 
 export type ReviewKind = 'feedback' | 'correction' | 'preference';
@@ -70,9 +72,10 @@ export interface MemoryRepo {
     sessionId: string,
     content: ModeratedText,
     embedding: Float32Array | undefined,
+    always?: boolean,
   ): Promise<string>;
   list(sessionId: string): Promise<MemoryItem[]>;
-  /** Memory with embeddings, for similarity search. */
+  /** Memory with embeddings, for similarity search; always-on items are left out, as they need none. */
   withEmbeddings(sessionId: string): Promise<{ content: string; embedding: Float32Array }[]>;
   /** True if an item was deleted; an id from another session deletes nothing. */
   delete(sessionId: string, id: string): Promise<boolean>;
@@ -188,23 +191,24 @@ const fromBlob = (v: unknown): Float32Array | undefined => {
 
 export function createMemoryRepo({ db, clock, newId }: StorageDeps): MemoryRepo {
   return {
-    add(sessionId, content, embedding) {
+    add(sessionId, content, embedding, always = false) {
       const id = newId();
       db.prepare(
-        'INSERT INTO memory (id, session_id, content, embedding, created_at) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO memory (id, session_id, content, embedding, created_at, always) VALUES (?, ?, ?, ?, ?, ?)',
       ).run(
         id,
         sessionId,
         content,
         embedding === undefined ? null : toBlob(embedding),
         clock.now().getTime(),
+        always ? 1 : 0,
       );
       return Promise.resolve(id);
     },
     list(sessionId) {
       const rows = db
         .prepare(
-          'SELECT id, content, created_at FROM memory WHERE session_id = ? ORDER BY created_at, id',
+          'SELECT id, content, created_at, always FROM memory WHERE session_id = ? ORDER BY created_at, id',
         )
         .all(sessionId);
       return Promise.resolve(
@@ -212,13 +216,14 @@ export function createMemoryRepo({ db, clock, newId }: StorageDeps): MemoryRepo 
           id: text(r.id),
           content: text(r.content),
           createdAt: new Date(num(r.created_at)),
+          always: num(r.always) === 1,
         })),
       );
     },
     withEmbeddings(sessionId) {
       const rows = db
         .prepare(
-          'SELECT content, embedding FROM memory WHERE session_id = ? AND embedding IS NOT NULL',
+          'SELECT content, embedding FROM memory WHERE session_id = ? AND embedding IS NOT NULL AND always = 0',
         )
         .all(sessionId);
       const out: { content: string; embedding: Float32Array }[] = [];
