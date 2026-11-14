@@ -10,6 +10,11 @@ updates:
       prefix: chore
       prefix-development: chore
       include: scope
+    ignore:
+      # The runtime is pinned to Node 24 (package.json engines), so its types
+      # stay on 24.x; a major bump would describe APIs the runtime lacks.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
       dev-tooling:
         dependency-type: development
