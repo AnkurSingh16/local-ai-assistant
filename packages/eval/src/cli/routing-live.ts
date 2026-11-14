@@ -25,7 +25,7 @@ for (const [i, c] of cases.entries()) {
   else results.push({ case: c, searched: route === 'searched' });
 }
 const date = config.now().toISOString().slice(0, 10);
-for (const split of ['heldout2', 'heldout', 'dev'] as const) {
+for (const split of ['heldout3', 'heldout2', 'heldout', 'dev'] as const) {
   const summary = summariseRouting(results.filter((r) => r.case.split === split));
   process.stdout.write(
     `${formatRouting(`Routing eval, whole turns with ${config.chatModel} (${digest}), ${date}, ${split} set`, summary)}\n\n`,

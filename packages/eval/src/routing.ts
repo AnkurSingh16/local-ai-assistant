@@ -23,9 +23,10 @@ export const routingCaseSchema = z.strictObject({
    * afterwards and never used to change it, so their numbers are the honest ones.
    * `heldout2` (#57) measures the personal-question rule: public questions that
    * contain a pronoun, and private people named without one, committed before
-   * any rule change.
+   * any rule change. `heldout3` was written after `heldout2` had been seen and
+   * before the change it measures, so it is the honest test of that change.
    */
-  split: z.enum(['dev', 'heldout', 'heldout2']),
+  split: z.enum(['dev', 'heldout', 'heldout2', 'heldout3']),
 });
 
 export type RoutingCase = z.infer<typeof routingCaseSchema>;

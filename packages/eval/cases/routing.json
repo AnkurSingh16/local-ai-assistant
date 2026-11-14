@@ -2378,5 +2378,425 @@
     "message": "Has Grace's broken wrist healed after six weeks?",
     "needsSearch": false,
     "split": "heldout2"
+  },
+  {
+    "id": "routing-341",
+    "category": "public_with_pronoun",
+    "message": "Who won the Tour de France this year? I lost track.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-342",
+    "category": "public_with_pronoun",
+    "message": "What's the gold price today? I'm thinking of selling a ring.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-343",
+    "category": "public_with_pronoun",
+    "message": "Is it raining in Manchester right now? I'm about to cycle home.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-344",
+    "category": "public_with_pronoun",
+    "message": "Who is Nvidia's CEO? I need it for a presentation.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-345",
+    "category": "public_with_pronoun",
+    "message": "What's the newest Galaxy phone? Mine is dying.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-346",
+    "category": "public_with_pronoun",
+    "message": "Are trains running to Brighton today? I have a meeting there.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-347",
+    "category": "public_with_pronoun",
+    "message": "What time does the Arsenal match start tonight? We're watching at the pub.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-348",
+    "category": "public_with_pronoun",
+    "message": "Is the new Mission Impossible film out yet? My dad wants to see it.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-349",
+    "category": "public_with_pronoun",
+    "message": "What's the dollar to yen rate today? We fly to Tokyo next week.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-350",
+    "category": "public_with_pronoun",
+    "message": "Is Slack down right now? Our messages aren't sending.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-351",
+    "category": "public_with_pronoun",
+    "message": "Who is the current president of France? My son asked me.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-352",
+    "category": "public_with_pronoun",
+    "message": "Has Python 3.14 been released yet? I want to upgrade my project.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-353",
+    "category": "public_with_pronoun",
+    "message": "What are interest rates like right now? I'm thinking of saving more.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-354",
+    "category": "public_with_pronoun",
+    "message": "Is the British Museum open tomorrow? I'm visiting with my kids.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-355",
+    "category": "public_with_pronoun",
+    "message": "Did the new Pokemon game come out? My daughter keeps asking.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-356",
+    "category": "public_with_pronoun",
+    "message": "Who won the Australian Open final? I fell asleep.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-357",
+    "category": "public_with_pronoun",
+    "message": "What's the latest on the junior doctors' strike? My appointment might be affected.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-358",
+    "category": "public_with_pronoun",
+    "message": "How much is a Steam Deck now? I've got a birthday coming up.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-359",
+    "category": "public_with_pronoun",
+    "message": "Who coaches England's rugby team now? My friend thinks it changed.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-360",
+    "category": "public_with_pronoun",
+    "message": "Is Spotify putting its prices up? I'm on the family plan.",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-361",
+    "category": "private_named",
+    "message": "Is Ella's cough still a worry after two weeks?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-362",
+    "category": "private_named",
+    "message": "Has Marco's depression lifted if he's eating again?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-363",
+    "category": "private_named",
+    "message": "Is Kate still legally his wife if they separated?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-364",
+    "category": "private_named",
+    "message": "Should Arjun stop taking his tablets if he feels fine?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-365",
+    "category": "private_named",
+    "message": "Is Uncle Joe's memory loss normal for his age?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-366",
+    "category": "private_named",
+    "message": "Is Freya still too young to be left home alone?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-367",
+    "category": "private_named",
+    "message": "Has Omar's wound healed if it stopped bleeding?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-368",
+    "category": "private_named",
+    "message": "Can Nina still get her deposit back after moving out?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-369",
+    "category": "private_named",
+    "message": "Is Ruby's allergy serious if her lips swelled?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-370",
+    "category": "private_named",
+    "message": "Does Jack still qualify for the student grant?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-371",
+    "category": "private_named",
+    "message": "Is Sofia's period late enough to take a test?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-372",
+    "category": "private_named",
+    "message": "Should Hassan tell his boss about the panic attacks?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-373",
+    "category": "private_named",
+    "message": "Is Megan still in her probation period?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-374",
+    "category": "private_named",
+    "message": "Is Theo still contagious with conjunctivitis?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-375",
+    "category": "private_named",
+    "message": "Has Amira's visa application been decided yet?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-376",
+    "category": "private_named",
+    "message": "Is Josh still angry about the argument?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-377",
+    "category": "private_named",
+    "message": "Can Isla still return her shoes without a receipt?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-378",
+    "category": "private_named",
+    "message": "Has Peter's knee recovered enough for running?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-379",
+    "category": "private_named",
+    "message": "Is Lily's temperature too high at 39?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-380",
+    "category": "private_named",
+    "message": "Should Max still be grounded after apologising?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-381",
+    "category": "private_self",
+    "message": "Is my lump still worth checking if it doesn't hurt?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-382",
+    "category": "private_self",
+    "message": "Should I stop my antidepressants now that I feel better?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-383",
+    "category": "private_self",
+    "message": "Is my landlord allowed to keep my deposit?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-384",
+    "category": "private_self",
+    "message": "Do I still have feelings for my ex?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-385",
+    "category": "private_self",
+    "message": "Is my rash something to see a doctor about?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-386",
+    "category": "private_self",
+    "message": "Can I still claim sick pay after three weeks?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-387",
+    "category": "private_self",
+    "message": "Is my blood pressure too high at 145 over 90?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-388",
+    "category": "private_self",
+    "message": "Am I still eligible for the visa if I change jobs?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-389",
+    "category": "private_self",
+    "message": "Is my anxiety getting worse if I can't sleep?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-390",
+    "category": "private_self",
+    "message": "Should I tell HR about my diagnosis?",
+    "needsSearch": false,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-391",
+    "category": "public_plain",
+    "message": "Who won the Ballon d'Or this year?",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-392",
+    "category": "public_plain",
+    "message": "What's the price of an iPad Air now?",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-393",
+    "category": "public_plain",
+    "message": "Is Heathrow having delays today?",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-394",
+    "category": "public_plain",
+    "message": "When is the next total solar eclipse?",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-395",
+    "category": "public_plain",
+    "message": "Who is the chancellor of Germany?",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-396",
+    "category": "public_plain",
+    "message": "Has GTA 6 been released?",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-397",
+    "category": "public_plain",
+    "message": "What's the weather in Rome this weekend?",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-398",
+    "category": "public_plain",
+    "message": "Is Twitter down right now?",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-399",
+    "category": "public_plain",
+    "message": "What's the latest news on the Mars rover?",
+    "needsSearch": true,
+    "split": "heldout3"
+  },
+  {
+    "id": "routing-400",
+    "category": "public_plain",
+    "message": "Who is the head coach of the Lakers now?",
+    "needsSearch": true,
+    "split": "heldout3"
   }
 ]
