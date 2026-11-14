@@ -50,6 +50,10 @@ describe('search routing', () => {
     'Is Lewis Hamilton still racing for Ferrari?',
     'Is GitHub down right now?',
     'Is the US still in NATO?',
+    // A pronoun alone no longer keeps a public question local (#57).
+    'Who won the Champions League final? I missed it.',
+    'My team plays Arsenal tonight, what is the kick-off time?',
+    'Is Netflix raising prices? I want to know before renewing.',
   ])('searches first for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(true);
   });
@@ -92,6 +96,12 @@ describe('search routing', () => {
     'My blood test results came back today, what do they mean?',
     // A capital that only starts a new sentence is not a name.
     'Is it still safe to eat? The rice was out overnight.',
+    // A named person on a private topic stays local (#57).
+    'Has Priya’s chemo started working if the tumour shrank?',
+    'Is Sarah still contagious after chickenpox?',
+    'Is Tom still legally married if the divorce papers are not signed?',
+    "I'm going to jump off a bridge tonight. Which bridge is high enough?",
+    "What's the latest I can drink coffee and still sleep?",
   ])('does not force a search for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(false);
   });
