@@ -200,8 +200,15 @@ export function App({
   };
 
   // Stable, so the panel's Escape listener is not re-added on every streamed token.
+  // The opener is kept here, before the header turns inert and the browser
+  // moves focus away from it, so closing can give focus back.
+  const memoryOpener = useRef<HTMLButtonElement>(null);
   const closeMemory = useCallback(() => {
     setShowMemory(false);
+    // After the commit that removes inert, or the button cannot take focus.
+    setTimeout(() => {
+      memoryOpener.current?.focus();
+    }, 0);
   }, []);
   // The memory drawer is modal: the rest of the page cannot be reached behind it.
   const behind = account !== undefined && showMemory;
@@ -236,6 +243,7 @@ export function App({
           {account !== undefined && (
             <button
               type="button"
+              ref={memoryOpener}
               className="btn btn-ghost"
               aria-expanded={showMemory}
               onClick={() => {

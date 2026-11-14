@@ -293,8 +293,9 @@ describe('request checks', () => {
       chat: createMockChatProvider({ delayMs: 2000 }),
     });
     await post(app, { message: 'Hello' });
-    const hint = logs.find((l) => l.includes('"problem":"turn_timeout"')) ?? '';
-    expect(hint).toContain('TURN_TIMEOUT_MS');
+    const hints = logs.filter((l) => l.includes('"problem":"turn_timeout"'));
+    expect(hints).toHaveLength(1);
+    expect(hints[0]).toContain('TURN_TIMEOUT_MS');
   });
 
   it('logs what to do when the safety model does not answer', async () => {

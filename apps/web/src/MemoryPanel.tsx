@@ -55,16 +55,12 @@ export function MemoryPanel({
     }
   };
 
-  // A modal drawer: focus moves into it on open and goes back to whatever
-  // opened it on close, so keyboard and screen reader users are not left on a
+  // A modal drawer: focus moves into it on open (App gives it back to the
+  // opener on close), so keyboard and screen reader users are not left on a
   // control hidden behind the backdrop. The page behind it is inert (App).
   const closeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    const opener = document.activeElement;
     closeButton.current?.focus();
-    return () => {
-      if (opener instanceof HTMLElement) opener.focus();
-    };
   }, []);
 
   // Escape closes the panel, as it does any overlay.

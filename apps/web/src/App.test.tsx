@@ -247,7 +247,9 @@ describe('memory view', () => {
     expect(screen.getByLabelText('Message').closest('[inert]')).not.toBeNull();
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(opener).toHaveFocus();
+    await waitFor(() => {
+      expect(opener).toHaveFocus();
+    });
     expect(screen.getByLabelText('Message').closest('[inert]')).toBeNull();
   });
 

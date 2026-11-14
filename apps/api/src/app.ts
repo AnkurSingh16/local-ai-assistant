@@ -8,7 +8,6 @@ import Fastify, { LogController } from 'fastify';
 import type { AppDeps } from './deps.js';
 import { apiError } from './http.js';
 import { createClockStore, createTurnSlots } from './limits.js';
-
 import { registerChatRoute } from './routes/chat.js';
 import { registerFeedbackRoute } from './routes/feedback.js';
 import { registerHealthRoutes } from './routes/health.js';

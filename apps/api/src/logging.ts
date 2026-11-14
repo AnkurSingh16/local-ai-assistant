@@ -1,11 +1,6 @@
 import type { Logger } from 'pino';
 import { pino } from 'pino';
 
-/**
- * Every log line is one of these closed shapes (ADR-0013). None has a field
- * for message text, page content or personal data, so they cannot be logged
- * by accident; pino's redact list below is only a backstop.
- */
 export type HintProblem =
   | 'guard_unavailable'
   | 'chat_model_unavailable'
@@ -48,6 +43,11 @@ export const hintText: Readonly<Record<HintProblem, string>> = {
 /** Problems any page can trigger at will, so their advice is logged only once per run. */
 const oncePerRun: ReadonlySet<HintProblem> = new Set(['host_rejected', 'origin_rejected']);
 
+/**
+ * Every log line is one of these closed shapes (ADR-0013). None has a field
+ * for message text, page content or personal data, so they cannot be logged
+ * by accident; pino's redact list below is only a backstop.
+ */
 export type LogEvent =
   | {
       readonly event: 'server_started';
