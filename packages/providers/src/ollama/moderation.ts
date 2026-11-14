@@ -40,7 +40,7 @@ const psSchema = z.object({
     z.object({
       name: z.string(),
       model: z.string().optional(),
-      context_length: z.number().optional(),
+      context_length: z.number().int().optional(),
     }),
   ),
 });
@@ -100,7 +100,9 @@ export function createOllamaModerationProvider(config: OllamaModerationConfig): 
       // Resident means loaded at the context size the guard asks for. Ollama
       // reloads a model asked for at another size (another client may have
       // loaded it at 4096), and that reload takes longer than the short warm
-      // deadline, so counting it as warm made every check time out.
+      // deadline, so counting it as warm made every check time out. An Ollama
+      // that does not report the size is still matched by name; a wrong "warm"
+      // only shortens the deadline, and the guard fails closed on a timeout.
       return parsed.data.models.some(
         (m) =>
           (sameModel(m.name, config.model) || sameModel(m.model ?? '', config.model)) &&
