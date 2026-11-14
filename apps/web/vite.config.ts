@@ -43,7 +43,8 @@ export default defineConfig({
   resolve: { conditions: ['@local-ai/source'] },
   server: {
     host: '127.0.0.1',
-    port: 5173,
+    // WEB_PORT moves the dev server when another project already uses 5173.
+    port: Number(process.env.WEB_PORT ?? 5173),
     strictPort: true,
     // Same-origin requests in development: the proxy rewrites Host to the API's
     // own address, which is on the API's Host allowlist.

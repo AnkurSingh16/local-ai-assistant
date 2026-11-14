@@ -256,6 +256,31 @@ describe('request checks', () => {
     expect(res.statusCode).toBe(403);
   });
 
+  it('logs what to do when a Host or Origin is refused', async () => {
+    const { app, logs } = await harness();
+    await post(app, { message: 'Hello' }, { host: 'evil.example:8787' });
+    await post(app, { message: 'Hello' }, { origin: 'http://localhost:3000' });
+    const hints = logs.filter((l) => l.includes('"event":"hint"')).join('\n');
+    expect(hints).toContain('ALLOWED_HOSTS=evil.example:8787');
+    expect(hints).toContain('ALLOWED_ORIGINS=http://localhost:3000');
+    expect(hints).toContain('docs/local-setup.md#troubleshooting');
+  });
+
+  it('logs what to do when the safety model does not answer', async () => {
+    const { app, logs } = await harness({
+      moderation: {
+        classify: () => {
+          throw new Error('down');
+        },
+      },
+    });
+    const res = await post(app, { message: 'Hello' });
+    expect(res.body).toContain('"kind":"unavailable"');
+    const hint = logs.find((l) => l.includes('"problem":"guard_unavailable"')) ?? '';
+    expect(hint).toContain('ollama ps');
+    expect(hint).not.toContain('Hello');
+  });
+
   it('allows the configured Origin, with CORS headers on the stream', async () => {
     const { app } = await harness();
     const res = await post(app, { message: 'Hello' }, { origin: 'http://localhost:5173' });

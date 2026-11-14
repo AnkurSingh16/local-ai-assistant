@@ -5,6 +5,8 @@ import { once } from 'node:events';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import type { AppDeps } from '../deps.js';
+import type { LogEvent } from '../logging.js';
+import { troubleshooting } from '../logging.js';
 import { apiError } from '../http.js';
 import type { TurnSlots } from '../limits.js';
 import { createWindowLimiter } from '../limits.js';
@@ -16,6 +18,36 @@ const defaultPingIntervalMs = 15_000;
  * POST /v1/chat answers as Server-Sent Events (ADR-0007). The route sees only
  * the assistant's handleTurn, never a provider or a store (ADR-0002).
  */
+/** What to do when a turn fails for a reason the operator can fix. */
+function hintFor(
+  refusalKind: string | undefined,
+  errorCode: string | undefined,
+  config: AppDeps['config'],
+): LogEvent | undefined {
+  if (refusalKind === 'unavailable') {
+    return {
+      event: 'hint',
+      problem: 'guard_unavailable',
+      hint: `The safety model (${config.guardModel}) did not answer in time, so the turn was refused rather than answered unchecked. Check that Ollama is running (ollama ps), that the model is pulled (ollama pull ${config.guardModel}), and that no other app is keeping Ollama busy, then try again. The first turn after a long idle can be slow while models load. See ${troubleshooting}.`,
+    };
+  }
+  if (errorCode === 'model_unavailable') {
+    return {
+      event: 'hint',
+      problem: 'chat_model_unavailable',
+      hint: `The chat model (${config.chatModel}) is not answering. Start Ollama (open the app, or run: ollama serve) and pull the model: ollama pull ${config.chatModel}. See ${troubleshooting}.`,
+    };
+  }
+  if (errorCode === 'timeout') {
+    return {
+      event: 'hint',
+      problem: 'turn_timeout',
+      hint: `A turn took longer than TURN_TIMEOUT_MS (${String(config.turnTimeoutMs)} ms). Ollama may be loading a model or busy with another app; try again, or raise TURN_TIMEOUT_MS. See ${troubleshooting}.`,
+    };
+  }
+  return undefined;
+}
+
 export function registerChatRoute(app: FastifyInstance, deps: AppDeps, slots: TurnSlots): void {
   // ADR-0011: a limit per session on top of the per-address one, so users behind
   // one address (a proxy, a household) do not share a budget and one session
@@ -187,6 +219,8 @@ export function registerChatRoute(app: FastifyInstance, deps: AppDeps, slots: Tu
           latencyMs: Math.round(deps.clock.monotonicMs() - started),
           clientAborted: client.signal.aborted,
         });
+        const hint = hintFor(refusalKind, errorCode, deps.config);
+        if (hint !== undefined) deps.logEvent(hint);
       }
       return reply;
     },

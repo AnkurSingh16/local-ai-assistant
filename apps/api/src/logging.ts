@@ -23,6 +23,22 @@ export type LogEvent =
       readonly reason: 'host' | 'origin' | 'validation' | 'busy' | 'rate_limited';
     }
   | {
+      /**
+       * A problem the operator can fix, with what to do. The hint is written
+       * here in the code from configuration and request headers, never from
+       * message text, so it is safe to log (ADR-0013).
+       */
+      readonly event: 'hint';
+      readonly problem:
+        | 'guard_unavailable'
+        | 'chat_model_unavailable'
+        | 'turn_timeout'
+        | 'host_rejected'
+        | 'origin_rejected'
+        | 'startup_check';
+      readonly hint: string;
+    }
+  | {
       readonly event: 'turn_completed';
       readonly requestId: string;
       readonly finishReason: string;
@@ -55,7 +71,15 @@ export function createLogger(level: string, pretty: boolean): Logger {
 
 export function createLogEvent(logger: Logger): LogEventFn {
   return (event) => {
-    const level = event.event === 'server_exposed' ? 'warn' : 'info';
+    const level = event.event === 'server_exposed' || event.event === 'hint' ? 'warn' : 'info';
     logger[level](event);
   };
+}
+
+/** Where the troubleshooting guide lives; every hint points to it. */
+export const troubleshooting = 'docs/local-setup.md#troubleshooting';
+
+/** A header value fit for a log line: printable ASCII only, and short. */
+export function safeHeader(value: string): string {
+  return value.replace(/[^\x20-\x7e]/g, '?').slice(0, 100);
 }
