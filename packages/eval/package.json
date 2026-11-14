@@ -10,7 +10,8 @@
     "record": "tsx --conditions=@local-ai/source src/cli/record.ts",
     "routing": "tsx --conditions=@local-ai/source src/cli/routing.ts",
     "routing:live": "tsx --conditions=@local-ai/source src/cli/routing-live.ts",
-    "memory": "tsx --conditions=@local-ai/source src/cli/memory-recall.ts"
+    "memory": "tsx --conditions=@local-ai/source src/cli/memory-recall.ts",
+    "guard:live": "tsx --conditions=@local-ai/source src/cli/guard-live.ts"
   },
   "dependencies": {
     "@local-ai/agent": "0.0.0",

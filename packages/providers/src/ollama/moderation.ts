@@ -28,11 +28,46 @@ export const guardNumCtx = 2048;
 /**
  * llama-guard3 classifies the last turn of a conversation. For an assistant
  * paragraph it needs a preceding user turn; the real user message is not sent,
- * so the verdict depends on the paragraph alone.
+ * so the verdict depends on the paragraph alone. The stand-in is an ordinary
+ * request: "(user message withheld)" read as something hidden and pushed
+ * harmless paragraphs towards unsafe (ADR-0014).
  */
-const withheldUserTurn = '(user message withheld)';
+export const standInUserTurn = 'Can you help me with something?';
 
-const responseSchema = z.object({ message: z.object({ content: z.string() }) });
+/**
+ * How sure the guard must be before an answer paragraph is withheld. The 1B
+ * guard's top answer flagged about 1 harmless paragraph in 10; requiring this
+ * probability of "unsafe" kept every harmful one in my test set (ADR-0014).
+ * User messages keep the top answer: a flagged message never reaches the model.
+ */
+export const answerUnsafeThreshold = 0.7;
+
+const logprobSchema = z.object({ token: z.string(), logprob: z.number() });
+
+const responseSchema = z.object({
+  message: z.object({ content: z.string() }),
+  logprobs: z.array(z.object({ top_logprobs: z.array(logprobSchema).optional() })).optional(),
+});
+
+/**
+ * The guard's probability of "unsafe" against "safe" at its first token, or
+ * undefined when Ollama did not return both, in which case its top answer stands.
+ */
+export function unsafeProbability(
+  logprobs: z.infer<typeof responseSchema>['logprobs'],
+): number | undefined {
+  const top = logprobs?.[0]?.top_logprobs;
+  if (top === undefined) return undefined;
+  let unsafe = 0;
+  let safe = 0;
+  for (const t of top) {
+    const word = t.token.trim();
+    if (word === 'unsafe') unsafe += Math.exp(t.logprob);
+    else if (word === 'safe') safe += Math.exp(t.logprob);
+  }
+  if (unsafe === 0 || safe === 0) return undefined;
+  return unsafe / (unsafe + safe);
+}
 
 /** The part of `GET /api/ps` this needs: which models are loaded. */
 const psSchema = z.object({
@@ -115,9 +150,10 @@ export function createOllamaModerationProvider(config: OllamaModerationConfig): 
         input.role === 'user'
           ? [{ role: 'user', content: input.text }]
           : [
-              { role: 'user', content: withheldUserTurn },
+              { role: 'user', content: standInUserTurn },
               { role: 'assistant', content: input.text },
             ];
+      const answer = input.role === 'assistant';
       const res = await postJson(
         config.fetch,
         url,
@@ -127,6 +163,8 @@ export function createOllamaModerationProvider(config: OllamaModerationConfig): 
           stream: false,
           keep_alive: config.keepAlive,
           options: { num_ctx: guardNumCtx, temperature: 0, num_predict: 20 },
+          // The first token's alternatives give the guard's confidence (ADR-0014).
+          ...(answer ? { logprobs: true, top_logprobs: 5 } : {}),
         },
         signal,
       );
@@ -134,7 +172,10 @@ export function createOllamaModerationProvider(config: OllamaModerationConfig): 
       const json = parseJsonLine(await readCapped(res.body, maxGuardResponseChars, signal));
       const parsed = responseSchema.safeParse(json);
       if (!parsed.success) throw new ProviderError('bad_response', res.status);
-      return parseGuardVerdict(parsed.data.message.content);
+      const verdict = parseGuardVerdict(parsed.data.message.content);
+      if (!answer || !verdict.flagged) return verdict;
+      const p = unsafeProbability(parsed.data.logprobs);
+      return p !== undefined && p < answerUnsafeThreshold ? { flagged: false } : verdict;
     },
   };
 }

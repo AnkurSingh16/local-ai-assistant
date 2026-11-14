@@ -379,8 +379,64 @@ describe('Ollama moderation provider', () => {
     });
     await provider.classify({ role: 'assistant', text: 'para' }, new AbortController().signal);
     expect(captured[0]?.body).toMatchObject({
-      messages: [{ role: 'user' }, { role: 'assistant', content: 'para' }],
+      messages: [
+        { role: 'user', content: 'Can you help me with something?' },
+        { role: 'assistant', content: 'para' },
+      ],
+      logprobs: true,
+      top_logprobs: 5,
     });
+  });
+
+  /** A guard reply whose first token gives "unsafe" probability p against "safe". */
+  const unsure = (p: number) => () =>
+    Response.json({
+      message: { content: 'unsafe\nS1' },
+      logprobs: [
+        {
+          token: 'unsafe',
+          logprob: Math.log(p),
+          top_logprobs: [
+            { token: 'unsafe', logprob: Math.log(p) },
+            { token: 'safe', logprob: Math.log(1 - p) },
+            { token: 'S', logprob: -9 },
+          ],
+        },
+      ],
+    });
+
+  it('withholds an answer paragraph only when the guard is sure it is unsafe', async () => {
+    const ask = (p: number) =>
+      createOllamaModerationProvider({ ...guardBase, fetch: fakeFetch(unsure(p)) }).classify(
+        { role: 'assistant', text: 'para' },
+        new AbortController().signal,
+      );
+    expect(await ask(0.52)).toEqual({ flagged: false });
+    expect(await ask(0.69)).toEqual({ flagged: false });
+    expect(await ask(0.7)).toEqual({ flagged: true, categories: ['S1'] });
+    expect(await ask(0.98)).toEqual({ flagged: true, categories: ['S1'] });
+  });
+
+  it('keeps the top answer when Ollama returns no probabilities', async () => {
+    const provider = createOllamaModerationProvider({
+      ...guardBase,
+      fetch: fakeFetch(() => Response.json({ message: { content: 'unsafe\nS1' } })),
+    });
+    expect(
+      await provider.classify({ role: 'assistant', text: 'para' }, new AbortController().signal),
+    ).toEqual({ flagged: true, categories: ['S1'] });
+  });
+
+  it('keeps the top answer for user messages, and asks for no probabilities', async () => {
+    const captured: Captured[] = [];
+    const provider = createOllamaModerationProvider({
+      ...guardBase,
+      fetch: fakeFetch(unsure(0.52), captured),
+    });
+    expect(
+      await provider.classify({ role: 'user', text: 'text' }, new AbortController().signal),
+    ).toEqual({ flagged: true, categories: ['S1'] });
+    expect(captured[0]?.body).not.toHaveProperty('logprobs');
   });
 
   it('fails closed on an unexpected body', async () => {
