@@ -107,7 +107,7 @@ const privateTopic =
  * persona's crisis instruction are the safety layer.
  */
 const accessQuestion =
-  /\b(?:open|opens|opening|reopen\w*|close|closes|closed|closing|shut|shuts|locked|unlocked|accessible|trading|nearest|train times?|timetable|latest train|running|last (?:train|bus|ferry)|next (?:train|bus|ferry)|which (?:train|bus)|trains? to|bus(?:es)? to|ferr(?:y|ies) to|route to|directions to|how (?:do|can) i get to|tallest|highest|how (?:high|tall|deep)|deepest)\b/;
+  /\b(?:open|opens|opening|reopen\w*|close|closes|closed|closing|shut|shuts|locked|unlocked|accessible|trading|serving|nearest|barriers?|lit|get (?:onto|into|to)|train times?|timetable|latest train|running|last (?:train|bus|ferry)|next (?:train|bus|ferry)|which (?:train|bus)|trains? to|bus(?:es)? to|ferr(?:y|ies) to|route to|directions to|how (?:do|can) i get to|tallest|highest|how (?:high|tall|deep)|deepest)\b/;
 
 /** A person named, by a capitalised name or a possessive such as "Priya's". */
 function namesPerson(message: string): boolean {
