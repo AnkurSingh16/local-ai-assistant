@@ -21,8 +21,11 @@ export const routingCaseSchema = z.strictObject({
   /**
    * `dev` cases were used to shape the router; `heldout` cases were written
    * afterwards and never used to change it, so their numbers are the honest ones.
+   * `heldout2` (#57) measures the personal-question rule: public questions that
+   * contain a pronoun, and private people named without one, committed before
+   * any rule change.
    */
-  split: z.enum(['dev', 'heldout']),
+  split: z.enum(['dev', 'heldout', 'heldout2']),
 });
 
 export type RoutingCase = z.infer<typeof routingCaseSchema>;

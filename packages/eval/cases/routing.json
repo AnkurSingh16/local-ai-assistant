@@ -2028,5 +2028,355 @@
     "message": "How do I tell if milk is still good?",
     "needsSearch": false,
     "split": "heldout"
+  },
+  {
+    "id": "routing-291",
+    "category": "public_with_pronoun",
+    "message": "Who won the Champions League final? I missed it.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-292",
+    "category": "public_with_pronoun",
+    "message": "What's the bitcoin price? I want to buy some.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-293",
+    "category": "public_with_pronoun",
+    "message": "What's the weather in Lisbon for my trip tomorrow?",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-294",
+    "category": "public_with_pronoun",
+    "message": "Who is the CEO of Apple? I need it for my essay.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-295",
+    "category": "public_with_pronoun",
+    "message": "What's the latest iPhone model? My contract is up.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-296",
+    "category": "public_with_pronoun",
+    "message": "I'm flying to Madrid tomorrow, is there an air traffic control strike?",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-297",
+    "category": "public_with_pronoun",
+    "message": "My team plays Arsenal tonight, what's the kick-off time?",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-298",
+    "category": "public_with_pronoun",
+    "message": "I want to watch the new Dune film, is it out yet?",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-299",
+    "category": "public_with_pronoun",
+    "message": "What's the euro exchange rate today? I'm changing money.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-300",
+    "category": "public_with_pronoun",
+    "message": "Is GitHub down? My pushes keep failing.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-301",
+    "category": "public_with_pronoun",
+    "message": "Who is the current UK prime minister? I keep forgetting.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-302",
+    "category": "public_with_pronoun",
+    "message": "Did Apple release macOS 16 yet? I want to update my Mac.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-303",
+    "category": "public_with_pronoun",
+    "message": "What are mortgage rates like right now? We're buying a house.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-304",
+    "category": "public_with_pronoun",
+    "message": "I'm going to the Louvre on Monday, is it open?",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-305",
+    "category": "public_with_pronoun",
+    "message": "Has the new Zelda game come out? My son wants it.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-306",
+    "category": "public_with_pronoun",
+    "message": "Who won the election in Japan? I read something about it.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-307",
+    "category": "public_with_pronoun",
+    "message": "What's the score in the cricket? I can't watch.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-308",
+    "category": "public_with_pronoun",
+    "message": "Is there a storm warning for Florida? My parents live there.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-309",
+    "category": "public_with_pronoun",
+    "message": "When is the next SpaceX launch? I'd love to watch it.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-310",
+    "category": "public_with_pronoun",
+    "message": "We're driving to Leeds today, is the M62 closed?",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-311",
+    "category": "public_with_pronoun",
+    "message": "What's the latest news on the rail strikes? I commute by train.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-312",
+    "category": "public_with_pronoun",
+    "message": "How much is a PS5 now? I'm saving up.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-313",
+    "category": "public_with_pronoun",
+    "message": "Who is Real Madrid's manager now? My friend says it changed.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-314",
+    "category": "public_with_pronoun",
+    "message": "What's the price of petrol this week? I need to fill up.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-315",
+    "category": "public_with_pronoun",
+    "message": "Is Netflix raising prices? I want to know before renewing.",
+    "needsSearch": true,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-316",
+    "category": "private_named",
+    "message": "Has Priya's chemo started working if the tumour shrank?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-317",
+    "category": "private_named",
+    "message": "Is Sarah still contagious after chickenpox?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-318",
+    "category": "private_named",
+    "message": "Is Tom still legally married if the divorce papers aren't signed?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-319",
+    "category": "private_named",
+    "message": "Should Ahmed go back to work after his surgery?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-320",
+    "category": "private_named",
+    "message": "Does Grandma Rose need a booster this year?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-321",
+    "category": "private_named",
+    "message": "Is Liam still grounded for missing curfew?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-322",
+    "category": "private_named",
+    "message": "Has Mia's fever gone on too long at five days?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-323",
+    "category": "private_named",
+    "message": "Can Raj still claim the deposit back from his landlord?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-324",
+    "category": "private_named",
+    "message": "Is Jenny's rash something to worry about?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-325",
+    "category": "private_named",
+    "message": "Does Oliver still qualify for free school meals?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-326",
+    "category": "private_named",
+    "message": "Is Emma's pregnancy still considered early at 10 weeks?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-327",
+    "category": "private_named",
+    "message": "Should Carlos tell HR about his diagnosis?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-328",
+    "category": "private_named",
+    "message": "Is Hannah still on probation at work?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-329",
+    "category": "private_named",
+    "message": "Has Ben's anxiety improved if he sleeps better now?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-330",
+    "category": "private_named",
+    "message": "Is Fatima still eligible for the visa after changing jobs?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-331",
+    "category": "private_named",
+    "message": "Can Leo still play football with a sprained ankle?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-332",
+    "category": "private_named",
+    "message": "Is Aunt Maria's blood pressure too high at 150 over 95?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-333",
+    "category": "private_named",
+    "message": "Does Noah still need his inhaler if the cough stopped?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-334",
+    "category": "private_named",
+    "message": "Is Chloe still owed holiday pay after resigning?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-335",
+    "category": "private_named",
+    "message": "Should Daniel still take antibiotics if he feels better?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-336",
+    "category": "private_named",
+    "message": "Has Zara's application been processed yet?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-337",
+    "category": "private_named",
+    "message": "Is Sam still upset about the breakup?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-338",
+    "category": "private_named",
+    "message": "Can Lucy still return the dress after 30 days?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-339",
+    "category": "private_named",
+    "message": "Is Mohammed still contagious with flu?",
+    "needsSearch": false,
+    "split": "heldout2"
+  },
+  {
+    "id": "routing-340",
+    "category": "private_named",
+    "message": "Has Grace's broken wrist healed after six weeks?",
+    "needsSearch": false,
+    "split": "heldout2"
   }
 ]
