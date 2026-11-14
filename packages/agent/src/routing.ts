@@ -79,7 +79,7 @@ const politeWrapper =
  * so accessQuestion below covers the shape as well.
  */
 const distress =
-  /\b(?:(?:don't|do not) want to (?:be here|live|exist)|want (?:it all|everything|my life|the pain) to (?:end|stop)|(?:nobody|no one) (?:would|will|'d) (?:even )?(?:miss|notice|care)|cannot go on|want to (?:disappear|die|vanish|not exist)|(?:not|never) (?:to )?wake up|done with (?:everything|it all|life)|can't (?:go on|take (?:it|this) anymore|do this anymore)|end (?:it all|everything)|no reason to (?:live|go on)|better off (?:dead|without me)|give up on (?:life|everything)|kill myself|hurt myself|self-harm|suicid\w*|overdose)\b/;
+  /\b(?:not going to be (?:around|here)|won't be (?:coming back|around|here)|this is my last (?:night|day)|saying goodbye|tired of living|sleep forever|(?:don't|do not) want to (?:be here|live|exist)|want (?:it all|everything|my life|the pain) to (?:end|stop)|(?:nobody|no one) (?:would|will|'d) (?:even )?(?:miss|notice|care)|cannot go on|want to (?:disappear|die|vanish|not exist)|(?:not|never) (?:to )?wake up|done with (?:everything|it all|life)|can't (?:go on|take (?:it|this) anymore|do this anymore)|end (?:it all|everything)|no reason to (?:live|go on)|better off (?:dead|without me)|give up on (?:life|everything)|kill myself|hurt myself|self-harm|suicid\w*|overdose)\b/;
 
 /** The user or people around them, by pronoun. "us" is checked on the original text, so "the US" is not. */
 const personPronoun =
@@ -102,9 +102,12 @@ const privateTopic =
  * bridge open tonight? This is my last night."), whatever words the distress
  * takes, so such a turn stays local. It costs searches for ordinary trips
  * ("Is the Tate open Sunday? I'm taking my parents"); ADR-0003 gives the cost.
+ * It is still a word list, and the model can choose to search on any turn, so
+ * it narrows a risk rather than closing it: the self-harm rule and the
+ * persona's crisis instruction are the safety layer.
  */
 const accessQuestion =
-  /\b(?:open|opens|opening|close|closes|closed|closing|running|last (?:train|bus|ferry)|next (?:train|bus|ferry)|which (?:train|bus)|trains? to|bus(?:es)? to|ferr(?:y|ies) to|route to|directions to|how (?:do|can) i get to|tallest|highest|how (?:high|tall|deep)|deepest)\b/;
+  /\b(?:open|opens|opening|reopen\w*|close|closes|closed|closing|shut|shuts|locked|unlocked|accessible|trading|nearest|train times?|timetable|latest train|running|last (?:train|bus|ferry)|next (?:train|bus|ferry)|which (?:train|bus)|trains? to|bus(?:es)? to|ferr(?:y|ies) to|route to|directions to|how (?:do|can) i get to|tallest|highest|how (?:high|tall|deep)|deepest)\b/;
 
 /** A person named, by a capitalised name or a possessive such as "Priya's". */
 function namesPerson(message: string): boolean {

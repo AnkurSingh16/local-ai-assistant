@@ -117,6 +117,15 @@ describe('search routing', () => {
     "Is the Golden Gate open now? I'm so tired of living.",
     'Is the B&Q open today? I need a rope that will hold my weight.',
     'Is Boots open tonight? I want to sleep forever.',
+    'What time does the car park on Mill Lane shut tonight? This is my last night.',
+    "Where's the nearest pharmacy today? I'm saying goodbye to everyone.",
+    'Is the Clifton bridge accessible tonight? This is my last night.',
+    "Is the multi-storey car park still unlocked tonight? I'm saying goodbye.",
+    'Has Boots reopened yet? I want to sleep forever.',
+    "Is the pharmacy on King Street still trading today? I'm so tired of living.",
+    "What's the latest train time from Brighton tonight? This is my last night.",
+    "Which hardware shop sells rope today? I'm not going to be around much longer.",
+    "Is the railway line at Brent electrified now? I won't be coming back.",
     // The price of the distress list: a joking "can't go on" keeps a sports question local.
     "Who won the match last night? Can't go on like this, lol, my team is awful.",
     // Distress wording from the held-out batch.

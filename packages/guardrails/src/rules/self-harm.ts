@@ -60,10 +60,11 @@ const warningSigns = [
   /\b(?:i have|i ve got|i ve|there is|there s)? ?no reason (?:left )?(?:for me )?to (?:live|stay alive|keep living)\b(?! in\b)/,
   /\bi (?:want to|wanna) (?:go to sleep|sleep) and never wake up\b/,
   // A means, an amount and an intent together ("enough paracetamol to not wake
-  // up", "the whole box so I don't wake up"). The amount is what separates
-  // these from sleep questions ("what can I take so I don't wake up at 3am?").
-  /\benough (?:\w+ ){0,2}(?:pills|tablets|paracetamol|painkillers|meds|medication|sleeping pills|insulin) to (?:not|never) wake up\b/,
-  /\b(?:take|swallow) (?:all (?:of )?(?:my|the|these|those)|every|the whole (?:box|bottle|pack|packet|lot)|a whole (?:box|bottle|pack|packet)) (?:\w+ ){0,3}so (?:that )?i (?:don t|do not|won t|will not|never) wake up\b/,
+  // up", "the whole box so I don't wake up"), with "wake up" ending the clause.
+  // The amount and the ending separate these from sleep questions ("can I take
+  // all my melatonin so I don't wake up at 3am?").
+  /\benough (?:\w+ ){0,2}(?:pills|tablets|paracetamol|painkillers|meds|medication|sleeping pills|insulin) to (?:not|never) wake up(?=\s*(?:again|ever|anymore|any more)?\s*(?:[.,!?;]|$))/,
+  /\b(?:take|swallow) (?:all (?:of )?(?:my|the|these|those)|every|the whole (?:box|bottle|pack|packet|lot)|a whole (?:box|bottle|pack|packet)) (?:\w+ ){0,3}so (?:that )?i (?:don t|do not|won t|will not|never) wake up(?=\s*(?:again|ever|anymore|any more)?\s*(?:[.,!?;]|$))/,
   /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:my )?(?:goodbye|farewell) (?:letters?|notes?) to (?:my family|everyone|my (?:kids|children|parents|wife|husband|partner|friends))\b/,
   /\bi (?:wrote|ve written|have written|am writing|m writing|left) (?:a |my )?suicide notes?\b/,
 ];
