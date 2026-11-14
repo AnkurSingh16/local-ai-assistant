@@ -19,14 +19,11 @@ export const routingCaseSchema = z.strictObject({
   message: z.string().min(1).max(500),
   needsSearch: z.boolean(),
   /**
-   * `dev` cases were used to shape the router; `heldout` cases were written
-   * afterwards and never used to change it, so their numbers are the honest ones.
-   * `heldout2` (#57) measures the personal-question rule: public questions that
-   * contain a pronoun, and private people named without one, committed before
-   * any rule change. `heldout3` was written after `heldout2` had been seen and
-   * before the change it measures, so it is the honest test of that change.
+   * `dev` cases were used to shape the router, including two batches written
+   * for #57. `heldout` and `heldout4` were each written after the rule they
+   * measure and never used to change it, so their numbers are the honest ones.
    */
-  split: z.enum(['dev', 'heldout', 'heldout2', 'heldout3']),
+  split: z.enum(['dev', 'heldout', 'heldout4']),
 });
 
 export type RoutingCase = z.infer<typeof routingCaseSchema>;
