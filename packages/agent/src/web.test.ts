@@ -54,6 +54,7 @@ describe('search routing', () => {
     'Who won the Champions League final? I missed it.',
     'My team plays Arsenal tonight, what is the kick-off time?',
     'Is Netflix raising prices? I want to know before renewing.',
+    'Can you tell me who won the match last night?',
   ])('searches first for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(true);
   });
@@ -102,6 +103,17 @@ describe('search routing', () => {
     'Is Tom still legally married if the divorce papers are not signed?',
     "I'm going to jump off a bridge tonight. Which bridge is high enough?",
     "What's the latest I can drink coffee and still sleep?",
+    // Distress anywhere in the message keeps the turn away from search (#57 review).
+    'Is the Severn Bridge still open tonight? I want to disappear.',
+    'Is Boots open tonight? I need enough paracetamol to not wake up.',
+    "Which train passes Brent station tonight? I'm done with everything.",
+    // Private topics with a time word, about the user or a named person.
+    'Is my son still being bullied at school today?',
+    "Is my mum's dementia getting worse this year?",
+    'Is the abortion clinic in Leeds open tomorrow? I need to go.',
+    'Is the food bank on King Street open today? We have nothing to eat.',
+    'Is Rahul still in rehab?',
+    "Has Aisha's asylum case been decided yet?",
   ])('does not force a search for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(false);
   });

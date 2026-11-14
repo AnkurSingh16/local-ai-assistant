@@ -66,6 +66,19 @@ const weakLiveState =
   /\b(?:costs?|prices?|pricing|expensive|cheapest|cheaper|(?:interest|mortgage|inflation) rates?|temperature|still|has (?:[\w' ]{1,40} )?(?:come out|been released|launched|held|ended|started|finished|changed)|delays?|cancell?ed|closed)\b/;
 /** A question addressed to the assistant ("how are you feeling today?"): small talk, never searched. */
 const toAssistant = /\b(?:you|your|you're|yourself)\b/;
+/** Polite wrappers ("can you tell me who won?") ask for facts, not about the assistant. */
+const politeWrapper =
+  /\b(?:can|could|would|will) you (?:please )?(?:tell me|find out|check|look up|let me know)\b|\bdo you know\b/g;
+
+/**
+ * Distress in any part of the message ("…tonight? I want to disappear").
+ * Such a turn is never searched: a search would hand opening times or routes
+ * to someone who may be at risk, and the query prompt would strip the warning
+ * sign out. The guard answers the clear cases with crisis resources; this
+ * catches vaguer ones it lets through (#57 review).
+ */
+const distress =
+  /\b(?:want to (?:disappear|die|vanish|not exist)|(?:not|never) (?:to )?wake up|done with (?:everything|it all|life)|can't (?:go on|take (?:it|this) anymore|do this anymore)|end (?:it all|everything)|no reason to (?:live|go on)|better off (?:dead|without me)|give up on (?:life|everything)|kill myself|hurt myself|self-harm|suicid\w*|overdose)\b/;
 
 /** The user or people around them, by pronoun. "us" is checked on the original text, so "the US" is not. */
 const personPronoun =
@@ -79,7 +92,7 @@ const personPronoun =
  * on the routing eval's personal batches (ADR-0003, #57).
  */
 const privateTopic =
-  /\b(?:pain|ache|lump|rash|fever|cough|symptoms?|diagnos\w*|chemo\w*|cancer|tumou?r|pregnan\w*|period|contagious|infect\w*|surgery|operation|wound|bleeding|injur\w*|sprain\w*|broken (?:wrist|arm|leg|bone|ankle)|knee|blood (?:pressure|test)|temperature (?:of|is|too)|memory loss|medic(?:ation|ine)s?|tablets|pills?|antibiotics?|antidepressants?|inhaler|booster|vaccin\w*|therapy|therapist|anxiety|panic attacks?|depress\w*|allerg\w*|dose|prescription|doctor|gp|hospital|heal(?:ed|ing)?|recover\w*|love|feelings for|ex|boyfriend|girlfriend|husband|wife|partner|divorce\w*|married|marriage|separated|breakup|break-up|upset|angry|argument|grounded|curfew|lonely|grief|left home alone|visa|deposit|landlord|tenant|eviction|rights to|custody|probation|holiday pay|sick pay|owed|salary|fired|resign\w*|hr|boss|eligible|qualify|claim|benefits?|grant|school meals|application|refund|receipt|return (?:the|her|his|my)|still good|suicid\w*|kill (?:myself|himself|herself)|jump off|end (?:my|his|her) life|self-harm|hurt (?:myself|himself|herself)|overdose|sad|cheer (?:me )?up|feel(?:ing)? (?:down|low)|mood|(?:my|our) (?:department|company|office|school|class|family|workplace|manager|boss))\b/;
+  /\b(?:pain|ache|lump|rash|fever|cough|symptoms?|diagnos\w*|chemo\w*|cancer|tumou?r|pregnan\w*|period|contagious|infect\w*|surgery|operation|wound|bleeding|injur\w*|sprain\w*|broken (?:wrist|arm|leg|bone|ankle)|knee|blood (?:pressure|test)|temperature (?:of|is|too)|memory loss|medic(?:ation|ine)s?|tablets|pills?|antibiotics?|antidepressants?|inhaler|booster|vaccin\w*|therapy|therapist|anxiety|panic attacks?|depress\w*|allerg\w*|dose|prescription|doctor|gp|hospital|heal(?:ed|ing)?|recover\w*|love|feelings for|ex|boyfriend|girlfriend|husband|wife|partner|divorce\w*|married|marriage|separated|breakup|break-up|upset|angry|argument|grounded|curfew|lonely|grief|left home alone|visa|deposit|landlord|tenant|eviction|rights to|custody|probation|holiday pay|sick pay|owed|salary|fired|resign\w*|hr|boss|eligible|qualify|claim|benefits?|grant|school meals|application|refund|receipt|return (?:the|her|his|my)|still good|bull(?:y|ied|ying)|dementia|alzheimer'?s?|ivf|fertility|miscarriage|abortion|hiv|std|sti|clinic|rehab|addiction|relapse|sober|prison|jail|arrested|court case|probation officer|asylum|immigration status|deport\w*|overdrawn|debt|bankrupt\w*|loan|evicted|homeless|food bank|nothing to eat|gay|lesbian|bisexual|trans(?:gender)?|coming out|sexuality|suicid\w*|kill (?:myself|himself|herself)|jump off|end (?:my|his|her) life|self-harm|hurt (?:myself|himself|herself)|overdose|sad|cheer (?:me )?up|feel(?:ing)? (?:down|low)|mood|(?:my|our) (?:department|company|office|school|class|family|workplace|manager|boss))\b/;
 
 /** A person named, by a capitalised name or a possessive such as "Priya's". */
 function namesPerson(message: string): boolean {
@@ -92,7 +105,8 @@ function namesPerson(message: string): boolean {
  * question private, so "who won the final? I missed it" can still be searched.
  */
 function isPrivate(message: string, text: string): boolean {
-  if (toAssistant.test(text)) return true;
+  if (distress.test(text)) return true;
+  if (toAssistant.test(text.replace(politeWrapper, ''))) return true;
   const person = personPronoun.test(text) || /\bus\b/.test(message) || namesPerson(message);
   return person && privateTopic.test(text);
 }
