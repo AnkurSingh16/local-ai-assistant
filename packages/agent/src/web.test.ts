@@ -46,6 +46,10 @@ describe('search routing', () => {
     'What is the latest version of the game Minecraft?',
     'What is the price of the game Elden Ring?',
     'Latest news of the show Severance',
+    'How expensive is Netflix per month?',
+    'Is Lewis Hamilton still racing for Ferrari?',
+    'Is GitHub down right now?',
+    'Is the US still in NATO?',
   ])('searches first for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(true);
   });
@@ -69,6 +73,25 @@ describe('search routing', () => {
     // A deliberate false negative: the user's employer stays out of search queries.
     'What is the price of the stock of my company?',
     'My app currently uses version 2 of React, how do I add a route?',
+    // Personal and assistant-directed questions stay local whatever words they use.
+    'Is my lump still worth checking if it does not hurt?',
+    'Do I still love him?',
+    'What is the cost of a divorce for my situation?',
+    'Is my visa still valid if I change jobs?',
+    'How are you feeling today?',
+    'Are you happy or sad right now?',
+    // Risky words about nothing named and no time word.
+    'Is it still safe to eat rice left out overnight?',
+    'How expensive is it to learn the piano?',
+    'What is the price elasticity of demand?',
+    'When is the next prime after 97?',
+    'Who leads in a tango?',
+    'Has the meeting started?',
+    // Personal questions stay local under the older rules too.
+    'Who is the head of my department?',
+    'My blood test results came back today, what do they mean?',
+    // A capital that only starts a new sentence is not a name.
+    'Is it still safe to eat? The rice was out overnight.',
   ])('does not force a search for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(false);
   });

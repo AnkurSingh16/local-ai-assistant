@@ -33,6 +33,64 @@ const aboutAText =
 const creativeRequest =
   /\b(?:write|compose|imagine|invent|draft|make up)\b.{0,60}\b(?:story|poem|song|lyrics|essay|script|scene|fiction|tale|letter|dialogue)\b/;
 
+/**
+ * A question asking for facts, as opposed to a request to explain, write or
+ * change something. A time word only forces search inside a question.
+ */
+const factualQuestion =
+  /^(?:\W*)(?:what(?:'s| is| are| was| were| did| does| do| time| films?| movies?)?|who(?:'s| is| are| won| runs| leads)?|when|where|which|is|are|was|were|did|does|do|will|has|have|had|any|how (?:much|many|is|are|did|does|do|\w+ (?:is|are|was|were|will))|can i (?:still )?(?:buy|get|watch|see))\b/;
+/** Requests to explain or produce something, which a time word does not make news. */
+const request =
+  /^(?:\W*)(?:(?:can|could|would) you (?:please )?)?(?:explain|write|help|tell me (?:a|about how)|show|teach|describe|define|summarise|summarize|translate|fix|review|rewrite)\b/;
+/** Questions about the clock or calendar, which get_current_datetime answers without search. */
+const clockQuestion =
+  /\b(?:what(?:'s| is) (?:the )?(?:time|date|day)(?: it)?(?: is it)?|what(?:'s| is) today's (?:date|day)|what day is it|what date is it|what time is it|how many (?:days|weeks|months) (?:until|till|to|since))\b/;
+/** Time words that make a factual question about now or the near future. */
+const nearTime =
+  /\b(?:today|tonight|tomorrow|yesterday|last night|this (?:morning|afternoon|evening|week|weekend|month|year|season)|right now|at the moment|these days|nowadays|so far|as of now|now(?=\s*(?:[?.!,;]|$))|currently|latest|newest|most recent|upcoming|next (?:week|month|year|weekend)|recently)\b/;
+/** Things still pending or scheduled: "is it out yet", "when is the next launch". */
+const pendingOrNext =
+  /\b(?:yet|when (?:is|are|does|do|will) (?:the )?next|what(?:'s| is) next for|next (?:launch|race|match|game|episode|season|election|eclipse|release|event|movie|film))\b/;
+/** Who holds a role, however it is asked. */
+const whoLeads =
+  /\bwho (?:runs|leads|heads|owns|is in charge of|chairs|coaches|manages)\b|\b(?:secretary[- ]general|chief executive|head coach|frontrunner|leader of the opposition)\b/;
+/** Live state that is public by nature: weather, rates, results, outages, availability. */
+const publicLiveState =
+  /\b(?:exchange rate|convert \d[\d,.]* ?(?:[a-z]{3}|dollars?|euros?|pounds?|yen|rupees?) (?:to|into)|how many (?:dollars|euros|pounds|yen|rupees) is|storm warning|weather|forecast|snowing|raining|sunny|how (?:hot|cold|warm) will|who (?:scored|won)|election results?|outage|is (?:\w+ )?down (?:right now|today)|on sale|in stock|sold out|flights? (?:from|to)|tickets? (?:for|to)|updates? (?:on|about)|news (?:on|about))\b/;
+/**
+ * Words that ask about now only when they are about something public: "how
+ * expensive is Netflix" yes, "how expensive is it to learn piano" no. They force
+ * search only next to a time word or a named thing.
+ */
+const weakLiveState =
+  /\b(?:costs?|prices?|pricing|expensive|cheapest|cheaper|(?:interest|mortgage|inflation) rates?|temperature|still|has (?:[\w' ]{1,40} )?(?:come out|been released|launched|held|ended|started|finished|changed)|delays?|cancell?ed|closed)\b/;
+/**
+ * The user, the assistant or people around them. Questions about them stay
+ * local: the broad rules would send a paraphrase of private context ("is my
+ * lump still worth checking", "do I still love him") or small talk with the
+ * assistant to a search engine.
+ */
+const personal =
+  /\b(?:i|i'm|i've|i'd|i'll|me|my|mine|myself|you|your|you're|yourself|we|we're|our|he|she|him|her|his|hers|they're|their)\b/;
+
+/** True for a personal question; "us" counts only in lower case, so "the US" does not. */
+function isPersonal(message: string, text: string): boolean {
+  return personal.test(text) || /\bus\b/.test(message);
+}
+
+/** A capitalised word after the first, other than "I": a named product, place, team or person. */
+function namesSomething(message: string): boolean {
+  const words = message.replace(/[‘’ʼ]/g, "'").split(/\s+/);
+  // A capital that only starts a new sentence ("…eat? The rice was out") is not a name.
+  return words.some(
+    (w, i) =>
+      i > 0 &&
+      !/[.?!]$/.test(words[i - 1] ?? '') &&
+      /^[A-Z][\w'.-]*[a-zA-Z]/.test(w) &&
+      !/^I(?:'\w+)?$/.test(w),
+  );
+}
+
 /** Years from the training cutoff on, written as four digits. */
 function mentionsRecentYear(text: string, currentYear: number): boolean {
   for (const match of text.matchAll(/\b(20\d\d)\b/g)) {
@@ -45,16 +103,36 @@ function mentionsRecentYear(text: string, currentYear: number): boolean {
 /**
  * True when the turn must search first: a question about who holds a role,
  * something that always changes (a price, the weather, who won), a time word
- * with something that changes, or a recent year. "What is a stock", "explain
- * how elections work" and fiction set in a recent year are not forced.
+ * with something that changes, a recent year, or a factual question about the
+ * world that asks about now, what comes next, or the live state of something
+ * named. Questions about the user or the assistant, "what is a stock",
+ * "explain how elections work" and fiction set in a recent year are not forced.
  */
 export function isTimeSensitive(message: string, now: Date): boolean {
   const text = message.toLowerCase().replace(/[‘’ʼ]/g, "'");
   if (aboutAText.test(text)) return false;
+  // Questions about the user, the assistant or people they know stay local
+  // under every rule: a forced query paraphrases the message, so it would carry
+  // private context ("my blood test results came back today") to a search engine.
+  if (isPersonal(message, text)) return false;
   if (currentRoles.test(text)) return true;
   if (alwaysChanging.test(text)) return true;
   if (!creativeRequest.test(text) && mentionsRecentYear(text, now.getUTCFullYear())) return true;
   if (timeWords.test(text) && changingThings.test(text)) return true;
+  // Broader rules, measured on the routing eval (ADR-0003), for factual
+  // questions about the world.
+  const question = factualQuestion.test(text) && !request.test(text) && !clockQuestion.test(text);
+  if (question) {
+    const timeOrName = nearTime.test(text) || namesSomething(message);
+    if (publicLiveState.test(text)) return true;
+    if (nearTime.test(text)) return true;
+    if (timeOrName && (pendingOrNext.test(text) || whoLeads.test(text))) return true;
+    if (timeOrName && weakLiveState.test(text)) return true;
+  }
+  // Price words about a named product ask about now even outside a question.
+  if (namesSomething(message) && /\b(?:cheapest|best price|price of|prices? for)\b/.test(text)) {
+    return true;
+  }
   return /\b(?:latest|today's|current) (?:news|price|score|version|release|results?|weather)\b/.test(
     text,
   );

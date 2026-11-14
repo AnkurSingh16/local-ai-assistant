@@ -1,4 +1,9 @@
-import { createMockEmbeddingProvider } from '@local-ai/providers/mock';
+import { isTimeSensitive } from '@local-ai/agent';
+import {
+  createMockChatProvider,
+  createMockEmbeddingProvider,
+  mockReply,
+} from '@local-ai/providers/mock';
 import { describe, expect, it } from 'vitest';
 
 import { runTurn } from './pipeline.js';
@@ -10,6 +15,14 @@ import {
   scorePairs,
 } from './memory-recall.js';
 import { replayProviders } from './replay.js';
+import {
+  formatRouting,
+  loadRoutingCases,
+  routingDate,
+  routeWithModel,
+  routeWithRules,
+  summariseRouting,
+} from './routing.js';
 import { loadCases, loadFixtures, runReplay } from './run.js';
 import type { RedTeamCase } from './schema.js';
 import { caseCategories } from './schema.js';
@@ -159,6 +172,76 @@ describe('stale fixtures', () => {
     });
     await runTurn(noVerdict, 'hello', timeouts);
     expect(noVerdict.stale()).toBe(true);
+  });
+});
+
+describe('routing eval (rules pre-router)', () => {
+  const cases = loadRoutingCases();
+  const summary = (split: 'dev' | 'heldout') =>
+    summariseRouting(routeWithRules(cases.filter((c) => c.split === split)));
+
+  it('has a labelled set with both kinds of question in each split', () => {
+    for (const split of ['dev', 'heldout'] as const) {
+      const s = summary(split);
+      expect(s.positives).toBeGreaterThanOrEqual(30);
+      expect(s.negatives).toBeGreaterThanOrEqual(30);
+    }
+  });
+
+  // Floors on the dev set only, at the level measured on 2026-11-14, so a rule
+  // change that loses recall or starts sending ordinary or private questions to
+  // search fails CI. The held-out set is reported, never a target.
+  it('keeps dev recall and unneeded searches at what was measured', () => {
+    expect(summary('dev').recall).toBeGreaterThanOrEqual(0.95);
+    expect(summary('dev').falsePositiveRate).toBe(0);
+  });
+
+  it('never forces a search for a red-team input', () => {
+    // The recorded red-team answers assume no forced search; a router change
+    // that forces one would make the replay stale without failing it.
+    const forced = loadCases().filter((c) => isTimeSensitive(c.input, routingDate));
+    expect(forced.map((c) => c.id)).toEqual([]);
+  });
+});
+
+describe('routing eval with a model', () => {
+  it('counts a forced search, a search the model chooses, and an answer without one', async () => {
+    const forced = await routeWithModel(
+      createMockChatProvider({ reply: (req) => mockReply('bitcoin price', req) }),
+      'What is the bitcoin price today?',
+      5000,
+    );
+    const chosen = await routeWithModel(
+      createMockChatProvider({
+        reply: () => [
+          { type: 'tool_call', call: { name: 'web_search', arguments: { query: 'x' } } },
+          { type: 'done', finishReason: 'tool_calls', usage: { promptTokens: 1, outputTokens: 1 } },
+        ],
+      }),
+      'Tell me about a topic.',
+      5000,
+    );
+    const answered = await routeWithModel(
+      createMockChatProvider({ reply: (req) => mockReply('Paris.', req) }),
+      'What is the capital of France?',
+      5000,
+    );
+    expect([forced, chosen, answered]).toEqual(['searched', 'searched', 'answered']);
+  });
+
+  it('formats a summary with misses and unneeded searches', () => {
+    const [first, second] = loadRoutingCases().filter((c) => c.split === 'heldout');
+    if (first === undefined || second === undefined) throw new Error('no cases');
+    const text = formatRouting(
+      'Title',
+      summariseRouting([
+        { case: { ...first, needsSearch: true }, searched: false },
+        { case: { ...second, needsSearch: false }, searched: true },
+      ]),
+    );
+    expect(text).toContain('Recall: 0.0% (0 of 1)');
+    expect(text).toContain('missed');
+    expect(text).toContain('unneeded');
   });
 });
 

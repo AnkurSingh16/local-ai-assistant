@@ -188,6 +188,16 @@ export async function runLive(
   return { scores, fixtures, newParagraphs, outages, retried };
 }
 
+/** The live chat provider, for other live runs such as the routing eval. */
+export function createLiveChat(config: LiveConfig): ChatProvider {
+  return createOllamaChatProvider({
+    baseUrl: config.baseUrl,
+    model: config.chatModel,
+    keepAlive: '30m',
+    fetch: config.fetch,
+  });
+}
+
 /** The live embedding provider, for the memory recall eval. */
 export function createLiveEmbeddings(config: LiveConfig, model: string): EmbeddingProvider {
   return createOllamaEmbeddingProvider({
