@@ -30,12 +30,22 @@ export interface MemoryEntry {
   readonly id: string;
   readonly content: string;
   readonly createdAt: string;
+  /** Used in every answer, not only related ones; I set this for things like allergies. */
+  readonly always: boolean;
 }
 
 export type FeedbackKind = 'feedback' | 'correction' | 'preference';
 
 const memorySchema = z.object({
-  items: z.array(z.object({ id: z.string(), content: z.string(), createdAt: z.string() })),
+  items: z.array(
+    z.object({
+      id: z.string(),
+      content: z.string(),
+      createdAt: z.string(),
+      // Absent from an older API, which had no always-on items.
+      always: z.boolean().default(false),
+    }),
+  ),
 });
 
 export interface AccountClientOptions {

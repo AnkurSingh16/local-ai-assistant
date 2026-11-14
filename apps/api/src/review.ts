@@ -9,7 +9,12 @@ import { createMemoryRepo, createReviewRepo, openDatabase } from '@local-ai/stor
 import { z } from 'zod';
 
 import { loadConfig } from './config.js';
-import { createReviewer, paraphraseProblem } from './learning.js';
+import {
+  approvalMessage,
+  createReviewer,
+  paraphraseProblem,
+  parseApproveArgs,
+} from './learning.js';
 
 /**
  * `npm run review`: my review queue (ADR-0009). Only items I approve become
@@ -17,6 +22,7 @@ import { createReviewer, paraphraseProblem } from './learning.js';
  *
  *   npm run review                       list pending items
  *   npm run review -- approve <id>       approve (preferences and corrections become memory)
+ *   npm run review -- approve <id> --always   approve as memory used in every prompt (allergies, health)
  *   npm run review -- reject <id>
  *   npm run review -- promote <id> <category> <expect> "<paraphrase>"
  */
@@ -60,8 +66,11 @@ async function main(): Promise<void> {
           `${item.id}  ${item.kind.padEnd(10)}  ${item.content.replace(/\s+/g, ' ').slice(0, 120)}\n`,
         );
       }
-    } else if (command === 'approve' && args[0] !== undefined) {
-      process.stdout.write(`${await reviewer.approve(args[0], signal)}\n`);
+    } else if (command === 'approve') {
+      const parsed = parseApproveArgs(args);
+      if ('error' in parsed) throw new Error(parsed.error);
+      const outcome = await reviewer.approve(parsed.id, signal, { always: parsed.always });
+      process.stdout.write(`${approvalMessage(outcome, parsed.always)}\n`);
     } else if (command === 'reject' && args[0] !== undefined) {
       process.stdout.write((await reviewer.reject(args[0])) ? 'rejected\n' : 'not_found\n');
     } else if (command === 'promote' && args.length === 4) {
@@ -86,7 +95,7 @@ async function main(): Promise<void> {
       );
     } else {
       process.stdout.write(
-        'Usage: npm run review -- [list | approve <id> | reject <id> | promote <id> <category> <expect> "<paraphrase>"]\n',
+        'Usage: npm run review -- [list | approve <id> [--always] | reject <id> | promote <id> <category> <expect> "<paraphrase>"]\n',
       );
       process.exitCode = 1;
     }

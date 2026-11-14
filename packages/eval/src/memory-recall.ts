@@ -13,7 +13,14 @@ import { z } from 'zod';
  * similarity cannot find them, and that limit is reported separately.
  */
 const setSchema = z.strictObject({
-  items: z.array(z.strictObject({ id: z.string(), text: z.string().min(1) })),
+  items: z.array(
+    z.strictObject({
+      id: z.string(),
+      text: z.string().min(1),
+      /** Marked always-on at approval, as I would mark an allergy (#55). */
+      always: z.boolean(),
+    }),
+  ),
   messages: z.array(
     z.strictObject({
       id: z.string(),
@@ -44,6 +51,7 @@ export interface ScoredPair {
   readonly split: 'dev' | 'heldout';
   readonly messageId: string;
   readonly itemId: string;
+  readonly always: boolean;
   readonly relevant: boolean;
   readonly score: number;
 }
@@ -69,6 +77,7 @@ export async function scorePairs(
       pairs.push({
         split: m.split,
         itemId: item.id,
+        always: item.always,
         relevant: m.relevant.includes(item.id),
         messageId: m.id,
         score: cosineSimilarity(messageVectors[mi] ?? empty, itemVectors[ii] ?? empty),
@@ -97,14 +106,21 @@ export function atThreshold(
   pairs: readonly ScoredPair[],
   threshold: number,
   topK = Number.POSITIVE_INFINITY,
+  withAlways = false,
 ): ThresholdResult {
+  // With `withAlways`, always-on items are kept for every message, as the API
+  // does; without it, every item competes on similarity alone.
+  const isAlways = (p: ScoredPair): boolean => withAlways && p.always;
   const byMessage = new Map<string, ScoredPair[]>();
-  for (const p of pairs.filter((x) => x.score >= threshold)) {
+  for (const p of pairs.filter((x) => !isAlways(x) && x.score >= threshold)) {
     byMessage.set(p.messageId, [...(byMessage.get(p.messageId) ?? []), p]);
   }
-  const kept = [...byMessage.values()].flatMap((list) =>
-    list.sort((a, b) => b.score - a.score).slice(0, topK),
-  );
+  const kept = [
+    ...pairs.filter(isAlways),
+    ...[...byMessage.values()].flatMap((list) =>
+      list.sort((a, b) => b.score - a.score).slice(0, topK),
+    ),
+  ];
   const relevant = pairs.filter((p) => p.relevant).length;
   const hits = kept.filter((p) => p.relevant).length;
   const recall = relevant === 0 ? 1 : hits / relevant;
@@ -127,4 +143,31 @@ export function bestThreshold(
     if (r.f1 > best.f1) best = r;
   }
   return best;
+}
+
+/** For each always-on item, how many of the messages that need it would get it by similarity alone. */
+export function alwaysItemCoverage(
+  pairs: readonly ScoredPair[],
+  threshold: number,
+  topK: number,
+): { readonly itemId: string; readonly bySimilarity: number; readonly needed: number }[] {
+  const kept = new Set<string>();
+  const byMessage = new Map<string, ScoredPair[]>();
+  for (const p of pairs.filter((x) => x.score >= threshold)) {
+    byMessage.set(p.messageId, [...(byMessage.get(p.messageId) ?? []), p]);
+  }
+  for (const list of byMessage.values()) {
+    for (const p of list.sort((a, b) => b.score - a.score).slice(0, topK)) {
+      kept.add(`${p.messageId}/${p.itemId}`);
+    }
+  }
+  const ids = [...new Set(pairs.filter((p) => p.always).map((p) => p.itemId))];
+  return ids.map((itemId) => {
+    const needed = pairs.filter((p) => p.itemId === itemId && p.relevant);
+    return {
+      itemId,
+      needed: needed.length,
+      bySimilarity: needed.filter((p) => kept.has(`${p.messageId}/${p.itemId}`)).length,
+    };
+  });
 }

@@ -538,8 +538,11 @@ describe('sessions and conversation memory', () => {
       url: '/v1/me/memory',
       headers: { host, cookie },
     });
-    const items = (JSON.parse(list.body) as { items: { id: string; content: string }[] }).items;
+    const items = (
+      JSON.parse(list.body) as { items: { id: string; content: string; always: boolean }[] }
+    ).items;
     expect(items.map((i) => i.content)).toEqual(['Call me Sam.', 'Prefers metric units.']);
+    expect(items.map((i) => i.always)).toEqual([false, false]);
 
     const first = items[0]?.id ?? '';
     expect(

@@ -39,7 +39,7 @@ async function ask(text: string): Promise<void> {
 }
 
 function fakeAccount(
-  items: { id: string; content: string; createdAt: string }[],
+  items: { id: string; content: string; createdAt: string; always: boolean }[],
   feedbackFails = false,
 ) {
   const calls: string[] = [];
@@ -212,7 +212,7 @@ describe('answer blocks', () => {
 describe('memory view', () => {
   it('lists what is remembered, with the disclosure, and forgets one item', async () => {
     const { account, calls } = fakeAccount([
-      { id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00Z' },
+      { id: 'm1', content: 'Call me Sam.', createdAt: '2026-11-13T00:00:00Z', always: false },
     ]);
     render(<App client={fakeClient(() => events([]))} account={account} />);
     await userEvent.click(screen.getByRole('button', { name: 'What I remember' }));
@@ -223,6 +223,21 @@ describe('memory view', () => {
       expect(screen.queryByText('Call me Sam.')).not.toBeInTheDocument();
     });
     expect(calls).toEqual(['forget m1']);
+  });
+
+  it('labels an always-on item', async () => {
+    const { account } = fakeAccount([
+      {
+        id: 'm2',
+        content: 'Allergic to peanuts.',
+        createdAt: '2026-11-13T00:00:00Z',
+        always: true,
+      },
+    ]);
+    render(<App client={fakeClient(() => events([]))} account={account} />);
+    await userEvent.click(screen.getByRole('button', { name: 'What I remember' }));
+    expect(await screen.findByText('Allergic to peanuts.')).toBeInTheDocument();
+    expect(screen.getByText(/used in every answer/)).toBeInTheDocument();
   });
 
   it('asks before deleting everything', async () => {

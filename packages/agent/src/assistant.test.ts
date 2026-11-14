@@ -297,6 +297,21 @@ describe('prompt budget', () => {
     expect(Object.values(slots).reduce((a, b) => a + b, 0)).toBe(numCtx);
   });
 
+  it('skips a memory item that does not fit, so a short one after it still arrives', async () => {
+    const guard = createInputGuard({ moderation: createMockModerationProvider(), timeoutMs: 1000 });
+    const verdict = await guard.check('Hello', new AbortController().signal);
+    if (!verdict.ok) throw new Error('expected a pass');
+    const messages = buildMessages(
+      verdict.text,
+      false,
+      [],
+      ['https://example.com/'.repeat(60), "I'm allergic to peanuts."],
+    );
+    const memory = messages?.find((m) => m.content.startsWith('Things this user asked'));
+    expect(memory?.content).toContain('allergic to peanuts');
+    expect(memory?.content).not.toContain('example.com');
+  });
+
   it('refuses to build a prompt over the user slot', async () => {
     const guard = createInputGuard({ moderation: createMockModerationProvider(), timeoutMs: 1000 });
     const verdict = await guard.check('`' + 'x'.repeat(2400) + '`', new AbortController().signal);

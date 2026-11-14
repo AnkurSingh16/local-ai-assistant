@@ -69,6 +69,7 @@ export function registerSessionRoutes(app: FastifyInstance, deps: AppDeps): void
         id: m.id,
         content: m.content,
         createdAt: m.createdAt.toISOString(),
+        always: m.always,
       })),
     });
   });

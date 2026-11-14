@@ -50,3 +50,5 @@ Measured with `qwen2.5:7b` on Ollama 0.40.15, 2026-11-12:
 - `<|im_start|>`, `<|im_end|>`, `<tool_call>`, `</tool_call>` and `<|endoftext|>` inside user content were each tokenised as one special token, and a forged system turn inside a user message made the model reply "PWNED".
 - Ollama's default context is 4,096 tokens: https://docs.ollama.com/faq (accessed 2026-11-12).
 - Bing turn caps after long-session drift: https://blogs.bing.com/search/february-2023/The-new-Bing-Edge-Updates-to-Chat (accessed 2026-11-12).
+
+**Amended 2026-11-14.** The 400-token memory slot holds always-on items first, then the most similar items (ADR-0001 amendment of 2026-11-14). Always-on items may use at most half of it, which approval enforces. An item that does not fit is skipped rather than ending the list.
