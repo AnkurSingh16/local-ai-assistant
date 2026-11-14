@@ -19,6 +19,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('127.0.0.1'),
   PORT: z.coerce.number().int().min(1).max(65535).default(8787),
+  /** The web dev server's port; the doctor checks it and the default allowed origins follow it. */
+  WEB_PORT: z.coerce.number().int().min(1).max(65535).default(5173),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   /** `mock` runs the deterministic providers, for end-to-end tests and demos without Ollama. */
   PROVIDERS: z.enum(['ollama', 'mock']).default('ollama'),
@@ -46,7 +48,7 @@ const envSchema = z.object({
   /** Host headers accepted, as host:port. Defaults to localhost and 127.0.0.1 on PORT. */
   ALLOWED_HOSTS: csv.optional(),
   /** Browser origins allowed to call the API. Defaults to the Vite dev server. */
-  ALLOWED_ORIGINS: csv.default(['http://localhost:5173', 'http://127.0.0.1:5173']),
+  ALLOWED_ORIGINS: csv.optional(),
   RATE_LIMIT_PER_IP: positiveInt.default(60),
   RATE_LIMIT_PER_SESSION: positiveInt.default(20),
   RATE_LIMIT_WINDOW_MS: positiveInt.default(600_000),
@@ -58,6 +60,7 @@ export interface Config {
   readonly nodeEnv: 'development' | 'test' | 'production';
   readonly host: string;
   readonly port: number;
+  readonly webPort: number;
   readonly logLevel: string;
   readonly providers: 'ollama' | 'mock';
   readonly ollamaBaseUrl: string;
@@ -101,6 +104,7 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>): 
     nodeEnv: e.NODE_ENV,
     host: e.HOST,
     port: e.PORT,
+    webPort: e.WEB_PORT,
     logLevel: e.LOG_LEVEL,
     providers: e.PROVIDERS,
     ollamaBaseUrl: e.OLLAMA_BASE_URL,
@@ -115,7 +119,10 @@ export function parseConfig(env: Readonly<Record<string, string | undefined>>): 
     guardWarmTimeoutMs: e.GUARD_WARM_TIMEOUT_MS,
     turnTimeoutMs: e.TURN_TIMEOUT_MS,
     allowedHosts: e.ALLOWED_HOSTS ?? [`localhost:${String(e.PORT)}`, `127.0.0.1:${String(e.PORT)}`],
-    allowedOrigins: e.ALLOWED_ORIGINS,
+    allowedOrigins: e.ALLOWED_ORIGINS ?? [
+      `http://localhost:${String(e.WEB_PORT)}`,
+      `http://127.0.0.1:${String(e.WEB_PORT)}`,
+    ],
     rateLimitPerIp: e.RATE_LIMIT_PER_IP,
     rateLimitPerSession: e.RATE_LIMIT_PER_SESSION,
     rateLimitWindowMs: e.RATE_LIMIT_WINDOW_MS,
