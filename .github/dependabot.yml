@@ -18,6 +18,9 @@ updates:
         update-types: ['version-update:semver-major']
       # Expo and React Native require one exact React version, pinned in the root
       # overrides; React moves together with an Expo SDK upgrade, never alone.
+      # This also stops Dependabot security PRs for React: npm audit in CI fails
+      # on a React advisory, and the fix comes by hand with an Expo patch or by
+      # raising the override. Revisit these entries at each Expo SDK upgrade.
       - dependency-name: 'react'
       - dependency-name: 'react-dom'
     groups:
