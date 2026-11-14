@@ -1,6 +1,6 @@
 import { createAssistant } from '@local-ai/agent';
 import type { ManualClock } from '@local-ai/core';
-import { createManualClock } from '@local-ai/core';
+import { createManualClock, ProviderError } from '@local-ai/core';
 import type { SseEvent } from '@local-ai/contract';
 import { sseEventSchema } from '@local-ai/contract';
 import {
@@ -111,7 +111,7 @@ async function harness(
         rules: createOutputRules({ systemPrompt: 'Test persona.' }),
       }),
       newId,
-      turnTimeoutMs: 5000,
+      turnTimeoutMs: config.turnTimeoutMs,
       clock,
       ...(conversations === undefined ? {} : { conversations }),
     }),
@@ -264,6 +264,33 @@ describe('request checks', () => {
     expect(hints).toContain('ALLOWED_HOSTS=evil.example:8787');
     expect(hints).toContain('ALLOWED_ORIGINS=http://localhost:3000');
     expect(hints).toContain('docs/local-setup.md#troubleshooting');
+  });
+
+  it('logs what to do when the chat model is not answering', async () => {
+    const { app, logs } = await harness({
+      chat: {
+        calls: [],
+        chat: () => ({
+          [Symbol.asyncIterator]: () => ({
+            next: () => Promise.reject(new ProviderError('unavailable')),
+          }),
+        }),
+      },
+    });
+    const res = await post(app, { message: 'Hello' });
+    expect(res.body).toContain('model_unavailable');
+    const hint = logs.find((l) => l.includes('"problem":"chat_model_unavailable"')) ?? '';
+    expect(hint).toContain('ollama pull');
+  });
+
+  it('logs what to do when a turn runs past its time limit', async () => {
+    const { app, logs } = await harness({
+      env: { TURN_TIMEOUT_MS: '50' },
+      chat: createMockChatProvider({ delayMs: 2000 }),
+    });
+    await post(app, { message: 'Hello' });
+    const hint = logs.find((l) => l.includes('"problem":"turn_timeout"')) ?? '';
+    expect(hint).toContain('TURN_TIMEOUT_MS (50 ms)');
   });
 
   it('logs what to do when the safety model does not answer', async () => {

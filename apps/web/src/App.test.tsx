@@ -79,6 +79,17 @@ describe('web app', () => {
     expect(screen.queryByText('Writing…')).not.toBeInTheDocument();
   });
 
+  it('offers suggestions on an empty conversation that send the question', async () => {
+    const client = fakeClient(() => events(fixtureTurns.answered ?? []));
+    render(<App client={client} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Write a haiku about autumn rain' }));
+    expect(screen.getByLabelText('You')).toHaveTextContent('Write a haiku about autumn rain');
+    expect(client.bodies[0]?.message).toBe('Write a haiku about autumn rain');
+    expect(
+      screen.queryByRole('heading', { name: 'How can I help today?' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('lists cited sources as numbered links that open safely', async () => {
     render(<App client={fakeClient(() => events(fixtureTurns.answered ?? []))} />);
     await userEvent.type(screen.getByLabelText('Message'), 'Hi{Enter}');
