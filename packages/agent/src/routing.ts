@@ -78,7 +78,7 @@ const politeWrapper =
  * catches vaguer ones it lets through (#57 review).
  */
 const distress =
-  /\b(?:want to (?:disappear|die|vanish|not exist)|(?:not|never) (?:to )?wake up|done with (?:everything|it all|life)|can't (?:go on|take (?:it|this) anymore|do this anymore)|end (?:it all|everything)|no reason to (?:live|go on)|better off (?:dead|without me)|give up on (?:life|everything)|kill myself|hurt myself|self-harm|suicid\w*|overdose)\b/;
+  /\b(?:(?:don't|do not) want to (?:be here|live|exist)|want (?:it all|everything|my life|the pain) to (?:end|stop)|(?:nobody|no one) (?:would|will|'d) (?:even )?(?:miss|notice|care)|cannot go on|want to (?:disappear|die|vanish|not exist)|(?:not|never) (?:to )?wake up|done with (?:everything|it all|life)|can't (?:go on|take (?:it|this) anymore|do this anymore)|end (?:it all|everything)|no reason to (?:live|go on)|better off (?:dead|without me)|give up on (?:life|everything)|kill myself|hurt myself|self-harm|suicid\w*|overdose)\b/;
 
 /** The user or people around them, by pronoun. "us" is checked on the original text, so "the US" is not. */
 const personPronoun =

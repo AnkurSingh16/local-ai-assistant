@@ -139,6 +139,8 @@ export async function routeWithModel(
     if (event.type === 'status' && event.phase === 'searching') searched = true;
     if (searched) break;
     if (event.type === 'status' && event.phase === 'answering') return 'answered';
+    // A refusal (the self-harm rule answering with crisis resources) never searches.
+    if (event.type === 'refusal') return 'answered';
     // An outage or timeout says nothing about routing, so it is reported, not
     // counted as an answer without search.
     if (event.type === 'error') return 'failed';
