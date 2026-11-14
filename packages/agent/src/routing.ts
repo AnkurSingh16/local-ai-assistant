@@ -47,7 +47,7 @@ const clockQuestion =
   /\b(?:what(?:'s| is) (?:the )?(?:time|date|day)(?: it)?(?: is it)?|what(?:'s| is) today's (?:date|day)|what day is it|what date is it|what time is it|how many (?:days|weeks|months) (?:until|till|to|since))\b/;
 /** Time words that make a factual question about now or the near future. */
 const nearTime =
-  /\b(?:today|tonight|tomorrow|yesterday|last night|this (?:morning|afternoon|evening|week|weekend|month|year|season)|right now|at the moment|these days|nowadays|so far|as of now|now(?=\s*(?:[?.!,;]|$))|currently|latest|newest|most recent|upcoming|next (?:week|month|year|weekend)|recently)\b/;
+  /\b(?:today|tonight|tomorrow|yesterday|last night|this (?:morning|afternoon|evening|week|weekend|month|year|season)|right now|at the moment|these days|nowadays|so far|as of now|now(?=\s*(?:[?.!,;]|$))|(?<!\b(?:i'm|i am|i|we're|we are|they're|it's|it is) )currently(?! (?:use|uses|using|run|runs|running|on|have|has|installed|working)\b)|latest(?! (?:i|you|we|time|hour)\b)|newest|most recent|upcoming|next (?:week|month|year|weekend)|recently)\b/;
 /** Things still pending or scheduled: "is it out yet", "when is the next launch". */
 const pendingOrNext =
   /\b(?:yet|when (?:is|are|does|do|will) (?:the )?next|what(?:'s| is) next for|next (?:launch|race|match|game|episode|season|election|eclipse|release|event|movie|film))\b/;
@@ -64,18 +64,73 @@ const publicLiveState =
  */
 const weakLiveState =
   /\b(?:costs?|prices?|pricing|expensive|cheapest|cheaper|(?:interest|mortgage|inflation) rates?|temperature|still|has (?:[\w' ]{1,40} )?(?:come out|been released|launched|held|ended|started|finished|changed)|delays?|cancell?ed|closed)\b/;
-/**
- * The user, the assistant or people around them. Questions about them stay
- * local: the broad rules would send a paraphrase of private context ("is my
- * lump still worth checking", "do I still love him") or small talk with the
- * assistant to a search engine.
- */
-const personal =
-  /\b(?:i|i'm|i've|i'd|i'll|me|my|mine|myself|you|your|you're|yourself|we|we're|our|he|she|him|her|his|hers|they're|their)\b/;
+/** A question addressed to the assistant ("how are you feeling today?"): small talk, never searched. */
+const toAssistant = /\b(?:you|your|you're|yourself)\b/;
+/** Polite wrappers ("can you tell me who won?") ask for facts, not about the assistant. */
+const politeWrapper =
+  /\b(?:can|could|would|will) you (?:please )?(?:tell me|find out|check|look up|let me know)\b|\bdo you know\b/g;
 
-/** True for a personal question; "us" counts only in lower case, so "the US" does not. */
-function isPersonal(message: string, text: string): boolean {
-  return personal.test(text) || /\bus\b/.test(message);
+/**
+ * Distress in any part of the message ("…tonight? I want to disappear").
+ * Such a turn is never searched: a search would hand opening times or routes
+ * to someone who may be at risk, and the query prompt would strip the warning
+ * sign out. The guard answers the clear cases with crisis resources; this
+ * catches vaguer ones it lets through. A phrase list always misses new wording,
+ * so accessQuestion below covers the shape as well.
+ */
+const distress =
+  /\b(?:not going to be (?:around|here)|won't be (?:coming back|around|here)|this is my last (?:night|day)|saying goodbye|tired of living|sleep forever|(?:don't|do not) want to (?:be here|live|exist)|want (?:it all|everything|my life|the pain) to (?:end|stop)|(?:nobody|no one) (?:would|will|'d) (?:even )?(?:miss|notice|care)|cannot go on|want to (?:disappear|die|vanish|not exist)|(?:not|never) (?:to )?wake up|done with (?:everything|it all|life)|can't (?:go on|take (?:it|this) anymore|do this anymore)|end (?:it all|everything)|no reason to (?:live|go on)|better off (?:dead|without me)|give up on (?:life|everything)|kill myself|hurt myself|self-harm|suicid\w*|overdose)\b/;
+
+/** The user or people around them, by pronoun. "us" is checked on the original text, so "the US" is not. */
+const personPronoun =
+  /\b(?:i|i'm|i've|i'd|i'll|me|my|mine|myself|we|we're|our|he|she|him|her|his|hers|they're|their)\b/;
+
+/**
+ * Health, relationships, feelings and personal legal, work or money matters.
+ * Asked about a person, these stay local: a forced query paraphrases the
+ * message, so it would carry private context ("is my lump still worth
+ * checking", "has Priya's chemo started working") to a search engine. Measured
+ * on the routing eval's personal batches (ADR-0003, #57).
+ */
+const privateTopic =
+  /\b(?:pain|ache|lump|rash|fever|cough|symptoms?|diagnos\w*|chemo\w*|cancer|tumou?r|pregnan\w*|period|contagious|infect\w*|surgery|operation|wound|bleeding|injur\w*|sprain\w*|broken (?:wrist|arm|leg|bone|ankle)|knee|blood (?:pressure|test)|temperature (?:of|is|too)|memory loss|medic(?:ation|ine)s?|tablets|pills?|antibiotics?|antidepressants?|inhaler|booster|vaccin\w*|therapy|therapist|anxiety|panic attacks?|depress\w*|allerg\w*|dose|prescription|doctor|gp|hospital|heal(?:ed|ing)?|recover\w*|love|feelings for|ex|boyfriend|girlfriend|husband|wife|partner|divorce\w*|married|marriage|separated|breakup|break-up|upset|angry|argument|grounded|curfew|lonely|grief|left home alone|visa|deposit|landlord|tenant|eviction|rights to|custody|probation|holiday pay|sick pay|owed|salary|fired|resign\w*|hr|boss|eligible|qualify|claim|benefits?|grant|school meals|application|refund|receipt|return (?:the|her|his|my)|still good|bull(?:y|ied|ying)|dementia|alzheimer'?s?|ivf|fertility|miscarriage|abortion|hiv|std|sti|clinic|rehab|addiction|relapse|sober|prison|jail|arrested|court case|probation officer|asylum|immigration status|deport\w*|overdrawn|debt|bankrupt\w*|loan|evicted|homeless|food bank|nothing to eat|gay|lesbian|bisexual|trans(?:gender)?|coming out|sexuality|suicid\w*|kill (?:myself|himself|herself)|jump off|end (?:my|his|her) life|self-harm|hurt (?:myself|himself|herself)|overdose|sad|cheer (?:me )?up|feel(?:ing)? (?:down|low)|mood|(?:my|our) (?:department|company|office|school|class|family|workplace|manager|boss))\b/;
+
+/**
+ * Whether a place or a way to get somewhere is open, closed or running, or how
+ * high or deep something is. Asked together with something about the asker,
+ * this is the shape of asking for access to a means of self-harm ("Is the
+ * bridge open tonight? This is my last night."), whatever words the distress
+ * takes, so such a turn stays local. It costs searches for ordinary trips
+ * ("Is the Tate open Sunday? I'm taking my parents"); ADR-0003 gives the cost.
+ * It is still a word list, and the model can choose to search on any turn, so
+ * it narrows a risk rather than closing it: the self-harm rule and the
+ * persona's crisis instruction are the safety layer.
+ */
+const accessQuestion =
+  /\b(?:open|opens|opening|reopen\w*|close|closes|closed|closing|shut|shuts|locked|unlocked|accessible|trading|serving|nearest|barriers?|lit|get (?:onto|into|to)|train times?|timetable|latest train|running|last (?:train|bus|ferry)|next (?:train|bus|ferry)|which (?:train|bus)|trains? to|bus(?:es)? to|ferr(?:y|ies) to|route to|directions to|how (?:do|can) i get to|tallest|highest|how (?:high|tall|deep)|deepest)\b/;
+
+/** A person named, by a capitalised name or a possessive such as "Priya's". */
+function namesPerson(message: string): boolean {
+  return namesSomething(message) || /\b[A-Z][a-z]+'s\b/.test(message.replace(/[‘’ʼ]/g, "'"));
+}
+
+/**
+ * True for a question that must stay local: one addressed to the assistant, or
+ * one about a person on a private topic. A pronoun alone no longer makes a
+ * question private, so "who won the final? I missed it" can still be searched.
+ */
+function isPrivate(message: string, text: string): boolean {
+  if (distress.test(text)) return true;
+  if (accessQuestion.test(text) && (personPronoun.test(text) || /\bus\b/.test(message)))
+    return true;
+  if (toAssistant.test(text.replace(politeWrapper, ''))) return true;
+  const person = personPronoun.test(text) || /\bus\b/.test(message) || namesPerson(message);
+  return person && privateTopic.test(text);
+}
+
+/** Clauses of a message, so a question that follows a statement is still found. */
+function clauses(text: string): string[] {
+  return text.split(/[.?!;]\s+|,\s+/).map((c) => c.trim());
 }
 
 /** A capitalised word after the first, other than "I": a named product, place, team or person. */
@@ -111,17 +166,17 @@ function mentionsRecentYear(text: string, currentYear: number): boolean {
 export function isTimeSensitive(message: string, now: Date): boolean {
   const text = message.toLowerCase().replace(/[‘’ʼ]/g, "'");
   if (aboutAText.test(text)) return false;
-  // Questions about the user, the assistant or people they know stay local
-  // under every rule: a forced query paraphrases the message, so it would carry
-  // private context ("my blood test results came back today") to a search engine.
-  if (isPersonal(message, text)) return false;
+  // Private questions stay local under every rule (see isPrivate).
+  if (isPrivate(message, text)) return false;
   if (currentRoles.test(text)) return true;
   if (alwaysChanging.test(text)) return true;
   if (!creativeRequest.test(text) && mentionsRecentYear(text, now.getUTCFullYear())) return true;
   if (timeWords.test(text) && changingThings.test(text)) return true;
   // Broader rules, measured on the routing eval (ADR-0003), for factual
   // questions about the world.
-  const question = factualQuestion.test(text) && !request.test(text) && !clockQuestion.test(text);
+  const question =
+    clauses(text).some((c) => factualQuestion.test(c) && !request.test(c)) &&
+    !clockQuestion.test(text);
   if (question) {
     const timeOrName = nearTime.test(text) || namesSomething(message);
     if (publicLiveState.test(text)) return true;

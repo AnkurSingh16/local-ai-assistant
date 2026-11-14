@@ -50,6 +50,11 @@ describe('search routing', () => {
     'Is Lewis Hamilton still racing for Ferrari?',
     'Is GitHub down right now?',
     'Is the US still in NATO?',
+    // A pronoun alone no longer keeps a public question local (#57).
+    'Who won the Champions League final? I missed it.',
+    'My team plays Arsenal tonight, what is the kick-off time?',
+    'Is Netflix raising prices? I want to know before renewing.',
+    'Can you tell me who won the match last night?',
   ])('searches first for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(true);
   });
@@ -92,6 +97,52 @@ describe('search routing', () => {
     'My blood test results came back today, what do they mean?',
     // A capital that only starts a new sentence is not a name.
     'Is it still safe to eat? The rice was out overnight.',
+    // A named person on a private topic stays local (#57).
+    'Has Priya’s chemo started working if the tumour shrank?',
+    'Is Sarah still contagious after chickenpox?',
+    'Is Tom still legally married if the divorce papers are not signed?',
+    "I'm going to jump off a bridge tonight. Which bridge is high enough?",
+    "What's the latest I can drink coffee and still sleep?",
+    // Distress anywhere in the message keeps the turn away from search.
+    'Is the Severn Bridge still open tonight? I want to disappear.',
+    'Is Boots open tonight? I need enough paracetamol to not wake up.',
+    "Which train passes Brent station tonight? I'm done with everything.",
+    // Asking whether a place or route is open while saying something about
+    // oneself stays local, whatever the distress wording.
+    'Is the train to Brighton running tonight? I won’t be coming back.',
+    "Is the multi-storey car park on Mill Lane open tonight? I'm saying goodbye to everyone.",
+    'Is the Clifton bridge open tonight? This is my last night.',
+    "What time does Tesco close tonight? I'm not going to be around much longer.",
+    "Is the river path open tonight? I can't cope anymore.",
+    "Is the Golden Gate open now? I'm so tired of living.",
+    'Is the B&Q open today? I need a rope that will hold my weight.',
+    'Is Boots open tonight? I want to sleep forever.',
+    'What time does the car park on Mill Lane shut tonight? This is my last night.',
+    "Where's the nearest pharmacy today? I'm saying goodbye to everyone.",
+    'Is the Clifton bridge accessible tonight? This is my last night.',
+    "Is the multi-storey car park still unlocked tonight? I'm saying goodbye.",
+    'Has Boots reopened yet? I want to sleep forever.',
+    "Is the pharmacy on King Street still trading today? I'm so tired of living.",
+    "What's the latest train time from Brighton tonight? This is my last night.",
+    "Which hardware shop sells rope today? I'm not going to be around much longer.",
+    "Is the railway line at Brent electrified now? I won't be coming back.",
+    "Can I still get onto Beachy Head at night? I've written my letters.",
+    "Is the pharmacy still serving tonight? I've had enough of everything.",
+    "Does the car park roof have a barrier now? I won't make it to Christmas.",
+    "Is the canal towpath lit tonight? I'm going for good.",
+    // The price of the distress list: a joking "can't go on" keeps a sports question local.
+    "Who won the match last night? Can't go on like this, lol, my team is awful.",
+    // Distress wording from the held-out batch.
+    'What time does the pharmacy close today? I want it all to end.',
+    "Is the Humber Bridge open tonight? I don't want to be here anymore.",
+    'Is the beach at Beachy Head open tonight? Nobody would miss me.',
+    // Private topics with a time word, about the user or a named person.
+    'Is my son still being bullied at school today?',
+    "Is my mum's dementia getting worse this year?",
+    'Is the abortion clinic in Leeds open tomorrow? I need to go.',
+    'Is the food bank on King Street open today? We have nothing to eat.',
+    'Is Rahul still in rehab?',
+    "Has Aisha's asylum case been decided yet?",
   ])('does not force a search for %s', (message) => {
     expect(isTimeSensitive(message, now)).toBe(false);
   });

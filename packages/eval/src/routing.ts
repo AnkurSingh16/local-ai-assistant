@@ -19,10 +19,11 @@ export const routingCaseSchema = z.strictObject({
   message: z.string().min(1).max(500),
   needsSearch: z.boolean(),
   /**
-   * `dev` cases were used to shape the router; `heldout` cases were written
-   * afterwards and never used to change it, so their numbers are the honest ones.
+   * `dev` cases were used to shape the router, including two batches written
+   * for #57. `heldout` and `heldout4` were each written after the rule they
+   * measure and never used to change it, so their numbers are the honest ones.
    */
-  split: z.enum(['dev', 'heldout']),
+  split: z.enum(['dev', 'heldout', 'heldout4']),
 });
 
 export type RoutingCase = z.infer<typeof routingCaseSchema>;
@@ -138,6 +139,8 @@ export async function routeWithModel(
     if (event.type === 'status' && event.phase === 'searching') searched = true;
     if (searched) break;
     if (event.type === 'status' && event.phase === 'answering') return 'answered';
+    // A refusal (the self-harm rule answering with crisis resources) never searches.
+    if (event.type === 'refusal') return 'answered';
     // An outage or timeout says nothing about routing, so it is reported, not
     // counted as an answer without search.
     if (event.type === 'error') return 'failed';

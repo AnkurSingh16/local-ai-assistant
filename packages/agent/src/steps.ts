@@ -160,7 +160,9 @@ export async function runToolCalls(ctx: StepContext, calls: readonly ToolCall[])
 }
 
 const queryPrompt =
-  'Write one web search query for the user’s message: at most 12 words, no quotes, no explanation. Reply with the query only.';
+  // The message may say why the user asks ("I'm flying to Madrid tomorrow"); the
+  // query carries only the public facts, so personal context stays local (#57).
+  'Write one web search query for the public facts in the user’s message: at most 12 words, no quotes, no explanation. Leave out anything about the user or people they know, such as their plans, family, health or the names of private people; keep the names of public figures, places, teams and products. Reply with the query only.';
 
 /**
  * Writes the forced query with the chat model rather than sending the user's
