@@ -44,4 +44,4 @@ The Expo source suggests `expo/fetch` honours `AbortSignal`, but the docs do not
 event: "turn_completed"  finishReason: "aborted"  clientAborted: true  latencyMs: 58622
 ```
 
-The latency covers loading the chat model and the first sentences before I tapped Stop; the turn ended when the phone closed the stream, not when the model finished. So `expo/fetch` does cancel the native stream when its signal is aborted ([#50](https://github.com/AnkurSingh16/local-ai-assistant/issues/50)). I have checked this on iOS only, not on Android.
+The latency covers loading the chat model and the first sentences before I tapped Stop; the turn ended when the phone closed the stream, not when the model finished. In this one run on iOS, `expo/fetch` cancelled the native stream when its signal was aborted ([#50](https://github.com/AnkurSingh16/local-ai-assistant/issues/50)). I have not checked Android.
