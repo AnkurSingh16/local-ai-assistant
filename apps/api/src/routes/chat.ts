@@ -5,12 +5,25 @@ import { once } from 'node:events';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import type { AppDeps } from '../deps.js';
+import type { LogEvent } from '../logging.js';
 import { apiError } from '../http.js';
 import type { TurnSlots } from '../limits.js';
 import { createWindowLimiter } from '../limits.js';
 import { tokenFrom } from '../sessions.js';
 
 const defaultPingIntervalMs = 15_000;
+
+/** What to do when a turn fails for a reason the operator can fix. */
+function hintFor(
+  refusalKind: string | undefined,
+  errorCode: string | undefined,
+): LogEvent | undefined {
+  if (refusalKind === 'unavailable') return { event: 'hint', problem: 'guard_unavailable' };
+  if (errorCode === 'model_unavailable')
+    return { event: 'hint', problem: 'chat_model_unavailable' };
+  if (errorCode === 'timeout') return { event: 'hint', problem: 'turn_timeout' };
+  return undefined;
+}
 
 /**
  * POST /v1/chat answers as Server-Sent Events (ADR-0007). The route sees only
@@ -187,6 +200,8 @@ export function registerChatRoute(app: FastifyInstance, deps: AppDeps, slots: Tu
           latencyMs: Math.round(deps.clock.monotonicMs() - started),
           clientAborted: client.signal.aborted,
         });
+        const hint = hintFor(refusalKind, errorCode);
+        if (hint !== undefined) deps.logEvent(hint);
       }
       return reply;
     },

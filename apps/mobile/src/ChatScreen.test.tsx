@@ -61,6 +61,17 @@ async function ask(text: string): Promise<void> {
   await fireEvent.press(screen.getByRole('button', { name: 'Send' }));
 }
 
+describe('the empty conversation', () => {
+  it('offers suggestions that send the question when tapped', async () => {
+    const { client, transport } = chatWith(fixtureTurns.answered ?? []);
+    await render(<ChatScreen client={client} openUrl={() => undefined} />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Write a haiku about autumn rain' }));
+    expect(await screen.findByLabelText('You: Write a haiku about autumn rain')).toBeTruthy();
+    expect(transport.bodies[0]?.message).toBe('Write a haiku about autumn rain');
+    expect(screen.queryByText('How can I help today?')).toBeNull();
+  });
+});
+
 describe('mobile streaming contract: the shared fixtures render the same as on web', () => {
   it('streams the answered turn into paragraphs and a code block, then lists its source', async () => {
     const { client } = chatWith(fixtureTurns.answered ?? []);

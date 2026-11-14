@@ -1,6 +1,6 @@
 import { createAssistant } from '@local-ai/agent';
 import type { ManualClock } from '@local-ai/core';
-import { createManualClock } from '@local-ai/core';
+import { createManualClock, ProviderError } from '@local-ai/core';
 import type { SseEvent } from '@local-ai/contract';
 import { sseEventSchema } from '@local-ai/contract';
 import {
@@ -111,7 +111,7 @@ async function harness(
         rules: createOutputRules({ systemPrompt: 'Test persona.' }),
       }),
       newId,
-      turnTimeoutMs: 5000,
+      turnTimeoutMs: config.turnTimeoutMs,
       clock,
       ...(conversations === undefined ? {} : { conversations }),
     }),
@@ -254,6 +254,63 @@ describe('request checks', () => {
     const { app } = await harness();
     const res = await post(app, { message: 'Hello' }, { origin: 'http://localhost:3000' });
     expect(res.statusCode).toBe(403);
+  });
+
+  it('logs fixed advice once when a Host or Origin is refused, never the refused value', async () => {
+    const { app, logs } = await harness();
+    await post(app, { message: 'Hello' }, { host: `${marker}.example:8787` });
+    await post(app, { message: 'Hello' }, { host: 'other.example:8787' });
+    await post(app, { message: 'Hello' }, { origin: `http://${marker}.example` });
+    await post(app, { message: 'Hello' }, { origin: 'http://localhost:3000' });
+    const hints = logs.filter((l) => l.includes('"event":"hint"'));
+    expect(hints).toHaveLength(2);
+    expect(hints.join('\n')).toContain('ipconfig getifaddr en0');
+    expect(hints.join('\n')).toContain('docs/local-setup.md#troubleshooting');
+    expect(logs.join('\n')).not.toContain(marker);
+    expect(logs.join('\n')).not.toContain('localhost:3000');
+  });
+
+  it('logs what to do when the chat model is not answering', async () => {
+    const { app, logs } = await harness({
+      chat: {
+        calls: [],
+        chat: () => ({
+          [Symbol.asyncIterator]: () => ({
+            next: () => Promise.reject(new ProviderError('unavailable')),
+          }),
+        }),
+      },
+    });
+    const res = await post(app, { message: 'Hello' });
+    expect(res.body).toContain('model_unavailable');
+    const hint = logs.find((l) => l.includes('"problem":"chat_model_unavailable"')) ?? '';
+    expect(hint).toContain('ollama serve');
+  });
+
+  it('logs what to do when a turn runs past its time limit', async () => {
+    const { app, logs } = await harness({
+      env: { TURN_TIMEOUT_MS: '50' },
+      chat: createMockChatProvider({ delayMs: 2000 }),
+    });
+    await post(app, { message: 'Hello' });
+    const hints = logs.filter((l) => l.includes('"problem":"turn_timeout"'));
+    expect(hints).toHaveLength(1);
+    expect(hints[0]).toContain('TURN_TIMEOUT_MS');
+  });
+
+  it('logs what to do when the safety model does not answer', async () => {
+    const { app, logs } = await harness({
+      moderation: {
+        classify: () => {
+          throw new Error('down');
+        },
+      },
+    });
+    const res = await post(app, { message: 'Hello' });
+    expect(res.body).toContain('"kind":"unavailable"');
+    const hint = logs.find((l) => l.includes('"problem":"guard_unavailable"')) ?? '';
+    expect(hint).toContain('ollama ps');
+    expect(hint).not.toContain('Hello');
   });
 
   it('allows the configured Origin, with CORS headers on the stream', async () => {

@@ -3,11 +3,37 @@ import type { Turn } from '@local-ai/client/react';
 import { useChat } from '@local-ai/client/react';
 import { maxMessageChars } from '@local-ai/contract';
 import type { KeyboardEvent, ReactElement, SyntheticEvent } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Answer } from './Answer.js';
 import { Feedback } from './Feedback.js';
+import {
+  BrainIcon,
+  LinkIcon,
+  LockIcon,
+  Mark,
+  PlusIcon,
+  RetryIcon,
+  SendIcon,
+  StopIcon,
+} from './Icons.js';
 import { MemoryPanel } from './MemoryPanel.js';
+
+/** Starting points for an empty conversation: one needs the web, the rest do not. */
+const suggestions = [
+  'What is the latest version of Node.js?',
+  'Explain how vaccines train the immune system',
+  'Write a haiku about autumn rain',
+  'Help me plan a relaxed weekend in Lisbon',
+];
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
 
 const phaseLabels: Partial<Record<TurnView['phase'], string>> = {
   sending: 'Sending…',
@@ -50,55 +76,78 @@ function TurnItem({
   const retryReady = useRetryReady(view.error?.retryAfterMs);
   return (
     <li className="turn">
-      <div className="question" aria-label="You">
-        {turn.question}
+      <div className="question-row">
+        <div className="question" aria-label="You">
+          {turn.question}
+        </div>
       </div>
-      <div
-        className="reply"
-        aria-label="Assistant"
-        aria-live="polite"
-        aria-busy={label !== undefined}
-      >
-        {view.text !== '' && <Answer text={view.text} />}
-        {view.citations.length > 0 && (
-          <ol className="sources" aria-label="Sources">
-            {view.citations.map((c) => (
-              <li key={c.n} value={c.n}>
-                {/* The contract allows only https URLs here; noopener keeps the opened page from reaching back. */}
-                <a href={c.url} target="_blank" rel="noopener noreferrer">
-                  {c.title === '' ? new URL(c.url).hostname : c.title}
-                </a>
-              </li>
-            ))}
-          </ol>
-        )}
-        {label !== undefined && <p className="status">{label}</p>}
-        {view.truncated && <p className="note">The answer reached its length limit.</p>}
-        {view.refusal !== undefined && (
-          <p className="refusal" role="note">
-            {view.refusal.message}
-          </p>
-        )}
-        {view.error !== undefined && (
-          <div className="error" role="alert">
-            <p>{view.error.message}</p>
-            {view.error.retryable && (
-              <button
-                type="button"
-                disabled={busy || !retryReady}
-                onClick={() => {
-                  onRetry(turn.question);
-                }}
-              >
-                Try again
-              </button>
-            )}
-          </div>
-        )}
-        {view.phase === 'cancelled' && <p className="note">Stopped.</p>}
-        {account !== undefined && view.phase === 'done' && view.text !== '' && (
-          <Feedback account={account} />
-        )}
+      <div className="reply-row">
+        <Mark size={30} />
+        <div
+          className="reply"
+          aria-label="Assistant"
+          aria-live="polite"
+          aria-busy={label !== undefined}
+        >
+          {view.text !== '' && <Answer text={view.text} />}
+          {view.citations.length > 0 && (
+            <ol className="sources" aria-label="Sources">
+              {view.citations.map((c) => (
+                <li key={c.n} value={c.n}>
+                  {/* The contract allows only https URLs here; noopener keeps the opened page from reaching back. */}
+                  <a href={c.url} target="_blank" rel="noopener noreferrer">
+                    <span className="source-n" aria-hidden="true">
+                      {c.n}
+                    </span>
+                    <span className="source-title">{c.title === '' ? hostOf(c.url) : c.title}</span>
+                    <span className="source-host" aria-hidden="true">
+                      <LinkIcon />
+                      {hostOf(c.url)}
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          )}
+          {label !== undefined && (
+            <p className="status">
+              <span className="dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+              {label}
+            </p>
+          )}
+          {view.truncated && <p className="note">The answer reached its length limit.</p>}
+          {view.refusal !== undefined && (
+            <p className="refusal" role="note">
+              {view.refusal.message}
+            </p>
+          )}
+          {view.error !== undefined && (
+            <div className="error" role="alert">
+              <p>{view.error.message}</p>
+              {view.error.retryable && (
+                <button
+                  type="button"
+                  className="btn btn-quiet"
+                  disabled={busy || !retryReady}
+                  onClick={() => {
+                    onRetry(turn.question);
+                  }}
+                >
+                  <RetryIcon />
+                  Try again
+                </button>
+              )}
+            </div>
+          )}
+          {view.phase === 'cancelled' && <p className="note">Stopped.</p>}
+          {account !== undefined && view.phase === 'done' && view.text !== '' && (
+            <Feedback account={account} />
+          )}
+        </div>
       </div>
     </li>
   );
@@ -116,6 +165,15 @@ export function App({
   const [draft, setDraft] = useState('');
   const [showMemory, setShowMemory] = useState(false);
   const end = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
+
+  // The box grows with the text, up to about eight lines, then scrolls.
+  useEffect(() => {
+    const box = input.current;
+    if (box === null) return;
+    box.style.height = 'auto';
+    box.style.height = `${String(Math.min(box.scrollHeight, 220))}px`;
+  }, [draft]);
 
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' });
@@ -136,44 +194,72 @@ export function App({
     }
   };
 
+  const ask = (question: string): void => {
+    if (chat.busy) return;
+    void chat.send(question);
+  };
+
+  // Stable, so the panel's Escape listener is not re-added on every streamed token.
+  // The opener is kept here, before the header turns inert and the browser
+  // moves focus away from it, so closing can give focus back.
+  const memoryOpener = useRef<HTMLButtonElement>(null);
+  const closeMemory = useCallback(() => {
+    setShowMemory(false);
+    // After the commit that removes inert, or the button cannot take focus.
+    setTimeout(() => {
+      memoryOpener.current?.focus();
+    }, 0);
+  }, []);
+  // The memory drawer is modal: the rest of the page cannot be reached behind it.
+  const behind = account !== undefined && showMemory;
+
   return (
-    <main className="app">
-      <header>
-        <h1>Local AI Assistant</h1>
-        <p className="subtitle">
-          Runs on this computer. Answers can be wrong; check anything important.
-        </p>
-        {chat.turns.length > 0 && (
-          <button
-            type="button"
-            className="link"
-            disabled={chat.busy}
-            onClick={() => {
-              chat.reset();
-            }}
-          >
-            New conversation
-          </button>
-        )}
-        {account !== undefined && (
-          <button
-            type="button"
-            className="link"
-            aria-expanded={showMemory}
-            onClick={() => {
-              setShowMemory((v) => !v);
-            }}
-          >
-            What I remember
-          </button>
-        )}
+    <div className="shell">
+      <header className="topbar" inert={behind}>
+        <div className="brand">
+          <Mark size={30} />
+          <div>
+            <h1>Local AI Assistant</h1>
+            <p className="badge">
+              <LockIcon />
+              Private · runs on this computer
+            </p>
+          </div>
+        </div>
+        <div className="actions top-actions">
+          {chat.turns.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={chat.busy}
+              onClick={() => {
+                chat.reset();
+              }}
+            >
+              <PlusIcon />
+              <span className="btn-label">New conversation</span>
+            </button>
+          )}
+          {account !== undefined && (
+            <button
+              type="button"
+              ref={memoryOpener}
+              className="btn btn-ghost"
+              aria-expanded={showMemory}
+              onClick={() => {
+                setShowMemory((v) => !v);
+              }}
+            >
+              <BrainIcon />
+              <span className="btn-label">What I remember</span>
+            </button>
+          )}
+        </div>
       </header>
       {account !== undefined && showMemory && (
         <MemoryPanel
           account={account}
-          onClose={() => {
-            setShowMemory(false);
-          }}
+          onClose={closeMemory}
           onDeletedEverything={() => {
             chat.reset();
             // A fresh session, so the next conversation is remembered again.
@@ -181,48 +267,92 @@ export function App({
           }}
         />
       )}
-      <ol className="turns" aria-label="Conversation">
-        {chat.turns.map((turn) => (
-          <TurnItem
-            key={turn.id}
-            turn={turn}
-            busy={chat.busy}
-            account={account}
-            onRetry={(q) => void chat.send(q)}
-          />
-        ))}
-      </ol>
-      <div ref={end} />
-      <form className="composer" onSubmit={submit}>
-        <label htmlFor="message" className="visually-hidden">
-          Message
-        </label>
-        <textarea
-          id="message"
-          value={draft}
-          maxLength={maxMessageChars}
-          rows={3}
-          placeholder="Ask anything"
-          onChange={(e) => {
-            setDraft(e.target.value);
-          }}
-          onKeyDown={onKeyDown}
-        />
-        {chat.busy ? (
-          <button
-            type="button"
-            onClick={() => {
-              chat.stop();
-            }}
-          >
-            Stop
-          </button>
-        ) : (
-          <button type="submit" disabled={draft.trim() === ''}>
-            Send
-          </button>
+      <main className="app" inert={behind}>
+        {chat.turns.length === 0 && (
+          <section className="welcome" aria-labelledby="welcome-title">
+            <Mark size={56} />
+            <h2 id="welcome-title">How can I help today?</h2>
+            <p className="subtitle">
+              Answers come from the model, or from fresh web results with numbered sources when you
+              ask about something recent.
+            </p>
+            <ul className="suggestions" aria-label="Suggestions">
+              {suggestions.map((s) => (
+                <li key={s}>
+                  <button
+                    type="button"
+                    className="suggestion"
+                    onClick={() => {
+                      ask(s);
+                    }}
+                  >
+                    {s}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
-      </form>
-    </main>
+        <ol className="turns" aria-label="Conversation">
+          {chat.turns.map((turn) => (
+            <TurnItem
+              key={turn.id}
+              turn={turn}
+              busy={chat.busy}
+              account={account}
+              onRetry={(q) => void chat.send(q)}
+            />
+          ))}
+        </ol>
+        <div ref={end} />
+      </main>
+      <div className="dock" inert={behind}>
+        <form className="composer" onSubmit={submit}>
+          <label htmlFor="message" className="visually-hidden">
+            Message
+          </label>
+          <textarea
+            id="message"
+            ref={input}
+            value={draft}
+            maxLength={maxMessageChars}
+            rows={1}
+            aria-describedby="composer-hint"
+            placeholder="Ask anything"
+            onChange={(e) => {
+              setDraft(e.target.value);
+            }}
+            onKeyDown={onKeyDown}
+          />
+          {chat.busy ? (
+            <button
+              type="button"
+              className="round round-stop"
+              aria-label="Stop"
+              title="Stop"
+              onClick={() => {
+                chat.stop();
+              }}
+            >
+              <StopIcon />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="round"
+              aria-label="Send"
+              title="Send"
+              disabled={draft.trim() === ''}
+            >
+              <SendIcon />
+            </button>
+          )}
+        </form>
+        <p className="hint" id="composer-hint">
+          Enter to send, Shift + Enter for a new line. Answers can be wrong; check anything
+          important.
+        </p>
+      </div>
+    </div>
   );
 }

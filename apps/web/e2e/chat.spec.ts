@@ -89,6 +89,17 @@ test('sends feedback and shows an empty memory view through the real API', async
   await expect(page.getByText(/deleted for real/)).toBeVisible();
 });
 
+test('the memory drawer takes focus and gives it back on Escape', async ({ page }) => {
+  await page.goto('/');
+  const opener = page.getByRole('button', { name: 'What I remember' });
+  await opener.click();
+  await expect(page.getByRole('dialog', { name: 'What I remember' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Close' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(opener).toBeFocused();
+});
+
 test('starts a new conversation', async ({ page }) => {
   await ask(page, 'First');
   await expect(page.getByLabel('Assistant')).toContainText(mockAnswer);

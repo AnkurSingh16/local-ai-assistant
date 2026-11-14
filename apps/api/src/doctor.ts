@@ -181,7 +181,8 @@ async function main(): Promise<void> {
   const results: CheckResult[] = [
     { ok: true, name: 'Node', detail: process.version },
     await checkPortFree(config.host, config.port, 'API'),
-    await checkPortFree('127.0.0.1', 5173, 'Web'),
+    // The web dev server reads the same variable (apps/web/vite.config.ts).
+    await checkPortFree('127.0.0.1', config.webPort, 'Web'),
   ];
   if (config.providers === 'ollama') {
     results.push(...(await checkOllama(config, (url, init) => fetch(url, init))));

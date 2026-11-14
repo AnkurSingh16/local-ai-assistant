@@ -3,6 +3,8 @@ import { maxFeedbackChars } from '@local-ai/contract';
 import type { ReactElement, SyntheticEvent } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 
+import { MessageIcon } from './Icons.js';
+
 const kindLabels: Record<FeedbackKind, string> = {
   feedback: 'Feedback on this answer',
   correction: 'A correction',
@@ -36,11 +38,12 @@ export function Feedback({ account }: { readonly account: AccountClient }): Reac
     return (
       <button
         type="button"
-        className="link"
+        className="link-button"
         onClick={() => {
           setState('open');
         }}
       >
+        <MessageIcon />
         Send feedback
       </button>
     );
@@ -112,12 +115,16 @@ export function Feedback({ account }: { readonly account: AccountClient }): Reac
         </p>
       )}
       <div className="actions">
-        <button type="submit" disabled={state === 'sending' || text.trim() === ''}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={state === 'sending' || text.trim() === ''}
+        >
           Send
         </button>
         <button
           type="button"
-          className="link"
+          className="btn btn-ghost"
           onClick={() => {
             setState('closed');
           }}

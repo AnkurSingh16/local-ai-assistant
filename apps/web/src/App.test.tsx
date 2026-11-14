@@ -79,6 +79,17 @@ describe('web app', () => {
     expect(screen.queryByText('Writing…')).not.toBeInTheDocument();
   });
 
+  it('offers suggestions on an empty conversation that send the question', async () => {
+    const client = fakeClient(() => events(fixtureTurns.answered ?? []));
+    render(<App client={client} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Write a haiku about autumn rain' }));
+    expect(screen.getByLabelText('You')).toHaveTextContent('Write a haiku about autumn rain');
+    expect(client.bodies[0]?.message).toBe('Write a haiku about autumn rain');
+    expect(
+      screen.queryByRole('heading', { name: 'How can I help today?' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('lists cited sources as numbered links that open safely', async () => {
     render(<App client={fakeClient(() => events(fixtureTurns.answered ?? []))} />);
     await userEvent.type(screen.getByLabelText('Message'), 'Hi{Enter}');
@@ -223,6 +234,23 @@ describe('memory view', () => {
       expect(screen.queryByText('Call me Sam.')).not.toBeInTheDocument();
     });
     expect(calls).toEqual(['forget m1']);
+  });
+
+  it('opens as a modal dialog that takes focus, and gives it back on Escape', async () => {
+    const { account } = fakeAccount([]);
+    render(<App client={fakeClient(() => events([]))} account={account} />);
+    const opener = screen.getByRole('button', { name: 'What I remember' });
+    await userEvent.click(opener);
+    const dialog = screen.getByRole('dialog', { name: 'What I remember' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
+    expect(screen.getByLabelText('Message').closest('[inert]')).not.toBeNull();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(opener).toHaveFocus();
+    });
+    expect(screen.getByLabelText('Message').closest('[inert]')).toBeNull();
   });
 
   it('labels an always-on item', async () => {

@@ -47,7 +47,7 @@ export function Feedback({
           setState('open');
         }}
       >
-        <Text style={styles.link}>Send feedback</Text>
+        <Text style={styles.open}>Send feedback</Text>
       </Pressable>
     );
   }
@@ -112,17 +112,23 @@ export function Feedback({
           accessibilityRole="button"
           accessibilityState={{ disabled: state === 'sending' || text.trim() === '' }}
           disabled={state === 'sending' || text.trim() === ''}
+          style={[
+            styles.button,
+            styles.primary,
+            (state === 'sending' || text.trim() === '') && styles.disabled,
+          ]}
           onPress={() => void send()}
         >
-          <Text style={styles.link}>Submit</Text>
+          <Text style={styles.primaryText}>Submit</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
           onPress={() => {
             setState('closed');
           }}
+          style={styles.button}
         >
-          <Text style={styles.link}>Cancel</Text>
+          <Text style={styles.buttonText}>Cancel</Text>
         </Pressable>
       </View>
     </View>
@@ -130,29 +136,58 @@ export function Feedback({
 }
 
 const styles = StyleSheet.create({
-  form: { marginTop: 8, gap: 6 },
+  open: { color: colors.muted, fontSize: 14, fontWeight: '600', paddingVertical: 4 },
+  form: {
+    marginTop: 4,
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.surface2,
+  },
   kinds: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   kind: {
     borderWidth: 1,
     borderColor: colors.line,
+    backgroundColor: colors.surface,
     borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
-  kindChosen: { backgroundColor: colors.link, borderColor: colors.link },
-  kindText: { color: colors.text },
-  kindChosenText: { color: colors.onLink },
+  kindChosen: { backgroundColor: colors.accent, borderColor: colors.accent },
+  kindText: { color: colors.text, fontSize: 14 },
+  kindChosenText: { color: colors.onAccent, fontSize: 14, fontWeight: '600' },
   input: {
-    minHeight: 44,
+    minHeight: 72,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 8,
-    padding: 8,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 10,
+    fontSize: 15,
     color: colors.text,
+    textAlignVertical: 'top',
   },
-  actions: { flexDirection: 'row', gap: 16 },
-  link: { color: colors.link, textDecorationLine: 'underline', paddingVertical: 6 },
-  note: { color: colors.muted, marginTop: 6 },
-  support: { color: colors.text, fontStyle: 'italic', marginTop: 6 },
-  error: { color: colors.danger },
+  actions: { flexDirection: 'row', gap: 8 },
+  button: {
+    minHeight: 38,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  buttonText: { color: colors.text, fontWeight: '600' },
+  primary: { backgroundColor: colors.accent, borderColor: colors.accent },
+  primaryText: { color: colors.onAccent, fontWeight: '600' },
+  disabled: { opacity: 0.45 },
+  note: { color: colors.muted, fontSize: 14 },
+  support: {
+    color: colors.warnText,
+    backgroundColor: colors.warnBg,
+    borderRadius: 12,
+    padding: 12,
+    overflow: 'hidden',
+  },
+  error: { color: colors.errText },
 });

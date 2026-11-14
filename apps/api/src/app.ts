@@ -55,6 +55,10 @@ export async function createApp(deps: AppDeps): Promise<FastifyInstance> {
         status: 403,
         reason: 'host',
       });
+      deps.logEvent({
+        event: 'hint',
+        problem: 'host_rejected',
+      });
       return apiError(reply, request, 403, 'forbidden', 'This host is not allowed.');
     }
     const origin = request.headers.origin;
@@ -65,6 +69,10 @@ export async function createApp(deps: AppDeps): Promise<FastifyInstance> {
         route: request.routeOptions.url ?? 'unknown',
         status: 403,
         reason: 'origin',
+      });
+      deps.logEvent({
+        event: 'hint',
+        problem: 'origin_rejected',
       });
       return apiError(reply, request, 403, 'forbidden', 'This origin is not allowed.');
     }
