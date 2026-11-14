@@ -13,6 +13,7 @@ updates:
     ignore:
       # The runtime is pinned to Node 24 (package.json engines), so its types
       # stay on 24.x; a major bump would describe APIs the runtime lacks.
+      # Remove this entry in the change that moves to a new Node major.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
     groups:
