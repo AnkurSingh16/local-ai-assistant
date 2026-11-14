@@ -441,6 +441,25 @@ describe('Ollama guard residency', () => {
     expect(await provider.isResident?.(signal)).toBe(true);
   });
 
+  it('counts the guard as resident only at the context size it asks for', async () => {
+    const at = (contextLength: number) =>
+      createOllamaModerationProvider({
+        ...guardBase,
+        fetch: psFetch(() =>
+          Response.json({ models: [{ name: 'llama-guard3:1b', context_length: contextLength }] }),
+        ),
+      });
+    // Loaded by another client at 4096: Ollama would reload it, so it is not warm.
+    expect(await at(4096).isResident?.(signal)).toBe(false);
+    expect(await at(2048).isResident?.(signal)).toBe(true);
+    // An Ollama that does not report the size is matched by name, as before.
+    const unsized = createOllamaModerationProvider({
+      ...guardBase,
+      fetch: psFetch(() => Response.json({ models: [{ name: 'llama-guard3:1b' }] })),
+    });
+    expect(await unsized.isResident?.(signal)).toBe(true);
+  });
+
   it('caps the response size and honours the caller abort', async () => {
     const big = createOllamaModerationProvider({
       ...guardBase,
