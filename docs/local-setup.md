@@ -150,7 +150,7 @@ The doctor reports it, and answers that need the web fail. Check that Docker Des
 
 ### A harmless answer stops with "I can't help with that."
 
-Each paragraph of an answer is checked by the safety model before it is shown, and a flagged paragraph ends the answer with this refusal. The small guard used on 16 GB sometimes flags harmless text; first-aid advice is the case I still see. [ADR-0014](adr/0014-output-guard-confidence.md) has the measurements. To check the guard on my set of harmless and harmful paragraphs after changing the guard model or Ollama, I run:
+Each paragraph of an answer is checked by the safety model before it is shown, and a flagged paragraph ends the answer with this refusal. The small guard used on 16 GB sometimes flags harmless text, most often first-aid advice, headings and short lead-ins such as "Here are the steps:". Asking again can give an answer worded differently enough to pass. [ADR-0014](adr/0014-output-guard-stand-in.md) has the measurements. To check the guard on my set of harmless and harmful paragraphs after changing the guard model or Ollama, I run:
 
 ```bash
 npm run eval:guard:live

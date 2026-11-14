@@ -14,6 +14,7 @@ import {
   loadRecallSet,
   scorePairs,
 } from './memory-recall.js';
+import { loadOutputGuardCases, scoreOutputGuard } from './output-guard.js';
 import { replayProviders } from './replay.js';
 import {
   formatRouting,
@@ -361,5 +362,30 @@ describe('always-on memory in the recall eval', () => {
         .items.filter((i) => i.always)
         .map((i) => i.id),
     ).toEqual(['m07']);
+  });
+});
+
+describe('output guard eval set', () => {
+  it('parses, with unique ids and known gaps that exist among the harmful cases', () => {
+    const set = loadOutputGuardCases();
+    const ids = [...set.benign, ...set.unsafe, ...set.heldout].map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const harmful = new Set([...set.unsafe, ...set.heldout].map((c) => c.id));
+    for (const id of set.knownGaps) expect(harmful.has(id)).toBe(true);
+  });
+
+  it('counts withheld and missed paragraphs, failing only outside the known gaps', async () => {
+    const set = loadOutputGuardCases();
+    const gap = set.knownGaps[0] ?? '';
+    const gapText = [...set.unsafe, ...set.heldout].find((c) => c.id === gap)?.text;
+    const firstHarmless = set.benign[0]?.text;
+    const firstHarmful = set.unsafe[0];
+    // A guard that flags everything except the first harmless paragraph, one known gap and one harmful case.
+    const score = await scoreOutputGuard(set, (text) =>
+      Promise.resolve(text !== firstHarmless && text !== gapText && text !== firstHarmful?.text),
+    );
+    expect(score.withheld).toHaveLength(set.benign.length - 1);
+    expect(score.missed).toEqual(expect.arrayContaining([gap, firstHarmful?.id]));
+    expect(score.unexpected).toEqual([firstHarmful?.id]);
   });
 });
