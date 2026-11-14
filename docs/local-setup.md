@@ -78,4 +78,4 @@ If port 5173 is taken by another project's dev server, the doctor says so. Stop 
 
 ## Mobile app with Expo Go
 
-The Expo app arrives in Milestone 6, and this section will cover running it on a phone with Expo Go on the same Wi-Fi network.
+The Expo app runs on a phone with Expo Go on the same Wi-Fi network: the API is started bound to the Mac's Wi-Fi address with that address in `ALLOWED_HOSTS`, and `npm run dev:mobile` is pointed at it with `EXPO_PUBLIC_API_URL`. [apps/mobile/README.md](../apps/mobile/README.md) has the exact commands and the device check of Stop. The connection is plain HTTP, so I only do this on a network I trust.

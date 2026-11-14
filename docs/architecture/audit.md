@@ -1,6 +1,6 @@
 # Requirements audit
 
-On 2026-11-13, with Milestone 6 merged except its device check, I checked every requirement in [requirements.md](requirements.md) against the code, tests and CI. Each line gives the evidence. Gaps are listed at the end, not hidden.
+I checked every requirement in [requirements.md](requirements.md) against the code, tests and CI, first on 2026-11-13 and again on 2026-11-14 after the follow-up work, with all seven milestones done. Each line gives the evidence. Gaps are listed at the end, not hidden.
 
 ## Fixed decisions
 
@@ -55,6 +55,5 @@ On 2026-11-13, with Milestone 6 merged except its device check, I checked every 
 ## Open gaps
 
 - **Routing recall.** Measured on 2026-11-14: 77% on the newest held-out batch (before two later safety changes; 71% for the rules alone after them) and 70% on the first, against a 95% target. More keyword rules overfit, and a yes/no question to `qwen2.5:7b` did not help, so closing the gap needs a stronger model (ADR-0003 amendments, [production guide](../production.md)). Private questions and distress are kept away from search by keyword lists, which miss wording they do not contain, and by a structural rule that keeps local any question about whether a place or route is open when the asker mentions themselves, at a cost of about 3 points of recall.
-- **Mobile Stop on a device.** The tests show the app aborts the request. Whether `expo/fetch` cancels the native stream still has to be checked on a physical phone ([#50](https://github.com/AnkurSingh16/local-ai-assistant/issues/50)); Milestone 6 stays in progress until then.
 - **The 1B guard's false positives.** 6 of 31 benign look-alikes refused in the last run. The 8B guard needs more RAM than this Mac has spare (ADR-0006); production would use a larger hosted classifier ([production guide](../production.md)).
 - **Memory recall.** The threshold is measured (0.46; ADR-0001 amendment of 2026-11-14) on a small set. Similarity alone missed a peanut allergy for 4 of 5 food questions, so I can mark such items always-on when approving them; a session's always-on items may use at most 200 tokens, which approval enforces. Preferences that apply to every message are still not found by similarity, and I have not measured them.

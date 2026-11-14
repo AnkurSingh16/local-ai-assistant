@@ -43,4 +43,4 @@ Option 3. `POST /v1/chat` returns `text/event-stream`. `packages/contract` defin
 
 - `expo/fetch` streams `response.body` and, in its source, honours `AbortSignal` (the docs do not say so); a device test in Milestone 6 confirms it: https://docs.expo.dev/versions/latest/sdk/expo/ (accessed 2026-11-12).
 
-**Amended 2026-11-13 (Milestone 6).** The device test of `AbortSignal` with `expo/fetch` has not been run yet. It is tracked in [#50](https://github.com/AnkurSingh16/local-ai-assistant/issues/50) and blocks closing Milestone 6.
+**Amended 2026-11-14 (Milestone 6).** The device test of `AbortSignal` with `expo/fetch` passed on an iPhone 16 Pro Max (iOS 27.3 public beta, Expo Go). Tapping Stop mid-answer ended the stream, and the API logged `finishReason: "aborted"` with `clientAborted: true` ([#50](https://github.com/AnkurSingh16/local-ai-assistant/issues/50)). Android is not checked.
