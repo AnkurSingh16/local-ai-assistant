@@ -223,7 +223,7 @@ export function App({
               }}
             >
               <PlusIcon />
-              New conversation
+              <span className="btn-label">New conversation</span>
             </button>
           )}
           {account !== undefined && (
@@ -236,7 +236,7 @@ export function App({
               }}
             >
               <BrainIcon />
-              What I remember
+              <span className="btn-label">What I remember</span>
             </button>
           )}
         </nav>

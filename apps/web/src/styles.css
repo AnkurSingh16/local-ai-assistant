@@ -533,7 +533,21 @@ button:disabled {
   }
 
   .actions .btn {
-    padding: 7px 9px;
+    padding: 8px;
+  }
+
+  /* Icon-only header buttons on narrow screens; the text stays for screen readers. */
+  .actions .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .badge {
+    font-size: 0.6875rem;
   }
 }
 
