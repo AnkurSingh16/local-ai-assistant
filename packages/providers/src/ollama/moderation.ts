@@ -36,7 +36,13 @@ const responseSchema = z.object({ message: z.object({ content: z.string() }) });
 
 /** The part of `GET /api/ps` this needs: which models are loaded. */
 const psSchema = z.object({
-  models: z.array(z.object({ name: z.string(), model: z.string().optional() })),
+  models: z.array(
+    z.object({
+      name: z.string(),
+      model: z.string().optional(),
+      context_length: z.number().optional(),
+    }),
+  ),
 });
 
 /** Ollama reports an untagged model as `name:latest`. */
@@ -91,8 +97,14 @@ export function createOllamaModerationProvider(config: OllamaModerationConfig): 
         parseJsonLine(await readCapped(res.body, maxGuardResponseChars, signal)),
       );
       if (!parsed.success) throw new ProviderError('bad_response', res.status);
+      // Resident means loaded at the context size the guard asks for. Ollama
+      // reloads a model asked for at another size (another client may have
+      // loaded it at 4096), and that reload takes longer than the short warm
+      // deadline, so counting it as warm made every check time out.
       return parsed.data.models.some(
-        (m) => sameModel(m.name, config.model) || sameModel(m.model ?? '', config.model),
+        (m) =>
+          (sameModel(m.name, config.model) || sameModel(m.model ?? '', config.model)) &&
+          (m.context_length === undefined || m.context_length === guardNumCtx),
       );
     },
 
