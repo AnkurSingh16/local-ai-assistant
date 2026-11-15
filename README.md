@@ -12,11 +12,11 @@ It is a demo project, separate from my retrieval-only portfolio chatbot.
 
 ## Limitations
 
-These are measured, not guessed. The full list of gaps is in the [audit](docs/architecture/audit.md#open-gaps).
+These are the limits I hit most often. The full list of open gaps, with how each was measured, is in the [audit](docs/architecture/audit.md#open-gaps).
 
-- **Answers sometimes stop halfway.** The small safety model (`llama-guard3:1b`) checks every paragraph of an answer, and it still flags some harmless ones. When it does, the answer ends with "I can't help with that." In my measurement it withheld 18 of 243 harmless paragraphs, and 3 of 20 live answers to "What is the latest version of Node.js?" were cut off ([ADR-0014](docs/adr/0014-output-guard-stand-in.md)). The fix is a better guard model, and the 8B one does not fit next to the chat model on 16 GB.
-- **Some questions that need fresh information are answered without a search.** Deciding whether to search is done by rules, and they catch 70% to 77% of the questions that need the web, against a 95% target. So roughly one such question in four gets an answer from the model's own knowledge, which may be out of date. More rules overfit, and asking `qwen2.5:7b` to decide did not help, so closing the gap needs a stronger model.
-- **Answers that search the web are slow.** The model reads the search results at a few hundred tokens a second and writes at about 26, so on my M1 Pro a cited answer takes much longer than one from the model's own knowledge. The first question after a pause also waits about 7 seconds while the model loads.
+- **Answers sometimes stop halfway.** The small safety model (`llama-guard3:1b`) checks every paragraph of an answer, and it still flags some harmless ones. When it does, the answer ends with "I can't help with that." On my eval set of answer paragraphs it withheld 18 of 243 harmless ones, and in live use 3 of 20 answers to "What is the latest version of Node.js?" were cut off ([ADR-0014](docs/adr/0014-output-guard-stand-in.md)). The fix is a better guard model, and the 8B one cannot stay loaded next to the chat model on 16 GB.
+- **Some questions that need fresh information are answered without a search.** Deciding whether to search is done by rules, and they catch 70% to 77% of the questions that need the web, against a 95% target. So between one in four and one in three such questions get an answer from the model's own knowledge, which may be out of date. More rules overfit, and asking `qwen2.5:7b` to decide did not help, so closing the gap needs a stronger model.
+- **Answers that search the web are slow.** The model has to read the fetched pages before it writes, and it writes at about 26 tokens a second on my M1 Pro, so a cited answer takes noticeably longer than one from the model's own knowledge. A cold load of the chat model adds about 5 seconds more ([ADR-0006](docs/adr/0006-guard-model-size.md)).
 
 ## Status
 
