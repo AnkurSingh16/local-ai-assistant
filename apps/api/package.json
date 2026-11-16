@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
-    "@fastify/cors": "^11.4.1",
+    "@fastify/cors": "^11.4.3",
     "@fastify/rate-limit": "^11.2.2",
     "@local-ai/agent": "0.0.0",
     "@local-ai/contract": "0.0.0",
